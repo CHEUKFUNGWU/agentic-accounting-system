@@ -1,0 +1,604 @@
+<!doctype html>
+<html lang="zh-HK">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Agentic Accounting — SME / OPC / 個體戶單體三大報表底稿工作區 (shadcn/ui Preview)</title>
+    <style>
+      :root {
+        --background: #ffffff;
+        --foreground: #09090b;
+        --card: #ffffff;
+        --card-foreground: #09090b;
+        --primary: #18181b;
+        --primary-foreground: #fafafa;
+        --secondary: #f4f4f5;
+        --secondary-foreground: #18181b;
+        --muted: #f4f4f5;
+        --muted-foreground: #71717a;
+        --accent: #f4f4f5;
+        --success: #16a34a;
+        --success-bg: #f0fdf4;
+        --success-border: #bbf7d0;
+        --warning: #d97706;
+        --warning-bg: #fffbeb;
+        --warning-border: #fde68a;
+        --border: #e4e4e7;
+        --ring: #18181b;
+        --radius: 0.5rem;
+      }
+      *, *::before, *::after { box-sizing: border-box; }
+      html, body {
+        margin: 0; padding: 0;
+        background-color: #fafafa;
+        color: var(--foreground);
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        font-size: 1rem;
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+      }
+      .tabular-nums { font-variant-numeric: tabular-nums; }
+      .sh-card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+      }
+      .sh-card-header { padding: 1.25rem 1.25rem 0.75rem; display: flex; flex-direction: column; gap: 0.25rem; }
+      .sh-card-title { margin: 0; font-weight: 600; letter-spacing: -0.015em; }
+      .sh-card-desc { margin: 0; color: var(--muted-foreground); }
+      .sh-card-content { padding: 0 1.25rem 1.25rem; }
+      .sh-btn {
+        display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
+        border-radius: calc(var(--radius) - 2px);
+        font-family: inherit; font-size: inherit; font-weight: 500;
+        padding: 0.45rem 0.85rem; cursor: pointer;
+        border: 1px solid transparent; transition: all 0.15s ease;
+      }
+      .sh-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+      .sh-btn-default { background: var(--primary); color: var(--primary-foreground); }
+      .sh-btn-default:hover:not(:disabled) { background: #27272a; }
+      .sh-btn-outline { background: var(--background); color: var(--foreground); border-color: var(--border); }
+      .sh-btn-outline:hover:not(:disabled) { background: var(--accent); }
+      .sh-btn-ghost { background: transparent; color: var(--foreground); }
+      .sh-btn-ghost:hover:not(:disabled) { background: var(--accent); }
+      .sh-badge {
+        display: inline-flex; align-items: center; gap: 0.25rem;
+        border-radius: 9999px; border: 1px solid var(--border);
+        padding: 0.125rem 0.6rem; font-weight: 500; white-space: nowrap;
+      }
+      .sh-badge-default { background: var(--primary); color: var(--primary-foreground); border-color: transparent; }
+      .sh-badge-secondary { background: var(--secondary); color: var(--secondary-foreground); border-color: transparent; }
+      .sh-badge-outline { background: var(--background); color: var(--foreground); }
+      .sh-badge-success { background: var(--success-bg); color: var(--success); border-color: var(--success-border); }
+      .sh-badge-warning { background: var(--warning-bg); color: var(--warning); border-color: var(--warning-border); }
+      .sh-badge-click { cursor: pointer; }
+      .sh-badge-click:hover { background: #e4e4e7; }
+      .sh-tabs-list {
+        display: inline-flex; background: var(--muted); padding: 0.25rem;
+        border-radius: var(--radius); gap: 0.25rem; flex-wrap: wrap;
+      }
+      .sh-tabs-trigger {
+        border: none; background: transparent; color: var(--muted-foreground);
+        font-family: inherit; font-size: inherit; font-weight: 500;
+        padding: 0.4rem 0.8rem; border-radius: calc(var(--radius) - 2px); cursor: pointer;
+      }
+      .sh-tabs-trigger.active {
+        background: var(--background); color: var(--foreground);
+        box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+      }
+      .sh-table-wrap { width: 100%; overflow-x: auto; }
+      .sh-table { width: 100%; border-collapse: collapse; text-align: left; }
+      .sh-table th {
+        padding: 0.6rem 0.75rem; color: var(--muted-foreground); font-weight: 500;
+        border-bottom: 1px solid var(--border); background: #fafafa;
+      }
+      .sh-table td { padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border); }
+      .sh-table tr:hover td { background: rgba(244,244,245,0.5); }
+      .sh-table tr.subtotal td {
+        background: #fafafa; font-weight: 600;
+        border-top: 1px solid var(--border); border-bottom: 2px solid var(--border);
+      }
+      .sh-input, .sh-select {
+        width: 100%; border-radius: calc(var(--radius) - 2px);
+        border: 1px solid var(--border); background: var(--background);
+        padding: 0.45rem 0.75rem; font-family: inherit; font-size: inherit;
+      }
+      .sh-overlay {
+        position: fixed; inset: 0; background: rgba(9,9,11,0.45);
+        backdrop-filter: blur(2px); z-index: 50; display: none; justify-content: flex-end;
+      }
+      .sh-overlay.open { display: flex; }
+      .sh-sheet {
+        width: 100%; max-width: 580px; height: 100vh; background: var(--background);
+        border-left: 1px solid var(--border); padding: 1.5rem; overflow-y: auto;
+        display: flex; flex-direction: column; gap: 1rem;
+      }
+      .sh-dialog-wrap {
+        position: fixed; inset: 0; background: rgba(9,9,11,0.45);
+        backdrop-filter: blur(2px); z-index: 50; display: none;
+        align-items: center; justify-content: center; padding: 1rem;
+      }
+      .sh-dialog-wrap.open { display: flex; }
+      .sh-dialog {
+        width: 100%; max-width: 520px; background: var(--background);
+        border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <script>
+      const ENTITIES = {
+        "AU-OPC-01": { name: "Spark AI Studio Pty Ltd (澳洲一人有限公司)", structure: "OPC_LIMITED", jurisdiction: "AU", standard: "AASB_TIER2", currency: "AUD", taxRate: 0.10, formName: "ATO Business Activity Statement (BAS) & Company Tax", relief: "Small Business Entity (25% Tax Rate + $20k Instant Asset Write-Off)" },
+        "CN-OPC-01": { name: "上海智算一人有限公司 (中國一人有限公司)", structure: "OPC_LIMITED", jurisdiction: "CN", standard: "PRC_SMALL", currency: "CNY", taxRate: 0.13, formName: "金稅四期增值稅及小微企業所得稅申報底稿", relief: "小型微利企業所得稅優惠（應納稅所得額 ≤ 300萬，實際稅負 5%）" },
+        "HK-SME-01": { name: "Pacific Nexus Tech Limited (香港中小企)", structure: "SME_CORP", jurisdiction: "HK", standard: "SME_FRS_HK", currency: "HKD", taxRate: 0.00, formName: "IRD Profits Tax Computation (兩級制利得稅底稿 BIR51)", relief: "首 HKD 200 萬應評稅利潤享 8.25% 兩級制利得稅率" },
+        "SG-OPC-01": { name: "Merlion Autonomous Labs Pte. Ltd. (新加坡一人私企)", structure: "OPC_LIMITED", jurisdiction: "SG", standard: "SFRS_SMALL", currency: "SGD", taxRate: 0.09, formName: "IRAS GST F5 & Form C-S Computation", relief: "新創免稅計畫 SUTE（首 10萬 75% 免稅，次 10萬 50% 免稅）" },
+        "US-SOLE-01": { name: "Griffin Analytics LLC (美國單成員 LLC / 個體戶)", structure: "SOLE_PROPRIETOR", jurisdiction: "US", standard: "US_GAAP", currency: "USD", taxRate: 0.0825, formName: "IRS Schedule C (Form 1040) & State Use Tax", relief: "IRC Sec. 199A QBI 20% 穿透所得扣除與家庭辦公室分攤" },
+        "EU-OPC-01": { name: "rheinAI Cloud UG / GmbH (歐洲一人有限公司)", structure: "OPC_LIMITED", jurisdiction: "EU", standard: "IFRS", currency: "EUR", taxRate: 0.20, formName: "EU VAT Return, VIES Reverse Charge & Corporate Tax", relief: "歐盟跨境 B2B 反向徵收 (Reverse Charge) 進銷項自動對沖" }
+      };
+
+      const STATE = {
+        entityCode: "AU-OPC-01",
+        activeTab: "STATEMENTS",
+        cfMethod: "INDIRECT",
+        drawerWp: null,
+        splitModal: false,
+        ajeModal: false,
+        splitDesc: "Founder Home Office Fibre, Mobile & AI Cloud Server",
+        splitGross: 2200,
+        splitPct: 70,
+        ajeDrCode: "6100",
+        ajeCrCode: "2110",
+        ajeAmt: 1800,
+        ajeMemo: "Month-end accrued external CPA review fee (W/P AA)",
+        ledgers: {}
+      };
+
+      function getLedger(code) {
+        if (!STATE.ledgers[code]) {
+          STATE.ledgers[code] = {
+            splits: 0,
+            locked: false,
+            rows: [
+              { code: "1110", name: "Cash at Bank - Operating Account (銀行存款)", type: "ASSET", wp: "W/P A", open: 85000, opDr: 142000, opCr: 64500, ajeDr: 0, ajeCr: 0 },
+              { code: "1210", name: "Accounts Receivable Control (應收帳款)", type: "ASSET", wp: "W/P B", open: 18000, opDr: 165000, opCr: 142000, ajeDr: 0, ajeCr: 0 },
+              { code: "1420", name: "Prepayments & Input VAT/GST (預付費用及進項稅額)", type: "ASSET", wp: "W/P C", open: 4000, opDr: 6500, opCr: 0, ajeDr: 0, ajeCr: 1500 },
+              { code: "1610", name: "Computer & AI Server Equipment - Cost (固定資產原值)", type: "ASSET", wp: "W/P F", open: 36000, opDr: 12000, opCr: 0, ajeDr: 0, ajeCr: 0 },
+              { code: "1650", name: "Accumulated Depreciation (累計折舊)", type: "ASSET", wp: "W/P F", open: -6000, opDr: 0, opCr: 0, ajeDr: 0, ajeCr: 2000 },
+              { code: "2110", name: "Accounts Payable & Accrued Expenses (應付帳款及應計費用)", type: "LIABILITY", wp: "W/P AA", open: -12000, opDr: 52500, opCr: 58000, ajeDr: 0, ajeCr: 3500 },
+              { code: "2190", name: "Director's Loan / Owner's Current Account (股東/業主往來)", type: "LIABILITY", wp: "W/P DD", open: -15000, opDr: 0, opCr: 0, ajeDr: 0, ajeCr: 0 },
+              { code: "2210", name: "Statutory Taxes Payable - GST/VAT/CIT (應交稅費)", type: "LIABILITY", wp: "W/P CC", open: -10000, opDr: 0, opCr: 15000, ajeDr: 0, ajeCr: 11200 },
+              { code: "3100", name: "Share / Owner Capital & Opening Surplus (實收資本及期初留存)", type: "EQUITY", wp: "W/P EQ", open: -100000, opDr: 0, opCr: 0, ajeDr: 0, ajeCr: 0 },
+              { code: "4100", name: "AI Consulting & SaaS Subscription Revenue (主營業務收入)", type: "REVENUE", wp: "W/P PL-10", open: 0, opDr: 0, opCr: 150000, ajeDr: 0, ajeCr: 0 },
+              { code: "5100", name: "Direct Cloud GPU & LLM API Token Cost (主營業務成本)", type: "EXPENSE", wp: "W/P PL-20", open: 0, opDr: 24000, opCr: 0, ajeDr: 0, ajeCr: 0 },
+              { code: "6100", name: "Operating, Software, Rent & Professional Expenses (管理費用)", type: "EXPENSE", wp: "W/P PL-40", open: 0, opDr: 27500, opCr: 0, ajeDr: 5000, ajeCr: 0 },
+              { code: "6410", name: "Depreciation Expense (折舊費用)", type: "EXPENSE", wp: "W/P F", open: 0, opDr: 0, opCr: 0, ajeDr: 2000, ajeCr: 0 },
+              { code: "7500", name: "Income Tax Expense (所得稅費用)", type: "EXPENSE", wp: "W/P CC", open: 0, opDr: 0, opCr: 0, ajeDr: 11200, ajeCr: 0 }
+            ]
+          };
+        }
+        return STATE.ledgers[code];
+      }
+
+      const f2 = (n) => Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+      function computePack() {
+        const meta = ENTITIES[STATE.entityCode];
+        const ldg = getLedger(STATE.entityCode);
+        const getAdj = (c) => {
+          const r = ldg.rows.find(x => x.code === c);
+          return r.open + r.opDr - r.opCr + r.ajeDr - r.ajeCr;
+        };
+        const rev = -getAdj("4100");
+        const cogs = getAdj("5100");
+        const gp = rev - cogs;
+        const opex = getAdj("6100");
+        const ebitda = gp - opex;
+        const dep = getAdj("6410");
+        const ebt = ebitda - dep;
+        const taxExp = getAdj("7500");
+        const netProfit = ebt - taxExp;
+
+        const cash = getAdj("1110");
+        const ar = getAdj("1210");
+        const prepay = getAdj("1420");
+        const faCost = getAdj("1610");
+        const faAccum = getAdj("1650");
+        const faNbv = faCost + faAccum;
+        const dirNet = getAdj("2190");
+        const dirAsset = dirNet > 0 ? dirNet : 0;
+        const dirLiab = dirNet < 0 ? -dirNet : 0;
+
+        const totalAssets = cash + ar + prepay + dirAsset + faNbv;
+        const ap = -getAdj("2110");
+        const taxPay = -getAdj("2210");
+        const totalLiab = ap + taxPay + dirLiab;
+        const openEq = -getAdj("3100");
+        const totalEq = openEq + netProfit;
+        const totalLE = totalLiab + totalEq;
+
+        const dAr = ar - 18000;
+        const dPrepay = prepay - 4000;
+        const dAp = ap - 12000;
+        const dTax = taxPay - 10000;
+        const cfOp = netProfit + dep - dAr - dPrepay + dAp + dTax;
+        const cfInv = -(faCost - 36000);
+        const cfFin = -(dirNet - (-15000));
+        const netCf = cfOp + cfInv + cfFin;
+
+        const schedules = {
+          "W/P A": { title: "W/P A — 貨幣資金與銀行調節底稿 (Cash & Bank Reconciliation)", gl: f2(cash), agent: "bookkeeper-and-split-agent", tick: "✓ 100% Agreed to External Bank Statement & Cash Flow Statement", note: "已完成全量銀行流水與應收/應付帳款對帳，期末無未達帳項。", items: [["期初銀行存款餘額 (1110)", f2(85000)], ["本期營業/投資/籌資現金淨變動", f2(netCf)], ["期末總帳與銀行對帳單餘額", f2(cash)]] },
+          "W/P B": { title: "W/P B — 應收帳款及帳齡分析底稿 (Accounts Receivable Aging)", gl: f2(ar), agent: "bookkeeper-and-split-agent", tick: "✓ Agreed to AR Sub-ledger (0-30 Days Current)", note: "所有應收帳款帳齡均在 30 天信用期內，無逾期壞帳風險。", items: [["0-30 天內未逾期客戶發票", f2(ar)], ["31-90+ 天逾期帳款", "0.00"]] },
+          "W/P C": { title: "W/P C — 預付費用攤銷與進項稅額留抵底稿 (Prepayments & Input Tax)", gl: f2(prepay), agent: "close-and-workpaper-agent", tick: "✓ Prepaid Amortization AJE Posted & Input GST/VAT Verified", note: "已提列本期預付軟體/保險攤銷 (1,500.00)，並僅針對商用比例申報進項稅額扣抵。", items: [["期初預付與留抵稅額", f2(4000)], ["本期新增商用進項稅額與預付", f2(prepay - 2500)], ["減：月底預付費用攤銷 (AJE)", "-1,500.00"]] },
+          "W/P DD": { title: "W/P DD — 股東/董事往來與公私混用拆帳底稿 (Director Loan / Owner Drawings)", gl: f2(dirNet), agent: "bookkeeper-and-split-agent", tick: dirNet > 0 ? "⚠ 借方佔款警示 (Review AU Div 7A / 新公司法第23條)" : "✓ 貸方餘額 (公司欠創辦人墊款，無資金混同風險)", note: "自動將公私混用開支中的私人比例剔除於損益表之外，轉入 2190 股東/業主往來帳戶。", items: [["期初創辦人墊付公司營運資金 (貸方)", "-15,000.00"], [`本期公私混用拆出之私人開銷 (${ldg.splits} 筆)`, f2(dirNet - (-15000))], ["期末股東/業主往來淨額", f2(dirNet)]] },
+          "W/P F": { title: "W/P F — 固定資產與累計折舊滾動底稿 (Fixed Assets Roll-Forward)", gl: f2(faNbv), agent: "close-and-workpaper-agent", tick: "✓ Agreed to Fixed Asset Register & Cash Flow CapEx", note: "依直線法自動提列本月 AI 伺服器與工作站折舊 (2,000.00 AJE)。", items: [["期末固定資產原值 (1610)", f2(faCost)], ["期末累計折舊 (1650)", f2(faAccum)], ["固定資產帳面淨值 (NBV)", f2(faNbv)]] },
+          "W/P AA": { title: "W/P AA — 應付帳款與月底應計費用底稿 (AP & Accrued Expenses)", gl: f2(ap), agent: "close-and-workpaper-agent", tick: "✓ 3-Way Matched Bills & Month-End Accruals Verified", note: "包含已三單匹配之供應商帳單及月底預提雲端/審計費用。", items: [["應付供應商帳款及應計費用期末餘額", f2(ap)]] },
+          "W/P CC": { title: `W/P CC — ${meta.formName}`, gl: f2(taxPay), agent: "close-and-workpaper-agent", tick: `✓ ${meta.relief}`, note: "自動匯總間接稅（GST/VAT）與企業所得稅提列，並計算稅務專戶建議預留金額。", items: [["本期應稅營業收入", f2(rev)], ["本期應納間接稅淨額 (VAT/GST)", f2(taxPay - taxExp)], ["本期所得稅提列 (Income Tax Provision)", f2(taxExp)], ["期末應交稅費總計 (建議預留稅款)", f2(taxPay)]] },
+          "W/P EQ": { title: "W/P EQ — 實收資本/業主資本與留存收益變動底稿 (Equity Roll-Forward)", gl: f2(totalEq), agent: "close-and-workpaper-agent", tick: "✓ Net Profit from W/P PL Reconciled to Ending Equity", note: "損益表本期淨利自動結轉至期末資產負債表權益項目。", items: [["期初實收資本及未分配利潤", f2(openEq)], ["加：本期損益表結轉淨利 (W/P PL)", f2(netProfit)], ["期末權益總計", f2(totalEq)]] },
+          "W/P PL": { title: "W/P PL — 損益表收入與成本費用截止性測試底稿 (P&L Cut-Off Schedule)", gl: f2(netProfit), agent: "close-and-workpaper-agent", tick: "✓ Cut-off verified; personal expenses excluded", note: "已確認收入截止性測試及月底折舊、預付攤銷與應計費用調整分錄。", items: [["主營業務收入 (W/P PL-10)", f2(rev)], ["主營業務成本 (W/P PL-20)", f2(-cogs)], ["管理及營運費用 (W/P PL-40)", f2(-opex)], ["折舊與所得稅提列", f2(-(dep + taxExp))], ["本期淨利", f2(netProfit)]] }
+        };
+        schedules["W/P PL-10"] = schedules["W/P PL"];
+        schedules["W/P PL-20"] = schedules["W/P PL"];
+        schedules["W/P PL-40"] = schedules["W/P PL"];
+
+        return { meta, ldg, rev, cogs, gp, opex, ebitda, dep, ebt, taxExp, netProfit, cash, ar, prepay, faCost, faAccum, faNbv, dirNet, dirAsset, dirLiab, totalAssets, ap, taxPay, totalLiab, openEq, totalEq, totalLE, dAr, dPrepay, dAp, dTax, cfOp, cfInv, cfFin, netCf, schedules };
+      }
+
+      window.openWp = (wp) => { STATE.drawerWp = wp; render(); };
+      window.closeWp = () => { STATE.drawerWp = null; render(); };
+      window.setTab = (t) => { STATE.activeTab = t; render(); };
+      window.setCf = (m) => { STATE.cfMethod = m; render(); };
+      window.changeEntity = (val) => { STATE.entityCode = val; render(); };
+      window.openSplit = () => { STATE.splitModal = true; render(); };
+      window.closeSplit = () => { STATE.splitModal = false; render(); };
+      window.openAje = () => { STATE.ajeModal = true; render(); };
+      window.closeAje = () => { STATE.ajeModal = false; render(); };
+
+      window.applySplit = () => {
+        const meta = ENTITIES[STATE.entityCode];
+        const ldg = getLedger(STATE.entityCode);
+        const gross = parseFloat(document.getElementById("sp-gross").value) || 2200;
+        const pct = (parseFloat(document.getElementById("sp-pct").value) || 70) / 100;
+        const net = gross / (1 + meta.taxRate);
+        const tax = gross - net;
+        const bizExp = net * pct;
+        const bizTax = tax * pct;
+        const personal = gross - bizExp - bizTax;
+
+        ldg.rows.find(r => r.code === "1110").opCr += gross;
+        ldg.rows.find(r => r.code === "6100").opDr += bizExp;
+        ldg.rows.find(r => r.code === "1420").opDr += bizTax;
+        ldg.rows.find(r => r.code === "2190").opDr += personal;
+        ldg.splits += 1;
+        STATE.splitModal = false;
+        render();
+      };
+
+      window.applyAje = () => {
+        const ldg = getLedger(STATE.entityCode);
+        const dr = document.getElementById("aje-dr").value;
+        const cr = document.getElementById("aje-cr").value;
+        const amt = parseFloat(document.getElementById("aje-amt").value) || 1800;
+        if (dr !== cr && amt > 0) {
+          ldg.rows.find(r => r.code === dr).ajeDr += amt;
+          ldg.rows.find(r => r.code === cr).ajeCr += amt;
+        }
+        STATE.ajeModal = false;
+        render();
+      };
+
+      window.lockPack = () => {
+        getLedger(STATE.entityCode).locked = true;
+        render();
+      };
+
+      function render() {
+        const p = computePack();
+        const cur = p.meta.currency;
+        const sched = STATE.drawerWp ? p.schedules[STATE.drawerWp] : null;
+
+        document.getElementById("app").innerHTML = `
+          <header style="background:#fff;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:30;">
+            <div style="max-width:1440px;margin:0 auto;padding:0.875rem 1.5rem;display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;">
+              <div style="display:flex;align-items:center;gap:0.75rem;">
+                <div style="width:2.1rem;height:2.1rem;border-radius:0.4rem;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;">A</div>
+                <div>
+                  <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+                    <strong>${p.meta.name}</strong>
+                    <span class="sh-badge sh-badge-secondary">${p.meta.structure}</span>
+                    <span class="sh-badge sh-badge-outline">${p.meta.standard}</span>
+                    <span class="sh-badge ${p.ldg.locked ? 'sh-badge-success' : 'sh-badge-warning'}">${p.ldg.locked ? '✓ 已簽核封存 (CPA Locked)' : '待簽核底稿 (Ready for CPA)'}</span>
+                  </div>
+                  <div style="color:var(--muted-foreground);">期間：2026-10 • 貨幣：${cur} • Stateless Streamable HTTP MCP: <code>POST /mcp</code></div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+                <select class="sh-select" style="width:auto;" onchange="changeEntity(this.value)">
+                  ${Object.keys(ENTITIES).map(k => `<option value="${k}" ${k===STATE.entityCode?'selected':''}>${k} • ${ENTITIES[k].name}</option>`).join("")}
+                </select>
+                <button class="sh-btn sh-btn-outline" onclick="openSplit()">+ 公私混用拆帳 (W/P DD)</button>
+                <button class="sh-btn sh-btn-outline" onclick="openAje()">+ 月結調整分錄 (AJE)</button>
+                <button class="sh-btn sh-btn-default" ${p.ldg.locked?'disabled':''} onclick="lockPack()">${p.ldg.locked ? '✓ 底稿已封存' : '簽核封存三大報表底稿'}</button>
+              </div>
+            </div>
+          </header>
+
+          <main style="max-width:1440px;margin:0 auto;padding:1.5rem;">
+            <!-- 4 KPI Cards -->
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem;margin-bottom:1.25rem;">
+              <div class="sh-card">
+                <div class="sh-card-header">
+                  <div style="display:flex;justify-content:space-between;"><span class="sh-card-desc">本期淨利 (Net Profit)</span><span class="sh-badge sh-badge-outline sh-badge-click" onclick="openWp('W/P PL')">W/P PL ↗</span></div>
+                  <h3 class="sh-card-title tabular-nums">${cur} ${f2(p.netProfit)}</h3>
+                </div>
+                <div class="sh-card-content" style="display:flex;justify-content:space-between;color:var(--muted-foreground);">
+                  <span>營收：${cur} ${f2(p.rev)}</span>
+                  <span>淨利率：${((p.netProfit/p.rev)*100).toFixed(1)}%</span>
+                </div>
+              </div>
+
+              <div class="sh-card">
+                <div class="sh-card-header">
+                  <div style="display:flex;justify-content:space-between;"><span class="sh-card-desc">安全可支用現金 (Safe-to-Spend Cash)</span><span class="sh-badge sh-badge-outline sh-badge-click" onclick="openWp('W/P A')">W/P A & CC ↗</span></div>
+                  <h3 class="sh-card-title tabular-nums" style="color:var(--success);">${cur} ${f2(p.cash - p.taxPay)}</h3>
+                </div>
+                <div class="sh-card-content" style="display:flex;justify-content:space-between;color:var(--muted-foreground);">
+                  <span>帳面現金：${f2(p.cash)}</span>
+                  <span>應留稅款：${f2(p.taxPay)}</span>
+                </div>
+              </div>
+
+              <div class="sh-card">
+                <div class="sh-card-header">
+                  <div style="display:flex;justify-content:space-between;"><span class="sh-card-desc">股東/業主往來淨額 (Director Loan)</span><span class="sh-badge ${p.dirAsset>0?'sh-badge-warning':'sh-badge-success'} sh-badge-click" onclick="openWp('W/P DD')">W/P DD ↗</span></div>
+                  <h3 class="sh-card-title tabular-nums">${cur} ${f2(p.dirNet)}</h3>
+                </div>
+                <div class="sh-card-content" style="color:var(--muted-foreground);">
+                  ${p.dirAsset > 0 ? '⚠ 借方佔款（注意 Div 7A / 新公司法第23條風險）' : '✓ 貸方餘額（公司欠創辦人墊款，無資金混同風險）'}
+                </div>
+              </div>
+
+              <div class="sh-card">
+                <div class="sh-card-header">
+                  <div style="display:flex;justify-content:space-between;"><span class="sh-card-desc">三大報表勾稽檢核 (3-Statement Proof)</span><span class="sh-badge sh-badge-success">✓ 100% Balanced</span></div>
+                  <h3 class="sh-card-title tabular-nums">A = L + E • CF = B/S</h3>
+                </div>
+                <div class="sh-card-content" style="color:var(--muted-foreground);">
+                  資產負債表差額：0.00 • 現金流量表差額：0.00
+                </div>
+              </div>
+            </div>
+
+            <!-- Tabs -->
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:0.75rem;">
+              <div class="sh-tabs-list">
+                <button class="sh-tabs-trigger ${STATE.activeTab==='STATEMENTS'?'active':''}" onclick="setTab('STATEMENTS')">1. 單體三大報表底稿 (P&L • B/S • Cash Flow)</button>
+                <button class="sh-tabs-trigger ${STATE.activeTab==='ETB'?'active':''}" onclick="setTab('ETB')">2. 延伸試算表總底稿 (Extended Trial Balance)</button>
+                <button class="sh-tabs-trigger ${STATE.activeTab==='TAX'?'active':''}" onclick="setTab('TAX')">3. 報稅申報與預留稅款底稿 (W/P CC)</button>
+              </div>
+              <span style="color:var(--muted-foreground);">💡 點擊表格內任一 <strong>W/P Ref</strong> 標籤即可滑出底稿明細與 AI Agent 推理鏈</span>
+            </div>
+
+            ${STATE.activeTab === "STATEMENTS" ? `
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(410px,1fr));gap:1rem;">
+                <!-- P&L -->
+                <div class="sh-card">
+                  <div class="sh-card-header">
+                    <div style="display:flex;justify-content:space-between;align-items:center;"><h3 class="sh-card-title">損益表底稿 (Income Statement)</h3><span class="sh-badge sh-badge-secondary sh-badge-click" onclick="openWp('W/P PL')">W/P PL ↗</span></div>
+                    <p class="sh-card-desc">權責發生制 • 私人開銷已由 AI 自動隔離至 W/P DD</p>
+                  </div>
+                  <div class="sh-card-content">
+                    <table class="sh-table tabular-nums">
+                      <thead><tr><th>底稿</th><th>損益項目</th><th style="text-align:right;">金額 (${cur})</th></tr></thead>
+                      <tbody>
+                        <tr><td><span class="sh-badge sh-badge-outline sh-badge-click" onclick="openWp('W/P PL')">W/P PL-10</span></td><td>主營業務收入 (Revenue)</td><td style="text-align:right;">${f2(p.rev)}</td></tr>
+                        <tr><td><span class="sh-badge sh-badge-outline sh-badge-click" onclick="openWp('W/P PL')">W/P PL-20</span></td><td>減：直接雲端與算力成本 (COGS)</td><td style="text-align:right;">${f2(-p.cogs)}</td></tr>
+                        <tr class="subtotal"><td><span class="sh-badge sh-badge-secondary">SUB</span></td><td>毛利 (Gross Profit)</td><td style="text-align:right;">${f2(p.gp)}</td></tr>
+                        <tr><td><span class="sh-badge sh-badge-outline sh-badge-click" onclick="openWp('W/P PL')">W/P PL-40</span></td><td>減：管理及營運費用 (Operating Expenses)</td><td style="text-align:right;">${f2(-p.opex)}</td></tr>
+                        <tr class="subtotal"><td><span class="sh-badge sh-badge-secondary">EBITDA</span></td><td>EBITDA</td><td style="text-align:right;">${f2(p.ebitda)}</td></tr>
+                        <tr><td><span class="sh-badge sh-badge-outline sh-badge-click" onclick="openWp('W/P F')">W/P F</span></td><td>減：折舊及攤銷 (Depreciation AJE)</td><td style="text-align:right;">${f2(-p.dep)}</td></tr>
+                        <tr><td><span class="sh-badge sh-badge-outline sh-badge-click" onclick="openWp('W/P CC')">W/P CC</span></td><td>減：所得稅費用提列 (Income Tax AJE)</td><td style="text-align:right;">${f2(-p.taxExp)}</td></tr>
+                        <tr class="subtotal"><td><span class="sh-badge sh-badge-default sh-badge-click" onclick="openWp('W/P EQ')">W/P EQ</span></td><td>本期淨利 (Net Profit &rarr; 結轉權益)</td><td style="text-align:right;">${f2(p.netProfit)}</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <!-- Balance Sheet -->
+                <div class="sh-card">
+                  <div class="sh-card-header">
+                    <div style="display:flex;justify-content:space-between;align-items:center;"><h3 class="sh-card-title">資產負債表底稿 (Balance Sheet)</h3><span class="sh-badge sh-badge-success">✓ A = L + E</span></div>
+                    <p class="sh-card-desc">每個科目餘額均與子帳本明細底稿 100% 對齊</p>
+                  </div>
+                  <div class="sh-card-content">
+                    <table class="sh-table tabular-nums">
+                      <thead><tr><th>底稿</th><th>資產、負債及權益項目</th><th style="text-align:right;">金額 (${cur})</th></tr></thead>
+                      <tbody>
+                        <tr><td><span class="sh-badge sh-badge-outline sh-badge-click" onclick="openWp('W/P A')">W/P A</span></td><td>貨幣資金 / 銀行存款 (Cash at Bank)</td><td style="text-align:right;">${f2(p.cash)}</td></tr>
+                        <tr><td><span class="sh-badge sh-badge-outline sh-badge-click" onclick="openWp('W/P B')">W/P B</span></td><td>應收帳款淨額 (Accounts Receivable)</td><td style="text-align:right;">${f2(p.ar)}</td></tr>
+                        <tr><td><span class="sh-badge sh-badge-outline sh-badge-click" onclick="openWp('W/P C')">W/P C</span></td><td>預付費用及進項稅額 (Prepayments & Input Tax)</td><td style="text-align:right;">${f2(p.prepay)}</td></tr>
+                        ${p.dirAsset > 0 ? `<tr><td><span class="sh-badge sh-badge-warning sh-badge-click" onclick="openWp('W/P DD')">W/P DD</span></td><td>應收股東/業主往來款 (Due from Owner)</td><td style="text-align:right;">${f2(p.dirAsset)}</td></tr>` : ''}
+                        <tr><td><span class="sh-badge sh-badge-outline sh-badge-click" onclick="openWp('W/P F')">W/P F</span></td><td>固定資產帳面淨值 (Fixed Assets NBV)</td><td style="text-align:right;">${f2(p.faNbv)}</td></tr>
+                        <tr class="subtotal"><td><span class="sh-badge sh-badge-default">TOTAL A</span></td><td>資產總計 (Total Assets)</td><td style="text-align:right;">${f2(p.totalAssets)}</td></tr>
+                        <tr><td><span class="sh-badge sh-badge-outline sh-badge-click" onclick="openWp('W/P AA')">W/P AA</span></td><td>應付帳款及應計費用 (Payables & Accruals)</td><td style="text-align:right;">${f2(p.ap)}</td></tr>
+                        <tr><td><span class="sh-badge sh-badge-outline sh-badge-click" onclick="openWp('W/P CC')">W/P CC</span></td><td>應交稅費 (Statutory Taxes Payable)</td><td style="text-align:right;">${f2(p.taxPay)}</td></tr>
+                        ${p.dirLiab > 0 ? `<tr><td><span class="sh-badge sh-badge-outline sh-badge-click" onclick="openWp('W/P DD')">W/P DD</span></td><td>應付股東/董事往來款 (Director's Loan)</td><td style="text-align:right;">${f2(p.dirLiab)}</td></tr>` : ''}
+                        <tr><td><span class="sh-badge sh-badge-outline sh-badge-click" onclick="openWp('W/P EQ')">W/P EQ</span></td><td>實收資本/業主資本及期初留存</td><td style="text-align:right;">${f2(p.openEq)}</td></tr>
+                        <tr><td><span class="sh-badge sh-badge-outline sh-badge-click" onclick="openWp('W/P PL')">W/P PL</span></td><td>本期淨利結轉 (Current Period Net Profit)</td><td style="text-align:right;">${f2(p.netProfit)}</td></tr>
+                        <tr class="subtotal"><td><span class="sh-badge sh-badge-default">TOTAL L+E</span></td><td>負債及權益總計 (Total Liab. & Equity)</td><td style="text-align:right;">${f2(p.totalLE)}</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <!-- Cash Flow Statement -->
+                <div class="sh-card">
+                  <div class="sh-card-header">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                      <h3 class="sh-card-title">現金流量表底稿 (Cash Flow)</h3>
+                      <div style="display:flex;gap:0.25rem;">
+                        <button class="sh-btn ${STATE.cfMethod==='INDIRECT'?'sh-btn-default':'sh-btn-outline'}" style="padding:0.2rem 0.55rem;" onclick="setCf('INDIRECT')">間接法</button>
+                        <button class="sh-btn ${STATE.cfMethod==='DIRECT'?'sh-btn-default':'sh-btn-outline'}" style="padding:0.2rem 0.55rem;" onclick="setCf('DIRECT')">直接法</button>
+                      </div>
+                    </div>
+                    <p class="sh-card-desc">期末現金自動勾稽資產負債表 <code>W/P A</code></p>
+                  </div>
+                  <div class="sh-card-content">
+                    <table class="sh-table tabular-nums">
+                      <thead><tr><th>底稿</th><th>現金流量項目 (${STATE.cfMethod==='INDIRECT'?'間接法':'直接法'})</th><th style="text-align:right;">金額 (${cur})</th></tr></thead>
+                      <tbody>
+                        ${STATE.cfMethod === 'INDIRECT' ? `
+                          <tr><td><span class="sh-badge sh-badge-outline sh-badge-click" onclick="openWp('W/P PL')">W/P PL</span></td><td>本期淨利 (Net Profit)</td><td style="text-align:right;">${f2(p.netProfit)}</td></tr>
+                          <tr><td><span class="sh-badge sh-badge-outline sh-badge-click" onclick="openWp('W/P F')">W/P F</span></td><td>加：固定資產折舊 (Depreciation)</td><td style="text-align:right;">${f2(p.dep)}</td></tr>
+                          <tr><td><span class="sh-badge sh-badge-outline sh-badge-click" onclick="openWp('W/P B')">W/P B</span></td><td>應收帳款變動 (-ΔAR)</td><td style="text-align:right;">${f2(-p.dAr)}</td></tr>
+                          <tr><td><span class="sh-badge sh-badge-outline sh-badge-click" onclick="openWp('W/P C')">W/P C</span></td><td>預付及進項稅額變動 (-ΔPrepay)</td><td style="text-align:right;">${f2(-p.dPrepay)}</td></tr>
+                          <tr><td><span class="sh-badge sh-badge-outline sh-badge-click" onclick="openWp('W/P AA')">W/P AA</span></td><td>應付及應計費用變動 (+ΔAP)</td><td style="text-align:right;">${f2(p.dAp)}</td></tr>
+                          <tr><td><span class="sh-badge sh-badge-outline sh-badge-click" onclick="openWp('W/P CC')">W/P CC</span></td><td>應交稅費變動 (+ΔTax)</td><td style="text-align:right;">${f2(p.dTax)}</td></tr>
+                        ` : `
+                          <tr><td><span class="sh-badge sh-badge-outline sh-badge-click" onclick="openWp('W/P B')">W/P B</span></td><td>銷售商品、提供勞務收到的現金</td><td style="text-align:right;">${f2(p.rev - p.dAr)}</td></tr>
+                          <tr><td><span class="sh-badge sh-badge-outline sh-badge-click" onclick="openWp('W/P AA')">W/P AA</span></td><td>購買商品及營運支付的現金</td><td style="text-align:right;">${f2(-(p.cogs + p.opex + p.dPrepay - p.dAp))}</td></tr>
+                          <tr><td><span class="sh-badge sh-badge-outline sh-badge-click" onclick="openWp('W/P CC')">W/P CC</span></td><td>支付的各項稅費</td><td style="text-align:right;">${f2(-(p.taxExp - p.dTax))}</td></tr>
+                        `}
+                        <tr class="subtotal"><td><span class="sh-badge sh-badge-secondary">CF-OP</span></td><td>營業活動現金流量淨額</td><td style="text-align:right;">${f2(p.cfOp)}</td></tr>
+                        <tr><td><span class="sh-badge sh-badge-outline sh-badge-click" onclick="openWp('W/P F')">W/P F</span></td><td>購建固定資產支付的現金 (CapEx)</td><td style="text-align:right;">${f2(p.cfInv)}</td></tr>
+                        <tr><td><span class="sh-badge sh-badge-outline sh-badge-click" onclick="openWp('W/P DD')">W/P DD</span></td><td>股東/業主往來資金變動 (Financing)</td><td style="text-align:right;">${f2(p.cfFin)}</td></tr>
+                        <tr><td><span class="sh-badge sh-badge-outline sh-badge-click" onclick="openWp('W/P A')">W/P A</span></td><td>期初現金餘額 (Opening Cash)</td><td style="text-align:right;">${f2(85000)}</td></tr>
+                        <tr class="subtotal"><td><span class="sh-badge sh-badge-success sh-badge-click" onclick="openWp('W/P A')">W/P A ✓</span></td><td>期末現金餘額 (Ending Cash == B/S)</td><td style="text-align:right;">${f2(85000 + p.netCf)}</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            ` : ''}
+
+            ${STATE.activeTab === "ETB" ? `
+              <div class="sh-card">
+                <div class="sh-card-header">
+                  <h3 class="sh-card-title">延伸試算表工作底稿 (Extended Trial Balance — ETB)</h3>
+                  <p class="sh-card-desc">期初餘額 &rarr; 日常營運發生額 &rarr; 調整前試算表 &rarr; 月結調整分錄 (AJE) &rarr; 調整後試算表 (ATB)</p>
+                </div>
+                <div class="sh-card-content sh-table-wrap">
+                  <table class="sh-table tabular-nums">
+                    <thead>
+                      <tr>
+                        <th>代碼</th><th>科目名稱</th><th>底稿</th>
+                        <th style="text-align:right;">期初餘額</th>
+                        <th style="text-align:right;">本期借方</th>
+                        <th style="text-align:right;">本期貸方</th>
+                        <th style="text-align:right;">AJE 借方</th>
+                        <th style="text-align:right;">AJE 貸方</th>
+                        <th style="text-align:right;">調整後淨額 (ATB)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${p.ldg.rows.map(r => {
+                        const adj = r.open + r.opDr - r.opCr + r.ajeDr - r.ajeCr;
+                        return `<tr>
+                          <td><code>${r.code}</code></td>
+                          <td>${r.name}</td>
+                          <td><span class="sh-badge sh-badge-outline sh-badge-click" onclick="openWp('${r.wp}')">${r.wp} ↗</span></td>
+                          <td style="text-align:right;">${f2(r.open)}</td>
+                          <td style="text-align:right;">${f2(r.opDr)}</td>
+                          <td style="text-align:right;">${f2(r.opCr)}</td>
+                          <td style="text-align:right;color:var(--warning);">${f2(r.ajeDr)}</td>
+                          <td style="text-align:right;color:var(--warning);">${f2(r.ajeCr)}</td>
+                          <td style="text-align:right;font-weight:600;">${f2(adj)}</td>
+                        </tr>`;
+                      }).join("")}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ` : ''}
+
+            ${STATE.activeTab === "TAX" ? `
+              <div class="sh-card">
+                <div class="sh-card-header">
+                  <h3 class="sh-card-title">${p.meta.formName} (W/P CC)</h3>
+                  <p class="sh-card-desc">${p.meta.relief}</p>
+                </div>
+                <div class="sh-card-content">
+                  <p><strong>帳面期末現金 (W/P A)：</strong> ${cur} ${f2(p.cash)}</p>
+                  <p style="color:var(--warning);"><strong>建議鎖定於稅務專戶金額 (W/P CC Tax Reserve)：</strong> - ${cur} ${f2(p.taxPay)}</p>
+                  <p style="color:var(--success);"><strong>創辦人安全可支用營運現金 (Safe-to-Spend Cash)：</strong> ${cur} ${f2(p.cash - p.taxPay)}</p>
+                </div>
+              </div>
+            ` : ''}
+          </main>
+
+          <!-- Slide-Over Sheet for W/P Ref -->
+          <div class="sh-overlay ${sched ? 'open' : ''}" onclick="closeWp()">
+            <div class="sh-sheet" onclick="event.stopPropagation()">
+              ${sched ? `
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                  <div>
+                    <h2 style="margin:0;">${sched.title}</h2>
+                    <p style="margin:0.25rem 0 0;color:var(--muted-foreground);">${sched.tick}</p>
+                  </div>
+                  <button class="sh-btn sh-btn-ghost" onclick="closeWp()">✕</button>
+                </div>
+                <div style="padding:0.85rem;background:var(--muted);border-radius:var(--radius);">
+                  <div><strong>負責 AI Agent：</strong> <code>${sched.agent}</code></div>
+                  <p style="margin:0.4rem 0 0;">${sched.note}</p>
+                </div>
+                <table class="sh-table tabular-nums">
+                  <thead><tr><th>底稿構成明細</th><th style="text-align:right;">金額 (${cur})</th></tr></thead>
+                  <tbody>
+                    ${sched.items.map(it => `<tr><td>${it[0]}</td><td style="text-align:right;font-weight:600;">${it[1]}</td></tr>`).join("")}
+                  </tbody>
+                </table>
+              ` : ''}
+            </div>
+          </div>
+
+          <!-- Mixed Expense Split Dialog -->
+          <div class="sh-dialog-wrap ${STATE.splitModal ? 'open' : ''}" onclick="closeSplit()">
+            <div class="sh-dialog" onclick="event.stopPropagation()">
+              <h3 style="margin-top:0;">公私混用費用自動拆帳 (Mixed Business / Personal Split)</h3>
+              <p style="color:var(--muted-foreground);">商用比例認列費用與進項稅額，私人比例自動轉入 W/P DD（股東/業主往來）</p>
+              <div style="display:flex;flex-direction:column;gap:0.75rem;">
+                <label>實付含稅總額 (${cur}) <input id="sp-gross" class="sh-input tabular-nums" value="${STATE.splitGross}" /></label>
+                <label>商用比例 (%) <input id="sp-pct" type="number" class="sh-input tabular-nums" value="${STATE.splitPct}" min="10" max="100" /></label>
+                <div style="display:flex;justify-content:flex-end;gap:0.5rem;margin-top:0.5rem;">
+                  <button class="sh-btn sh-btn-outline" onclick="closeSplit()">取消</button>
+                  <button class="sh-btn sh-btn-default" onclick="applySplit()">執行拆帳並更新三大報表底稿</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- AJE Dialog -->
+          <div class="sh-dialog-wrap ${STATE.ajeModal ? 'open' : ''}" onclick="closeAje()">
+            <div class="sh-dialog" onclick="event.stopPropagation()">
+              <h3 style="margin-top:0;">新增月結調整分錄 (Month-End Adjusting Entry - AJE)</h3>
+              <div style="display:flex;flex-direction:column;gap:0.75rem;">
+                <label>借方科目
+                  <select id="aje-dr" class="sh-select">
+                    <option value="6100">6100 — 管理及營運費用 (W/P PL-40)</option>
+                    <option value="6410">6410 — 折舊費用 (W/P F)</option>
+                    <option value="7500">7500 — 所得稅費用 (W/P CC)</option>
+                  </select>
+                </label>
+                <label>貸方科目
+                  <select id="aje-cr" class="sh-select">
+                    <option value="2110">2110 — 應付及應計費用 (W/P AA)</option>
+                    <option value="1650">1650 — 累計折舊 (W/P F)</option>
+                    <option value="2210">2210 — 應交稅費 (W/P CC)</option>
+                  </select>
+                </label>
+                <label>調整金額 (${cur}) <input id="aje-amt" class="sh-input tabular-nums" value="1800" /></label>
+                <div style="display:flex;justify-content:flex-end;gap:0.5rem;margin-top:0.5rem;">
+                  <button class="sh-btn sh-btn-outline" onclick="closeAje()">取消</button>
+                  <button class="sh-btn sh-btn-default" onclick="applyAje()">過帳至 ETB 並重算三大報表</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+      render();
+    </script>
+  </body>
+</html>
