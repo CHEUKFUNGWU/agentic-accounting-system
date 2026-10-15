@@ -51,3 +51,7 @@ data/
 .env
 .env.local
 .env.*.local
+
+# Tooling caches
+.impeccable/
+frontend/.impeccable/

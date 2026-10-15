@@ -38,22 +38,22 @@ export const ExtendedTrialBalanceView: React.FC<ExtendedTrialBalanceViewProps> =
       <CardHeader style={{ paddingBottom: "0.75rem", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
           <div>
-            <CardTitle style={{ fontSize: "1.1rem" }}>
-              Extended Trial Balance (ETB 延伸試算表總底稿)
+            <CardTitle style={{ fontSize: "1.15rem", fontWeight: 700 }}>
+              延伸試算表 (Extended Trial Balance)
             </CardTitle>
             <span style={{ fontSize: "0.8rem", color: "var(--muted-foreground)" }}>
-              幣別：{currency} • 期初餘額 $\to$ 本期發生額 $\to$ 未調整試算表 $\to$ 月底調整分錄 (AJE) $\to$ 調整後試算表 (ATB)
+              幣別：{currency} • 期初餘額 → 本期發生額 → 未調整試算表 (UTB) → 調整分錄 (AJE) → 調整後試算表 (ATB)
             </span>
           </div>
           <div style={{ display: "flex", gap: "0.5rem" }}>
             <Badge variant="success" style={{ fontSize: "0.75rem" }}>
-              ✓ 調整前試算平衡
+              UTB 平衡
             </Badge>
             <Badge variant="success" style={{ fontSize: "0.75rem" }}>
-              ✓ AJE 借貸平衡
+              AJE 平衡
             </Badge>
             <Badge variant="success" style={{ fontSize: "0.75rem" }}>
-              ✓ 調整後試算平衡
+              ATB 平衡
             </Badge>
           </div>
         </div>

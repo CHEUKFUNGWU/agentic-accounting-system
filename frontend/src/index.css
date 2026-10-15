@@ -357,5 +357,146 @@ body {
 .sh-progress-indicator {
   height: 100%;
   background-color: var(--primary);
-  transition: width 0.25s ease;
+  transform-origin: left center;
+  transition: transform 0.2s ease;
 }
+
+/* ==========================================================================
+   Professional Accounting Shell & Layout
+   ========================================================================== */
+
+.acc-shell {
+  display: flex;
+  min-height: 100vh;
+  background-color: #fbfbfb;
+}
+
+.acc-sidebar {
+  width: 250px;
+  flex-shrink: 0;
+  background-color: #ffffff;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+.acc-sidebar-header {
+  padding: 1.125rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.acc-sidebar-nav {
+  flex: 1;
+  padding: 0.75rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  overflow-y: auto;
+}
+
+.acc-sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius);
+  color: #3f3f46;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  transition: background-color 0.12s, color 0.12s;
+}
+
+.acc-sidebar-item:hover {
+  background-color: #f4f4f5;
+  color: #18181b;
+}
+
+.acc-sidebar-item[data-active="true"] {
+  background-color: #18181b;
+  color: #ffffff;
+}
+
+.acc-sidebar-footer {
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--border);
+  background-color: #fafafa;
+  font-size: 0.75rem;
+}
+
+.acc-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.acc-topbar {
+  height: 3.5rem;
+  background-color: #ffffff;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1.5rem;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.acc-content {
+  flex: 1;
+  padding: 1.5rem;
+  max-width: 1400px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* Double underline for accounting totals */
+.acc-double-underline {
+  border-bottom: 3px double var(--foreground);
+}
+
+@media (max-width: 768px) {
+  .acc-shell {
+    flex-direction: column;
+  }
+  .acc-sidebar {
+    width: 100%;
+    height: auto;
+    position: static;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .acc-sidebar-nav {
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 0.5rem;
+  }
+  .acc-sidebar-item {
+    white-space: nowrap;
+    width: auto;
+  }
+  .acc-sidebar-footer {
+    display: none;
+  }
+  .acc-topbar {
+    height: auto;
+    padding: 0.75rem 1rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  .acc-content {
+    padding: 1rem 0.5rem;
+  }
+}
+
+

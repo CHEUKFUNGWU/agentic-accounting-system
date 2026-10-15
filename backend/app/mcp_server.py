@@ -34,6 +34,8 @@ from app.core.sod_guard import (
     AgentRole,
     DeterministicSoDGuard,
     JournalStatus,
+    PeriodStatus,
+    ProposedLine,
 )
 from app.core.repository import repo
 from app.core.working_papers import (
@@ -368,14 +370,43 @@ async def propose_expense_with_personal_split(
     evidence_uri: str,
 ) -> Dict[str, Any]:
     """Apportions a mixed business & personal expense and updates the ETB and W/P DD schedule."""
-    maker = PRINCIPALS.get(agent_principal_key, PRINCIPALS["bookkeeper-maker-01"])
+    maker = PRINCIPALS.get(agent_principal_key)
+    if not maker:
+        return {"status": "ERROR", "reason": f"Unknown maker agent principal key: '{agent_principal_key}'"}
+
+    if not maker.role.value.startswith("MAKER_"):
+        return {"status": "ERROR", "reason": f"INVALID_MAKER_ROLE: SOD_ROLE_VIOLATION: Principal '{maker.agent_name}' with role '{maker.role.value}' cannot create proposals."}
+
     entity = ENTITIES.get(entity_code)
     if not entity:
         return {"status": "ERROR", "reason": f"Unknown entity_code: {entity_code}"}
 
-    gross = q4(gross_amount_paid)
-    rate = Decimal(str(tax_rate))
-    biz_pct = Decimal(str(business_use_pct))
+    if PACK_STATUS_STATE.get(entity_code) == "CPA_SIGNED_LOCKED":
+        return {"status": "ERROR", "reason": f"PERIOD_CUTOFF_VIOLATION: Cannot propose expenses for entity '{entity_code}' in CPA_SIGNED_LOCKED status."}
+
+    try:
+        gross = q4(gross_amount_paid)
+        if gross <= Decimal("0.0000"):
+            return {"status": "ERROR", "reason": "Gross amount paid must be greater than 0.0000"}
+    except Exception as e:
+        return {"status": "ERROR", "reason": f"Invalid gross_amount_paid: {e}"}
+
+    try:
+        biz_pct = Decimal(str(business_use_pct))
+        if not (Decimal("0.0000") <= biz_pct <= Decimal("1.0000")):
+            return {"status": "ERROR", "reason": "business_use_pct must be between 0.00 and 1.00 (inclusive)"}
+    except Exception as e:
+        return {"status": "ERROR", "reason": f"Invalid business_use_pct: {e}"}
+
+    try:
+        rate = Decimal(str(tax_rate))
+        if not (Decimal("0.0000") <= rate <= Decimal("0.5000")):
+            return {"status": "ERROR", "reason": "tax_rate must be between 0.00 and 0.50"}
+    except Exception as e:
+        return {"status": "ERROR", "reason": f"Invalid tax_rate: {e}"}
+
+    if not evidence_uri:
+        return {"status": "ERROR", "reason": "EVIDENCE_REQUIRED_VIOLATION: Every agentic journal proposal must include at least one immutable evidence URI."}
 
     total_net = q4(gross / (Decimal("1.0000") + rate))
     total_tax = q4(gross - total_net)
@@ -383,6 +414,50 @@ async def propose_expense_with_personal_split(
     biz_expense = q4(total_net * biz_pct)
     biz_recoverable_tax = q4(total_tax * biz_pct)
     personal_drawing_or_loan = q4(gross - biz_expense - biz_recoverable_tax)
+
+    etb = _get_or_init_etb(entity_code)
+    etb_map = {r.account_code: r for r in etb}
+    for acc in ["1110", "6100", "1420", "2190"]:
+        if acc not in etb_map:
+            return {"status": "ERROR", "reason": f"COA_MISSING_ACCOUNT: Account '{acc}' does not exist in entity CoA."}
+
+    raw_lines = []
+    line_no = 1
+    if biz_expense > Decimal("0.0000"):
+        raw_lines.append({"line_number": line_no, "account_code": "6100", "debit": str(biz_expense), "credit": "0.0000", "memo": f"Business portion ({biz_pct * 100:.0f}%) [W/P PL-40]"})
+        line_no += 1
+    if biz_recoverable_tax > Decimal("0.0000"):
+        raw_lines.append({"line_number": line_no, "account_code": "1420", "debit": str(biz_recoverable_tax), "credit": "0.0000", "memo": "Recoverable Input GST/VAT [W/P C]"})
+        line_no += 1
+    if personal_drawing_or_loan > Decimal("0.0000"):
+        raw_lines.append({"line_number": line_no, "account_code": "2190", "debit": str(personal_drawing_or_loan), "credit": "0.0000", "memo": "Personal portion routed to Director Loan / Drawings [W/P DD]"})
+        line_no += 1
+    raw_lines.append({"line_number": line_no, "account_code": "1110", "debit": "0.0000", "credit": str(gross), "memo": "Paid from Business Bank Account [W/P A]"})
+
+    proposed_lines = [
+        ProposedLine(
+            line_number=l["line_number"],
+            account_code=l["account_code"],
+            is_control_account=l["account_code"] in {"1110", "1210", "2110"},
+            tx_debit=Decimal(l["debit"]),
+            tx_credit=Decimal(l["credit"]),
+            func_debit=Decimal(l["debit"]),
+            func_credit=Decimal(l["credit"]),
+            memo=l["memo"],
+        )
+        for l in raw_lines
+    ]
+    try:
+        DeterministicSoDGuard.validate_proposal_submission(
+            maker=maker,
+            source_module="EXPENSE_SPLIT",
+            period_status=PeriodStatus.OPEN,
+            lines=proposed_lines,
+            evidence_uris=[evidence_uri],
+            confidence_score=Decimal("0.9700"),
+        )
+    except AccountingInvariantError as e:
+        return {"status": "ERROR", "reason": str(e)}
 
     split_entry = {
         "journal_id": str(uuid4()),
@@ -412,6 +487,7 @@ async def propose_expense_with_personal_split(
         "created_by_principal_key": agent_principal_key,
         "created_by_principal_id": str(maker.principal_id),
         "approved_by_principal_key": None,
+        "approved_by_principal_id": None,
         "ai_confidence_score": "0.9700",
         "ai_reasoning_summary": (
             f"Mixed Expense Apportionment ({split_entry['business_use_pct']} Business): "
@@ -423,12 +499,7 @@ async def propose_expense_with_personal_split(
             f"Personal split of {entity['currency']} {personal_drawing_or_loan} charged to W/P DD (2190)."
         ],
         "statutory_return_boxes": {"RECOVERABLE_INPUT_TAX": str(biz_recoverable_tax)},
-        "lines": [
-            {"line_number": 1, "account_code": "6100", "debit": str(biz_expense), "credit": "0.0000", "memo": f"Business portion ({split_entry['business_use_pct']}) [W/P PL-40]"},
-            {"line_number": 2, "account_code": "1420", "debit": str(biz_recoverable_tax), "credit": "0.0000", "memo": "Recoverable Input GST/VAT [W/P C]"},
-            {"line_number": 3, "account_code": "2190", "debit": str(personal_drawing_or_loan), "credit": "0.0000", "memo": "Personal portion routed to Director Loan / Drawings [W/P DD]"},
-            {"line_number": 4, "account_code": "1110", "debit": "0.0000", "credit": str(gross), "memo": "Paid from Business Bank Account [W/P A]"},
-        ],
+        "lines": raw_lines,
     }
 
     await repo.save_personal_split(split_entry)
@@ -456,6 +527,7 @@ async def propose_adjusting_workpaper_entry(
     amount: str,
     memo: str,
     wp_ref: str = "W/P AA",
+    maker_principal_key: str = "workpaper-close-01",
 ) -> Dict[str, Any]:
     """
     Close & Working Paper Agent / CPA Tool: Posts a balanced Month-End Adjusting Journal Entry (AJE)
@@ -465,32 +537,44 @@ async def propose_adjusting_workpaper_entry(
     if not entity:
         return {"status": "ERROR", "reason": f"Unknown entity_code: {entity_code}"}
 
-    amt = q4(amount)
-    if amt <= Decimal("0.0000") or debit_account_code == credit_account_code:
-        return {"status": "ERROR", "reason": "AJE amount must be positive and debit/credit accounts must differ."}
+    if PACK_STATUS_STATE.get(entity_code) == "CPA_SIGNED_LOCKED":
+        return {"status": "ERROR", "reason": f"PERIOD_CUTOFF_VIOLATION: Cannot post AJE to entity '{entity_code}' in CPA_SIGNED_LOCKED status."}
+
+    maker = PRINCIPALS.get(maker_principal_key)
+    if not maker or not maker.role.value.startswith("MAKER_"):
+        return {"status": "ERROR", "reason": f"SOD_ROLE_VIOLATION: Principal '{maker_principal_key}' is not authorized to create AJE proposals."}
+
+    try:
+        amt = q4(amount)
+        if amt <= Decimal("0.0000"):
+            return {"status": "ERROR", "reason": "AJE amount must be strictly positive."}
+    except Exception as e:
+        return {"status": "ERROR", "reason": f"Invalid amount: {e}"}
+
+    if debit_account_code == credit_account_code:
+        return {"status": "ERROR", "reason": "Debit and credit accounts must differ."}
 
     etb = _get_or_init_etb(entity_code)
-    dr_found = False
-    cr_found = False
-    for row in etb:
-        if row.account_code == debit_account_code:
-            row.aje_debit = q4(row.aje_debit + amt)
-            dr_found = True
-        elif row.account_code == credit_account_code:
-            row.aje_credit = q4(row.aje_credit + amt)
-            cr_found = True
+    etb_map = {row.account_code: row for row in etb}
 
-    if not (dr_found and cr_found):
-        return {"status": "ERROR", "reason": "Account code not found in ETB."}
+    if debit_account_code not in etb_map:
+        return {"status": "ERROR", "reason": f"COA_MISSING_ACCOUNT: Debit account '{debit_account_code}' does not exist in ETB."}
+    if credit_account_code not in etb_map:
+        return {"status": "ERROR", "reason": f"COA_MISSING_ACCOUNT: Credit account '{credit_account_code}' does not exist in ETB."}
+
+    # Atomically apply to AJE columns
+    etb_map[debit_account_code].aje_debit = q4(etb_map[debit_account_code].aje_debit + amt)
+    etb_map[credit_account_code].aje_credit = q4(etb_map[credit_account_code].aje_credit + amt)
 
     aje_record = {
-        "aje_id": str(uuid4()),
+        "aje_id": f"AJE-{uuid4().hex[:8].upper()}",
         "entity_code": entity_code,
         "debit_account_code": debit_account_code,
         "credit_account_code": credit_account_code,
         "amount": str(amt),
         "wp_ref": wp_ref,
         "memo": memo,
+        "created_by": maker.agent_name,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     CUSTOM_AJE_LOG.setdefault(entity_code, []).append(aje_record)
@@ -514,32 +598,61 @@ async def lock_and_sign_working_paper_pack(
     period: str = "2026-10",
 ) -> Dict[str, Any]:
     """Seals the Standalone 3-Statement Working Paper Pack as `CPA_SIGNED_LOCKED` after verifying mathematical proofs."""
+    cpa = PRINCIPALS.get(cpa_principal_key)
+    if not cpa or cpa.role != AgentRole.HUMAN_CPA:
+        return {
+            "status": "ERROR",
+            "reason": f"UNAUTHORIZED_SIGNER: Principal '{cpa_principal_key}' is not an authorized HUMAN_CPA.",
+        }
+
+    # Verify reconciliation proofs before allowing lock
+    pack = await generate_three_statements_working_paper(entity_code=entity_code, period=period)
+    proofs = pack.get("reconciliation_proofs", {})
+    if not proofs.get("etb_unadjusted_balanced"):
+        return {"status": "ERROR", "reason": "RECONCILIATION_PROOF_FAILED: Unadjusted Trial Balance is out of balance."}
+    if not proofs.get("etb_adjustments_balanced"):
+        return {"status": "ERROR", "reason": "RECONCILIATION_PROOF_FAILED: Adjusting Journal Entries are out of balance."}
+    if not proofs.get("etb_adjusted_balanced"):
+        return {"status": "ERROR", "reason": "RECONCILIATION_PROOF_FAILED: Adjusted Trial Balance is out of balance."}
+    if not proofs.get("balance_sheet_equation_balanced"):
+        return {"status": "ERROR", "reason": f"RECONCILIATION_PROOF_FAILED: Balance Sheet equation out of balance (variance: {proofs.get('balance_sheet_variance')})."}
+    if not proofs.get("cash_flow_reconciles_to_bs_cash"):
+        return {"status": "ERROR", "reason": f"RECONCILIATION_PROOF_FAILED: Cash Flow does not reconcile to Balance Sheet cash (variance: {proofs.get('cash_flow_variance')})."}
+
     PACK_STATUS_STATE[entity_code] = "CPA_SIGNED_LOCKED"
     await repo.set_pack_status(entity_code, "CPA_SIGNED_LOCKED")
     await orchestrator.publish_outbox_event(
         event_type="workpaper.cpa_signed_locked",
         entity_code=entity_code,
         aggregate_id=f"{entity_code}-{period}",
-        payload={"signed_by": cpa_principal_key, "period": period},
+        payload={"signed_by": cpa.agent_name, "period": period},
     )
     return await generate_three_statements_working_paper(entity_code=entity_code, period=period)
 
 
 @mcp.tool()
 async def review_and_approve_proposal(
-    agent_principal_key: str,
-    journal_id: str,
+    agent_principal_key: str = "",
+    journal_id: str = "",
     action: str = "APPROVE",
     rejection_reason: str = "",
+    reviewer_principal_key: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Controller Reviewer Agent / Human CPA Tool:
     Enforces Maker != Checker Segregation of Duties (SoD), validates proposal confidence
     and materiality threshold, and seals POSTED entries with a SHA-256 cryptographic hash chain.
     """
-    reviewer = PRINCIPALS.get(agent_principal_key)
+    effective_key = reviewer_principal_key or agent_principal_key
+    reviewer = PRINCIPALS.get(effective_key)
     if not reviewer:
-        return {"status": "ERROR", "reason": f"Unknown reviewer principal key: {agent_principal_key}"}
+        return {"status": "ERROR", "reason": f"Unknown reviewer principal key: '{effective_key}'"}
+
+    if reviewer.role not in (AgentRole.CHECKER_CONTROLLER, AgentRole.HUMAN_CPA):
+        return {
+            "status": "ERROR",
+            "reason": f"SOD_MAKER_CHECKER_VIOLATION: Principal '{reviewer.agent_name}' with role '{reviewer.role.value}' cannot review proposals.",
+        }
 
     journal = JOURNAL_LEDGER.get(journal_id)
     if not journal:
@@ -549,7 +662,23 @@ async def review_and_approve_proposal(
     if not journal:
         return {"status": "ERROR", "reason": f"Journal entry '{journal_id}' not found."}
 
+    current_status = journal.get("status")
+    if current_status not in (JournalStatus.PENDING_CHECKER.value, JournalStatus.AWAITING_CPA.value):
+        return {
+            "status": "ERROR",
+            "reason": f"CANNOT_REVIEW_FINALIZED_JOURNAL: Journal '{journal_id}' is already in status '{current_status}'. Cannot review multiple times.",
+        }
+
+    # Strict Maker != Checker enforcement: Maker cannot review/approve/reject their own proposal
+    if str(reviewer.principal_id) == str(journal.get("created_by_principal_id")):
+        return {
+            "status": "ERROR",
+            "reason": "SOD_MAKER_CHECKER_VIOLATION: Approver/Reviewer Principal ID cannot equal Creator Principal ID.",
+        }
+
     entity_code = journal["entity_code"]
+    if PACK_STATUS_STATE.get(entity_code) == "CPA_SIGNED_LOCKED":
+        return {"status": "ERROR", "reason": f"PERIOD_CUTOFF_VIOLATION: Cannot review entries for locked entity '{entity_code}'"}
 
     if action.upper() == "REJECT":
         journal["status"] = JournalStatus.REJECTED.value
@@ -563,7 +692,7 @@ async def review_and_approve_proposal(
             aggregate_id=journal_id,
             payload={"rejected_by": reviewer.agent_name, "reason": rejection_reason},
         )
-        return {"status": "SUCCESS", "action": "REJECTED", "journal": journal}
+        return {"status": "SUCCESS", "action": "REJECTED", "entry_status": "REJECTED", "journal": journal}
 
     created_by_str = journal.get("created_by_principal_id")
     if not created_by_str:
@@ -582,44 +711,56 @@ async def review_and_approve_proposal(
     except AccountingInvariantError as e:
         return {"status": "ERROR", "reason": str(e)}
 
-    journal["approved_by_principal_key"] = agent_principal_key
+    journal["approved_by_principal_key"] = effective_key
     journal["approved_by_principal_id"] = str(reviewer.principal_id)
     journal["status"] = new_status.value
 
     if new_status == JournalStatus.POSTED:
-        # Apply posted lines to ETB
         etb = _get_or_init_etb(entity_code)
+        etb_map = {row.account_code: row for row in etb}
+
+        # Check all accounts exist BEFORE modifying anything
+        for line in journal.get("lines", []):
+            acc_code = line["account_code"]
+            if acc_code not in etb_map:
+                return {"status": "ERROR", "reason": f"COA_MISSING_ACCOUNT: Account '{acc_code}' does not exist in ETB."}
+
+        # Apply lines
         for line in journal.get("lines", []):
             acc_code = line["account_code"]
             dr = Decimal(str(line.get("debit", "0.0000")))
             cr = Decimal(str(line.get("credit", "0.0000")))
-            for row in etb:
-                if row.account_code == acc_code:
-                    if dr > Decimal("0.0000"):
-                        row.period_op_debit = q4(row.period_op_debit + dr)
-                    if cr > Decimal("0.0000"):
-                        row.period_op_credit = q4(row.period_op_credit + cr)
-        await repo.save_etb_accounts(entity_code, etb)
+            row = etb_map[acc_code]
+            if dr > Decimal("0.0000"):
+                row.period_op_debit = q4(row.period_op_debit + dr)
+            if cr > Decimal("0.0000"):
+                row.period_op_credit = q4(row.period_op_credit + cr)
 
         prev_hash = await repo.get_latest_posted_hash(entity_code)
+        next_block_index = await repo.get_next_block_index(entity_code)
+        lines_hash = DeterministicSoDGuard.compute_lines_sha256(journal.get("lines", []))
         entry_hash = DeterministicSoDGuard.compute_entry_sha256_hash(
             prev_entry_hash=prev_hash,
-            journal_id=UUID(journal_id),
-            entity_id=UUID("00000000-0000-0000-0000-000000000001"),
+            journal_id=str(journal_id),
+            entity_code=entity_code,
             accounting_date=journal.get("accounting_date", date.today().isoformat()),
             func_debit=Decimal(str(journal["total_debit"])),
             func_credit=Decimal(str(journal["total_credit"])),
-            created_by=created_by_id,
-            approved_by=reviewer.principal_id,
+            lines_sha256=lines_hash,
+            created_by=str(journal["created_by_principal_id"]),
+            approved_by=str(reviewer.principal_id),
         )
         journal["prev_entry_hash"] = prev_hash
         journal["entry_hash"] = entry_hash
-        await repo.save_journal(journal)
+        journal["block_index"] = next_block_index
+
+        await repo.post_journal_and_update_etb(entity_code, journal, etb)
+
         await orchestrator.publish_outbox_event(
             event_type="journal.posted",
             entity_code=entity_code,
             aggregate_id=journal_id,
-            payload={"posted_by": reviewer.agent_name, "entry_hash": entry_hash},
+            payload={"posted_by": reviewer.agent_name, "entry_hash": entry_hash, "block_index": next_block_index},
         )
         return {
             "status": "SUCCESS",
@@ -656,6 +797,16 @@ async def generate_three_statements_working_paper(
         return {"status": "ERROR", "reason": f"Unknown entity_code: {entity_code}"}
 
     etb = _get_or_init_etb(entity_code)
+
+    # Filter personal splits: strictly include ONLY splits that have been APPROVED and POSTED!
+    all_splits = PERSONAL_SPLITS_LOG.get(entity_code, [])
+    posted_splits = []
+    for sp in all_splits:
+        j_id = sp.get("journal_id")
+        j = JOURNAL_LEDGER.get(j_id)
+        if j and j.get("status") == JournalStatus.POSTED.value:
+            posted_splits.append(sp)
+
     pack = StandaloneWorkingPaperEngine.generate_working_paper_pack(
         entity_code=entity_code,
         legal_name=entity["legal_name"],
@@ -665,7 +816,7 @@ async def generate_three_statements_working_paper(
         currency=entity["currency"],
         period=period,
         etb_accounts=etb,
-        personal_split_transactions=PERSONAL_SPLITS_LOG.get(entity_code, []),
+        personal_split_transactions=posted_splits,
         custom_aje_history=CUSTOM_AJE_LOG.get(entity_code, []),
         pack_status=PACK_STATUS_STATE.get(entity_code, "READY_FOR_CPA"),
     )

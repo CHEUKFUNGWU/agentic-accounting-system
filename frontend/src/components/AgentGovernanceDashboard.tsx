@@ -16,7 +16,6 @@ import {
   ThreeStatementWorkingPaperPack,
 } from "../types/accounting";
 import { AJEModal } from "./AJEModal";
-import { AppHeader } from "./AppHeader";
 import { DesktopManagerView } from "./DesktopManagerView";
 import { ExtendedTrialBalanceView } from "./ExtendedTrialBalanceView";
 import { JournalLedgerView } from "./JournalLedgerView";
@@ -26,6 +25,16 @@ import { LeadSchedulesView } from "./LeadSchedulesView";
 import { PersonalSplitModal } from "./PersonalSplitModal";
 import { TaxAndCloseView } from "./TaxAndCloseView";
 import { ThreeStatementsView } from "./ThreeStatementsView";
+import { Badge, Button } from "./ui/shadcn";
+
+const ENTITY_OPTIONS = [
+  { code: "AU-OPC-01", label: "AU-OPC-01: Spark AI Studio Pty Ltd", sub: "AASB Tier 2 • 澳洲一人公司" },
+  { code: "CN-OPC-01", label: "CN-OPC-01: 上海智算一人有限公司", sub: "小企業會計準則 • 中國一人有限" },
+  { code: "HK-SME-01", label: "HK-SME-01: Pacific Nexus Tech Ltd", sub: "SME-FRS • 香港中小企" },
+  { code: "SG-OPC-01", label: "SG-OPC-01: Merlion Autonomous Labs", sub: "SFRS Small • 新加坡私人豁免" },
+  { code: "US-SOLE-01", label: "US-SOLE-01: Griffin Analytics LLC", sub: "US GAAP • 美國單一成員穿透實體" },
+  { code: "EU-OPC-01", label: "EU-OPC-01: rheinAI Cloud UG", sub: "IFRS / HGB • 德國一人微型企業" },
+];
 
 export const AgentGovernanceDashboard: React.FC = () => {
   const [entityCode, setEntityCode] = useState<string>("AU-OPC-01");
@@ -45,7 +54,7 @@ export const AgentGovernanceDashboard: React.FC = () => {
   });
 
   const [activeTab, setActiveTab] = useState<
-    "STATEMENTS" | "ETB" | "SCHEDULES" | "JOURNALS" | "TAX_CLOSE" | "DESKTOP"
+    "STATEMENTS" | "ETB" | "JOURNALS" | "SCHEDULES" | "TAX_CLOSE" | "DESKTOP"
   >("STATEMENTS");
 
   // Lead Schedule drawer state
@@ -166,12 +175,12 @@ export const AgentGovernanceDashboard: React.FC = () => {
 
   if (!pack) {
     return (
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}>
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", backgroundColor: "#ffffff" }}>
         <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: "1.2rem", fontWeight: 600, marginBottom: "0.5rem" }}>
-            正在加載單體財務報表底稿庫...
+          <div style={{ fontSize: "1.1rem", fontWeight: 600, marginBottom: "0.25rem" }}>
+            正在載入帳套資料庫...
           </div>
-          <span style={{ color: "var(--muted-foreground)" }}>連接本地 SQLite 帳套與 Stateless MCP</span>
+          <span style={{ fontSize: "0.85rem", color: "var(--muted-foreground)" }}>連接本地會計分類帳與底稿引擎</span>
         </div>
       </div>
     );
@@ -181,154 +190,275 @@ export const AgentGovernanceDashboard: React.FC = () => {
     ? pack.lead_schedules[selectedWpRef] || null
     : null;
 
-  return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
-      {/* App Header */}
-      <AppHeader
-        entityCode={entityCode}
-        onEntityChange={setEntityCode}
-        period={period}
-        onPeriodChange={setPeriod}
-        packStatus={pack.pack_status}
-        isLiveBackend={isLiveBackend}
-        dbPathFormatted={dbInfo.file_path}
-        pendingCount={pendingJournals.length}
-        onOpenSplitModal={() => setSplitModalOpen(true)}
-        onOpenAjeModal={() => setAjeModalOpen(true)}
-        onOpenReviewModal={() => setReviewModalOpen(true)}
-        onBackupDb={handleBackupDb}
-        onLockPack={handleLockPack}
-      />
+  const currentEntity = ENTITY_OPTIONS.find((e) => e.code === entityCode) || ENTITY_OPTIONS[0];
 
-      {/* Main Workspace Navigation Tabs */}
-      <div
-        style={{
-          padding: "0.75rem 1.5rem",
-          backgroundColor: "#fafafa",
-          borderBottom: "1px solid var(--border)",
-        }}
-      >
-        <div className="sh-tabs-list">
+  return (
+    <div className="acc-shell">
+      {/* Accounting Sidebar Navigation */}
+      <aside className="acc-sidebar">
+        {/* Company & Entity Selector Header */}
+        <div className="acc-sidebar-header">
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
+            <div
+              style={{
+                width: "1.5rem",
+                height: "1.5rem",
+                backgroundColor: "#18181b",
+                color: "#ffffff",
+                borderRadius: "4px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "0.8rem",
+                fontWeight: 700,
+              }}
+            >
+              A
+            </div>
+            <span style={{ fontWeight: 700, fontSize: "0.95rem", letterSpacing: "-0.01em" }}>
+              Agentic Accounting
+            </span>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+            <select
+              value={entityCode}
+              onChange={(e) => setEntityCode(e.target.value)}
+              className="sh-select"
+              style={{ fontSize: "0.8rem", padding: "0.35rem 0.5rem" }}
+            >
+              {ENTITY_OPTIONS.map((opt) => (
+                <option key={opt.code} value={opt.code}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <div style={{ fontSize: "0.7rem", color: "var(--muted-foreground)", paddingLeft: "0.15rem" }}>
+              {currentEntity.sub}
+            </div>
+          </div>
+        </div>
+
+        {/* Accounting Modules Navigation */}
+        <nav className="acc-sidebar-nav">
           <button
             type="button"
-            className="sh-tabs-trigger"
-            data-state={activeTab === "STATEMENTS" ? "active" : "inactive"}
+            className="acc-sidebar-item"
+            data-active={activeTab === "STATEMENTS"}
             onClick={() => setActiveTab("STATEMENTS")}
           >
-            📊 單體三大財務報表 (3 Statements)
+            財務報表 (Financial Statements)
           </button>
+
           <button
             type="button"
-            className="sh-tabs-trigger"
-            data-state={activeTab === "ETB" ? "active" : "inactive"}
+            className="acc-sidebar-item"
+            data-active={activeTab === "ETB"}
             onClick={() => setActiveTab("ETB")}
           >
-            📑 ETB 延伸試算表總底稿
+            試算表 (Trial Balance / ETB)
           </button>
+
           <button
             type="button"
-            className="sh-tabs-trigger"
-            data-state={activeTab === "SCHEDULES" ? "active" : "inactive"}
+            className="acc-sidebar-item"
+            data-active={activeTab === "JOURNALS"}
+            onClick={() => setActiveTab("JOURNALS")}
+            style={{ justifyContent: "space-between" }}
+          >
+            <span>日記帳與憑證 (Journals)</span>
+            {pendingJournals.length > 0 && (
+              <span
+                style={{
+                  backgroundColor: "#dc2626",
+                  color: "#ffffff",
+                  borderRadius: "9999px",
+                  fontSize: "0.7rem",
+                  padding: "0.1rem 0.4rem",
+                  fontWeight: 600,
+                }}
+              >
+                {pendingJournals.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            className="acc-sidebar-item"
+            data-active={activeTab === "SCHEDULES"}
             onClick={() => setActiveTab("SCHEDULES")}
           >
-            🔍 明細底稿庫 (W/P A~EQ)
+            審計底稿 (Lead Schedules)
           </button>
+
           <button
             type="button"
-            className="sh-tabs-trigger"
-            data-state={activeTab === "JOURNALS" ? "active" : "inactive"}
-            onClick={() => setActiveTab("JOURNALS")}
-          >
-            📜 日記帳與 SoD 防偽審批
-          </button>
-          <button
-            type="button"
-            className="sh-tabs-trigger"
-            data-state={activeTab === "TAX_CLOSE" ? "active" : "inactive"}
+            className="acc-sidebar-item"
+            data-active={activeTab === "TAX_CLOSE"}
             onClick={() => setActiveTab("TAX_CLOSE")}
           >
-            ⚖ 稅務儲備與月結清單
+            月末關帳與稅務 (Close & Tax)
           </button>
+
           <button
             type="button"
-            className="sh-tabs-trigger"
-            data-state={activeTab === "DESKTOP" ? "active" : "inactive"}
+            className="acc-sidebar-item"
+            data-active={activeTab === "DESKTOP"}
             onClick={() => setActiveTab("DESKTOP")}
           >
-            💻 桌面端帳套文件管理
+            帳套文件管理 (Company File)
           </button>
+        </nav>
+
+        {/* Sidebar Footer: Period & DB Status */}
+        <div className="acc-sidebar-footer">
+          <div style={{ marginBottom: "0.5rem" }}>
+            <label style={{ display: "block", fontSize: "0.7rem", color: "var(--muted-foreground)", marginBottom: "0.2rem" }}>
+              當前會計期間:
+            </label>
+            <select
+              value={period}
+              onChange={(e) => setPeriod(e.target.value)}
+              className="sh-select"
+              style={{ fontSize: "0.75rem", padding: "0.25rem 0.4rem" }}
+            >
+              <option value="2026-10">2026-10 (當前月結期)</option>
+              <option value="2026-09">2026-09 (前期)</option>
+              <option value="2026-Q3">2026-Q3 (第三季)</option>
+            </select>
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "0.35rem", borderTop: "1px solid var(--border)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+              <span
+                style={{
+                  width: "8px",
+                  height: "8px",
+                  borderRadius: "50%",
+                  backgroundColor: isLiveBackend ? "#16a34a" : "#d97706",
+                }}
+              />
+              <span style={{ fontSize: "0.75rem", color: "var(--muted-foreground)" }}>
+                {isLiveBackend ? "本地資料庫在線" : "離線模式"}
+              </span>
+            </div>
+
+            {pack.pack_status === "CPA_SIGNED_LOCKED" ? (
+              <Badge variant="default" style={{ fontSize: "0.7rem", padding: "0.15rem 0.4rem" }}>
+                已封存
+              </Badge>
+            ) : (
+              <span style={{ fontSize: "0.75rem", color: "#d97706" }}>待簽核</span>
+            )}
+          </div>
         </div>
+      </aside>
+
+      {/* Main Workspace Area */}
+      <div className="acc-main">
+        {/* Lean Top Context Bar */}
+        <header className="acc-topbar">
+          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+            <h1 style={{ fontSize: "1.1rem", fontWeight: 700, margin: 0 }}>
+              {activeTab === "STATEMENTS" && "財務報表 (Financial Statements)"}
+              {activeTab === "ETB" && "延伸試算表 (Extended Trial Balance)"}
+              {activeTab === "JOURNALS" && "日記帳簿與憑證審核 (General Ledger & Journals)"}
+              {activeTab === "SCHEDULES" && "審計明細底稿庫 (Audit Lead Schedules)"}
+              {activeTab === "TAX_CLOSE" && "月末關帳與稅務申報 (Month-End Close & Tax)"}
+              {activeTab === "DESKTOP" && "本機帳套文件管理 (Company File Management)"}
+            </h1>
+            <span style={{ fontSize: "0.8rem", color: "var(--muted-foreground)" }}>
+              {pack.legal_name} • {pack.currency}
+            </span>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            {pendingJournals.length > 0 && (
+              <Button
+                variant="outline"
+                onClick={() => setReviewModalOpen(true)}
+                style={{ fontSize: "0.8rem", padding: "0.3rem 0.65rem" }}
+              >
+                待覆核分錄 ({pendingJournals.length})
+              </Button>
+            )}
+
+            <Button
+              variant="outline"
+              onClick={handleBackupDb}
+              style={{ fontSize: "0.8rem", padding: "0.3rem 0.65rem" }}
+            >
+              備份帳套
+            </Button>
+          </div>
+        </header>
+
+        {/* Content Workspace */}
+        <main className="acc-content">
+          {activeTab === "STATEMENTS" && (
+            <ThreeStatementsView
+              currency={pack.currency}
+              incomeStatement={pack.income_statement_wp}
+              balanceSheet={pack.balance_sheet_wp}
+              cashFlow={pack.cash_flow_statement_wp}
+              kpi={pack.kpi_summary}
+              proofs={pack.reconciliation_proofs}
+              onOpenWpDrawer={handleOpenWpDrawer}
+            />
+          )}
+
+          {activeTab === "ETB" && (
+            <ExtendedTrialBalanceView
+              currency={pack.currency}
+              rows={pack.etb_rows}
+              totals={pack.etb_totals as any}
+              onOpenWpDrawer={handleOpenWpDrawer}
+            />
+          )}
+
+          {activeTab === "JOURNALS" && (
+            <JournalLedgerView
+              currency={pack.currency}
+              journals={journals}
+              onReviewJournal={handleReviewJournal}
+              onOpenAjeModal={() => setAjeModalOpen(true)}
+              onOpenSplitModal={() => setSplitModalOpen(true)}
+            />
+          )}
+
+          {activeTab === "SCHEDULES" && (
+            <LeadSchedulesView
+              currency={pack.currency}
+              schedules={pack.lead_schedules}
+              onOpenWpDrawer={handleOpenWpDrawer}
+            />
+          )}
+
+          {activeTab === "TAX_CLOSE" && (
+            <TaxAndCloseView
+              currency={pack.currency}
+              taxWorkpaper={pack.statutory_tax_workpaper}
+              checklist={pack.close_checklist}
+              packStatus={pack.pack_status}
+              onLockPack={handleLockPack}
+              onOpenWpDrawer={handleOpenWpDrawer}
+            />
+          )}
+
+          {activeTab === "DESKTOP" && (
+            <DesktopManagerView
+              storageType={dbInfo.storage_type}
+              filePath={dbInfo.file_path}
+              fileSizeFormatted={dbInfo.file_size_formatted}
+              appPlatform={dbInfo.app_platform}
+              onBackupDb={handleBackupDb}
+            />
+          )}
+        </main>
       </div>
 
-      {/* Workspace Body */}
-      <main style={{ flex: 1, padding: "1.5rem", maxWidth: "1600px", width: "100%", margin: "0 auto" }}>
-        {activeTab === "STATEMENTS" && (
-          <ThreeStatementsView
-            currency={pack.currency}
-            incomeStatement={pack.income_statement_wp}
-            balanceSheet={pack.balance_sheet_wp}
-            cashFlow={pack.cash_flow_statement_wp}
-            kpi={pack.kpi_summary}
-            proofs={pack.reconciliation_proofs}
-            onOpenWpDrawer={handleOpenWpDrawer}
-          />
-        )}
-
-        {activeTab === "ETB" && (
-          <ExtendedTrialBalanceView
-            currency={pack.currency}
-            rows={pack.etb_rows}
-            totals={pack.etb_totals as any}
-            onOpenWpDrawer={handleOpenWpDrawer}
-          />
-        )}
-
-        {activeTab === "SCHEDULES" && (
-          <LeadSchedulesView
-            currency={pack.currency}
-            schedules={pack.lead_schedules}
-            onOpenWpDrawer={handleOpenWpDrawer}
-          />
-        )}
-
-        {activeTab === "JOURNALS" && (
-          <JournalLedgerView
-            currency={pack.currency}
-            journals={journals}
-            onReviewJournal={handleReviewJournal}
-          />
-        )}
-
-        {activeTab === "TAX_CLOSE" && (
-          <TaxAndCloseView
-            currency={pack.currency}
-            taxWorkpaper={pack.statutory_tax_workpaper}
-            checklist={pack.close_checklist}
-            packStatus={pack.pack_status}
-            onLockPack={handleLockPack}
-            onOpenWpDrawer={handleOpenWpDrawer}
-          />
-        )}
-
-        {activeTab === "DESKTOP" && (
-          <DesktopManagerView
-            storageType={dbInfo.storage_type}
-            filePath={dbInfo.file_path}
-            fileSizeFormatted={dbInfo.file_size_formatted}
-            appPlatform={dbInfo.app_platform}
-            onBackupDb={handleBackupDb}
-          />
-        )}
-      </main>
-
-      {/* Slide-over Drawer for Lead Schedule Drill-down */}
-      <LeadScheduleDrawer
-        schedule={selectedSchedule}
-        currency={pack.currency}
-        onClose={() => setSelectedWpRef(null)}
-      />
-
-      {/* Personal Split Modal */}
+      {/* Global Modals and Drawers */}
       <PersonalSplitModal
         open={splitModalOpen}
         currency={pack.currency}
@@ -336,7 +466,6 @@ export const AgentGovernanceDashboard: React.FC = () => {
         onSubmit={handleApplyPersonalSplit}
       />
 
-      {/* Month-End AJE Modal */}
       <AJEModal
         open={ajeModalOpen}
         currency={pack.currency}
@@ -344,13 +473,18 @@ export const AgentGovernanceDashboard: React.FC = () => {
         onSubmit={handlePostAJE}
       />
 
-      {/* SoD Review Modal */}
       <JournalReviewModal
         open={reviewModalOpen}
         currency={pack.currency}
         pendingJournals={pendingJournals}
         onClose={() => setReviewModalOpen(false)}
         onReview={handleReviewJournal}
+      />
+
+      <LeadScheduleDrawer
+        schedule={selectedSchedule}
+        currency={pack.currency}
+        onClose={() => setSelectedWpRef(null)}
       />
     </div>
   );

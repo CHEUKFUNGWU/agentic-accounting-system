@@ -11,7 +11,7 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, func, select, update
 
 from app.core.db import (
     CustomAJELogModel,
@@ -411,12 +411,75 @@ class AccountingRepository:
                     JournalEntryModel.status == "POSTED",
                     JournalEntryModel.entry_hash.isnot(None),
                 )
-                .order_by(JournalEntryModel.created_at.desc())
+                .order_by(JournalEntryModel.block_index.desc(), JournalEntryModel.posted_at.desc(), JournalEntryModel.created_at.desc())
                 .limit(1)
             )
             res = await session.execute(stmt)
             h = res.scalar_one_or_none()
             return h or "GENESIS_BLOCK_0000000000000000000000000000000000000000000000000000000000"
 
+    async def get_next_block_index(self, entity_code: str) -> int:
+        async with self.manager.session_factory() as session:
+            stmt = (
+                select(func.max(JournalEntryModel.block_index))
+                .where(
+                    JournalEntryModel.entity_code == entity_code,
+                    JournalEntryModel.status == "POSTED",
+                )
+            )
+            res = await session.execute(stmt)
+            cur_max = res.scalar_one_or_none() or 0
+            return int(cur_max) + 1
+
+    async def post_journal_and_update_etb(
+        self,
+        entity_code: str,
+        journal: Dict[str, Any],
+        etb_accounts: List[ETBAccountRow],
+    ) -> None:
+        """
+        Atomically transitions journal status to POSTED, stamps block index & posted timestamp,
+        and applies debits/credits to the Extended Trial Balance in a single database transaction.
+        Guarantees that double-approval or concurrent posting fails immediately.
+        """
+        async with self.manager.session_factory() as session:
+            async with session.begin():
+                stmt = select(JournalEntryModel).where(JournalEntryModel.journal_id == journal["journal_id"]).with_for_update()
+                res = await session.execute(stmt)
+                m = res.scalar_one_or_none()
+                if not m:
+                    raise ValueError(f"Journal '{journal['journal_id']}' not found in database.")
+                if m.status not in ("PENDING_CHECKER", "AWAITING_CPA"):
+                    raise ValueError(
+                        f"CANNOT_REVIEW_FINALIZED_JOURNAL: Journal '{journal['journal_id']}' is already in status '{m.status}'. "
+                        "Cannot approve multiple times or approve a finalized entry."
+                    )
+
+                m.status = "POSTED"
+                m.approved_by_principal_key = journal.get("approved_by_principal_key")
+                m.approved_by_principal_id = journal.get("approved_by_principal_id")
+                m.entry_hash = journal.get("entry_hash")
+                m.prev_entry_hash = journal.get("prev_entry_hash")
+                m.block_index = journal.get("block_index", 0)
+                m.posted_at = datetime.now(timezone.utc)
+                m.ai_reasoning_summary = journal.get("ai_reasoning_summary", "")
+
+                for acc in etb_accounts:
+                    up_stmt = (
+                        update(ETBAccountModel)
+                        .where(
+                            ETBAccountModel.entity_code == entity_code,
+                            ETBAccountModel.account_code == acc.account_code,
+                        )
+                        .values(
+                            period_op_debit=str(acc.period_op_debit),
+                            period_op_credit=str(acc.period_op_credit),
+                            aje_debit=str(acc.aje_debit),
+                            aje_credit=str(acc.aje_credit),
+                        )
+                    )
+                    await session.execute(up_stmt)
+
 
 repo = AccountingRepository()
+

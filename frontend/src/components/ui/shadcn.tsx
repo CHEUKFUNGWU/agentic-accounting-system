@@ -80,7 +80,7 @@ export const Button: React.FC<ButtonProps> = ({
   </button>
 );
 
-export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
+export interface BadgeProps extends React.HTMLAttributes<HTMLElement> {
   variant?: "default" | "secondary" | "outline" | "success" | "warning";
   interactive?: boolean;
 }
@@ -91,22 +91,36 @@ export const Badge: React.FC<BadgeProps> = ({
   className = "",
   children,
   ...props
-}) => (
-  <span
-    className={`sh-badge sh-badge-${variant} ${
-      interactive ? "sh-badge-interactive" : ""
-    } ${className}`.trim()}
-    {...props}
-  >
-    {children}
-  </span>
-);
+}) => {
+  const classes = `sh-badge sh-badge-${variant} ${
+    interactive ? "sh-badge-interactive" : ""
+  } ${className}`.trim();
+
+  if (interactive) {
+    return (
+      <button
+        type="button"
+        className={classes}
+        style={{ font: "inherit", border: "inherit" }}
+        {...(props as React.ButtonHTMLAttributes<HTMLButtonElement>)}
+      >
+        {children}
+      </button>
+    );
+  }
+
+  return (
+    <span className={classes} {...props}>
+      {children}
+    </span>
+  );
+};
 
 export const Progress: React.FC<{ value: number }> = ({ value }) => (
   <div className="sh-progress-track">
     <div
       className="sh-progress-indicator"
-      style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
+      style={{ transform: `scaleX(${Math.min(1, Math.max(0, value / 100))})` }}
     />
   </div>
 );
@@ -118,18 +132,35 @@ export const Sheet: React.FC<{
   description?: string;
   children: React.ReactNode;
 }> = ({ open, onOpenChange, title, description, children }) => {
+  React.useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onOpenChange(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [open, onOpenChange]);
+
   if (!open) return null;
   return (
     <div className="sh-overlay" onClick={() => onOpenChange(false)}>
-      <div className="sh-sheet-content" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="sh-sheet-content"
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>
-            <h2 style={{ margin: 0, fontWeight: 600 }}>{title}</h2>
+            <h2 style={{ margin: 0, fontWeight: 600, fontSize: "1.1rem" }}>{title}</h2>
             {description && (
-              <p style={{ margin: "0.25rem 0 0", color: "var(--muted-foreground)" }}>{description}</p>
+              <p style={{ margin: "0.25rem 0 0", color: "var(--muted-foreground)", fontSize: "0.85rem" }}>
+                {description}
+              </p>
             )}
           </div>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+          <Button variant="ghost" onClick={() => onOpenChange(false)} aria-label="關閉">
             ✕
           </Button>
         </div>
@@ -146,18 +177,35 @@ export const Dialog: React.FC<{
   description?: string;
   children: React.ReactNode;
 }> = ({ open, onOpenChange, title, description, children }) => {
+  React.useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onOpenChange(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [open, onOpenChange]);
+
   if (!open) return null;
   return (
     <div className="sh-dialog-overlay" onClick={() => onOpenChange(false)}>
-      <div className="sh-dialog-content" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="sh-dialog-content"
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1rem" }}>
           <div>
-            <h3 style={{ margin: 0, fontWeight: 600 }}>{title}</h3>
+            <h3 style={{ margin: 0, fontWeight: 600, fontSize: "1.1rem" }}>{title}</h3>
             {description && (
-              <p style={{ margin: "0.25rem 0 0", color: "var(--muted-foreground)" }}>{description}</p>
+              <p style={{ margin: "0.25rem 0 0", color: "var(--muted-foreground)", fontSize: "0.85rem" }}>
+                {description}
+              </p>
             )}
           </div>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+          <Button variant="ghost" onClick={() => onOpenChange(false)} aria-label="關閉">
             ✕
           </Button>
         </div>

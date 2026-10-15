@@ -43,21 +43,21 @@ export const LeadScheduleDrawer: React.FC<LeadScheduleDrawerProps> = ({
         {/* Audit Tickmark & Variance */}
         <div style={{ backgroundColor: "#f0fdf4", border: "1px solid #bbf7d0", padding: "0.6rem 0.75rem", borderRadius: "var(--radius)", fontSize: "0.8rem", color: "#166534" }}>
           <div style={{ fontWeight: 600 }}>{schedule.tickmark}</div>
-          <div>勾稽差額 (Variance): {schedule.variance} (0.0000 絕對平衡)</div>
+          <div>勾稽差額 (Variance): {schedule.variance} (帳實相符)</div>
         </div>
 
-        {/* Roles & Cryptographic Hash */}
+        {/* Roles & Verification Hash */}
         <div style={{ fontSize: "0.8rem", display: "flex", flexDirection: "column", gap: "0.25rem", color: "var(--muted-foreground)" }}>
-          <div>製單智能體 (Maker): <strong style={{ color: "var(--foreground)" }}>{schedule.prepared_by}</strong></div>
-          <div>覆核智能體 (Checker): <strong style={{ color: "var(--foreground)" }}>{schedule.reviewed_by}</strong></div>
+          <div>編制人 (Prepared by): <strong style={{ color: "var(--foreground)" }}>{schedule.prepared_by}</strong></div>
+          <div>覆核人 (Reviewed by): <strong style={{ color: "var(--foreground)" }}>{schedule.reviewed_by}</strong></div>
           <div style={{ marginTop: "0.25rem", wordBreak: "break-all" }}>
-            不可篡改哈希 (SHA-256): <span style={{ fontFamily: "monospace", color: "var(--foreground)" }}>{schedule.evidence_sha256}</span>
+            防偽指紋 (SHA-256): <span style={{ fontFamily: "monospace", color: "var(--foreground)" }}>{schedule.evidence_sha256}</span>
           </div>
         </div>
 
-        {/* AI Reasoning Summary */}
+        {/* Audit Notes */}
         <div style={{ backgroundColor: "var(--secondary)", padding: "0.75rem", borderRadius: "var(--radius)", fontSize: "0.8rem" }}>
-          <div style={{ fontWeight: 600, marginBottom: "0.25rem" }}>🤖 智能體審計推理 (Agent Reasoning):</div>
+          <div style={{ fontWeight: 600, marginBottom: "0.25rem" }}>審計底稿附註與核驗說明:</div>
           <p style={{ margin: 0, color: "var(--foreground)" }}>{schedule.agent_reasoning}</p>
         </div>
 

@@ -60,88 +60,97 @@ export const DesktopManagerView: React.FC<DesktopManagerViewProps> = ({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
       <Card className="sh-card">
-        <CardHeader>
+        <CardHeader style={{ borderBottom: "1px solid var(--border)", paddingBottom: "0.75rem" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
-              <CardTitle style={{ fontSize: "1.1rem" }}>
-                桌面端帳套文件管理 (Desktop Company File & Offline Vault)
+              <CardTitle style={{ fontSize: "1.15rem", fontWeight: 700 }}>
+                帳套文件與資料管理 (Company File & Database Management)
               </CardTitle>
               <span style={{ fontSize: "0.8rem", color: "var(--muted-foreground)" }}>
-                基於 MyGo 跨平台桌面引擎與 SQLite WAL 嵌入式數據庫 • 零運維、開箱即用、離線優先
+                本地嵌入式存儲引擎與備份管理
               </span>
             </div>
-            <Badge variant="default" style={{ fontSize: "0.75rem" }}>
-              MyGo Desktop (macOS / Windows)
+            <Badge variant="outline" style={{ fontSize: "0.75rem" }}>
+              {appPlatform === "darwin" ? "macOS" : appPlatform === "win32" ? "Windows" : appPlatform}
             </Badge>
           </div>
         </CardHeader>
 
-        <CardContent style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+        <CardContent style={{ padding: "1.25rem", display: "flex", flexDirection: "column", gap: "1.25rem" }}>
           {/* Storage Specs Grid */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "0.75rem" }}>
-            <div style={{ border: "1px solid var(--border)", padding: "0.75rem", borderRadius: "var(--radius)" }}>
-              <div style={{ fontSize: "0.75rem", color: "var(--muted-foreground)" }}>存儲引擎架構</div>
-              <div style={{ fontWeight: 600, fontSize: "0.95rem", marginTop: "0.2rem" }}>{storageType}</div>
-              <span style={{ fontSize: "0.7rem", color: "#16a34a" }}>支持高併發讀寫無鎖鎖定</span>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem" }}>
+            <div style={{ border: "1px solid var(--border)", padding: "1rem", borderRadius: "var(--radius)" }}>
+              <div style={{ fontSize: "0.8rem", color: "var(--muted-foreground)" }}>存儲架構</div>
+              <div style={{ fontWeight: 600, fontSize: "1.05rem", marginTop: "0.25rem" }}>{storageType}</div>
+              <span style={{ fontSize: "0.75rem", color: "var(--muted-foreground)" }}>本地獨立事務日誌庫</span>
             </div>
 
-            <div style={{ border: "1px solid var(--border)", padding: "0.75rem", borderRadius: "var(--radius)" }}>
-              <div style={{ fontSize: "0.75rem", color: "var(--muted-foreground)" }}>本機帳套大小 (DB Size)</div>
-              <div style={{ fontWeight: 600, fontSize: "0.95rem", marginTop: "0.2rem" }} className="tabular-nums">
+            <div style={{ border: "1px solid var(--border)", padding: "1rem", borderRadius: "var(--radius)" }}>
+              <div style={{ fontSize: "0.8rem", color: "var(--muted-foreground)" }}>帳套資料大小</div>
+              <div style={{ fontWeight: 600, fontSize: "1.05rem", marginTop: "0.25rem" }} className="tabular-nums">
                 {fileSizeFormatted}
               </div>
-              <span style={{ fontSize: "0.7rem", color: "var(--muted-foreground)" }}>毫秒級加載，極低內存佔用</span>
+              <span style={{ fontSize: "0.75rem", color: "var(--muted-foreground)" }}>即時無延遲本地讀寫</span>
             </div>
 
-            <div style={{ border: "1px solid var(--border)", padding: "0.75rem", borderRadius: "var(--radius)" }}>
-              <div style={{ fontSize: "0.75rem", color: "var(--muted-foreground)" }}>當前操作系統平台</div>
-              <div style={{ fontWeight: 600, fontSize: "0.95rem", marginTop: "0.2rem" }}>
-                {appPlatform === "darwin" ? "Apple macOS (WKWebView)" : appPlatform === "win32" ? "Microsoft Windows (WebView2)" : appPlatform}
+            <div style={{ border: "1px solid var(--border)", padding: "1rem", borderRadius: "var(--radius)" }}>
+              <div style={{ fontSize: "0.8rem", color: "var(--muted-foreground)" }}>執行環境</div>
+              <div style={{ fontWeight: 600, fontSize: "1.05rem", marginTop: "0.25rem" }}>
+                {isNativeDesktop ? "原生桌面應用程式" : "瀏覽器客戶端 (Web)"}
               </div>
-              <span style={{ fontSize: "0.7rem", color: "#2563eb" }}>原生系統渲染無外掛 Chromium</span>
+              <span style={{ fontSize: "0.75rem", color: "var(--muted-foreground)" }}>本地私有數據庫</span>
             </div>
           </div>
 
           {/* Database File Location */}
-          <div style={{ border: "1px solid var(--border)", padding: "0.875rem", borderRadius: "var(--radius)", backgroundColor: "#fafafa" }}>
-            <div style={{ fontSize: "0.8rem", fontWeight: 600, marginBottom: "0.35rem" }}>
-              📂 本地公司帳套文件路徑 (Local Company Database Location):
-            </div>
-            <div style={{ fontFamily: "monospace", fontSize: "0.8rem", wordBreak: "break-all", color: "var(--foreground)" }}>
+          <div style={{ border: "1px solid var(--border)", padding: "1rem", borderRadius: "var(--radius)", backgroundColor: "#fafafa" }}>
+            <div style={{ fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.35rem" }}>帳套資料庫本機路徑:</div>
+            <code style={{ fontSize: "0.8rem", wordBreak: "break-all", color: "#3f3f46" }}>
               {filePath}
+            </code>
+            <div style={{ marginTop: "0.75rem", display: "flex", gap: "0.5rem" }}>
+              <Button variant="outline" onClick={handleOpenFolder} style={{ fontSize: "0.8rem" }}>
+                在檔案總管中定位
+              </Button>
+              <Button variant="outline" onClick={() => navigator.clipboard?.writeText(filePath)} style={{ fontSize: "0.8rem" }}>
+                複製路徑
+              </Button>
             </div>
-            <p style={{ margin: "0.5rem 0 0", fontSize: "0.75rem", color: "var(--muted-foreground)" }}>
-              所有日記帳、延伸試算表、公私混用拆分記錄與 SHA-256 防偽鏈均存儲於此本機文件中，不受任何服務器重啟影響，數據主權 100% 歸創辦人所有。
-            </p>
+            {folderStatus && (
+              <p style={{ margin: "0.5rem 0 0", fontSize: "0.75rem", color: "#2563eb" }}>{folderStatus}</p>
+            )}
           </div>
 
-          {/* Action Area */}
-          <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", flexWrap: "wrap", paddingTop: "0.5rem" }}>
-            <Button variant="default" onClick={handleBackup} disabled={backupLoading}>
-              {backupLoading ? "備份生成中..." : "💾 一鍵生成帳套備份快照 (.db)"}
-            </Button>
-            <Button variant="secondary" onClick={handleOpenFolder}>
-              📂 打開本機帳套目錄 (Finder / Explorer)
-            </Button>
-            <Badge variant={isNativeDesktop ? "success" : "outline"} style={{ fontSize: "0.75rem" }}>
-              {isNativeDesktop ? "● MyGo 原生引擎在線" : "○ 瀏覽器預覽模式"}
-            </Badge>
-          </div>
-
-          {folderStatus && (
-            <div style={{ padding: "0.5rem 0.75rem", backgroundColor: "var(--secondary)", borderRadius: "var(--radius)", fontSize: "0.8rem" }}>
-              {folderStatus}
-            </div>
-          )}
-
-          {lastBackupFile && (
-            <div style={{ padding: "0.75rem", backgroundColor: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "var(--radius)", fontSize: "0.8rem", color: "#166534" }}>
-              ✓ 備份成功！快照文件已生成至：
-              <div style={{ fontFamily: "monospace", marginTop: "0.25rem", wordBreak: "break-all" }}>
-                {lastBackupFile}
+          {/* Manual Backup Action */}
+          <div style={{ border: "1px solid var(--border)", padding: "1rem", borderRadius: "var(--radius)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: "0.9rem" }}>建立即時帳套快照備份</div>
+                <div style={{ fontSize: "0.8rem", color: "var(--muted-foreground)" }}>
+                  將當前 SQLite WAL 帳套文件完整備份至本地獨立副本
+                </div>
               </div>
+              <Button variant="default" onClick={handleBackup} disabled={backupLoading} style={{ fontSize: "0.85rem" }}>
+                {backupLoading ? "備份中..." : "立即備份帳套"}
+              </Button>
             </div>
-          )}
+
+            {lastBackupFile && (
+              <div
+                style={{
+                  marginTop: "0.75rem",
+                  padding: "0.5rem 0.75rem",
+                  borderRadius: "var(--radius)",
+                  backgroundColor: "#f0fdf4",
+                  border: "1px solid #bbf7d0",
+                  fontSize: "0.8rem",
+                  color: "#166534",
+                }}
+              >
+                備份成功：{lastBackupFile}
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>

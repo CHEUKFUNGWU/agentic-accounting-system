@@ -43,15 +43,18 @@ async def test_three_financial_statements_mathematical_proofs():
         assert indirect_op_cash == net_op_cash, f"[{entity_code}] Indirect CF discrepancy"
         assert direct_op_cash == net_op_cash, f"[{entity_code}] Direct CF discrepancy"
 
-        # 4. Lead Schedules Subledger vs GL tying (e.g. W/P A Cash, W/P B AR, W/P AA AP)
+        # 4. Lead Schedules: W/P A transparently flags external unperformed bank feed, while internal roll-forwards tie to GL
         wp_a = lead["W/P A"]
-        assert wp_a["variance"] == "0.0000"
-        assert Decimal(wp_a["gl_balance"]) == Decimal(wp_a["subledger_balance"])
+        assert wp_a["reconciliation_status"] == "NOT_PERFORMED"
+        assert wp_a["evidence_sha256"] is None
+        assert Decimal(wp_a["gl_balance"]) == bs_cash
 
-        wp_b = lead["W/P B"]
-        assert wp_b["variance"] == "0.0000"
-        assert Decimal(wp_b["gl_balance"]) == Decimal(wp_b["subledger_balance"])
+        # W/P DD (Director's Loan & Drawings) rolls forward accurately
+        wp_dd = lead["W/P DD"]
+        assert wp_dd["variance"] == "0.0000"
+        assert Decimal(wp_dd["gl_balance"]) == Decimal(pack["kpi_summary"]["director_loan_net"])
 
-        wp_aa = lead["W/P AA"]
-        assert wp_aa["variance"] == "0.0000"
-        assert Decimal(wp_aa["gl_balance"]) == Decimal(wp_aa["subledger_balance"])
+        # W/P EQ (Equity) rolls forward to Balance Sheet total equity
+        wp_eq = lead["W/P EQ"]
+        assert wp_eq["variance"] == "0.0000"
+        assert Decimal(wp_eq["gl_balance"]) == -Decimal(bs["total_equity"])

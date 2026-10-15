@@ -427,42 +427,57 @@ class StandaloneWorkingPaperEngine:
             (Decimal(str(x.get("personal_amount", "0"))) for x in personal_split_transactions),
             Decimal("0.0000"),
         )
+        opening_prepay_total = q4(sum((r.opening_balance for r in prepay_rows), Decimal("0.0000")))
+        prepay_aje_cr = q4(sum((r.aje_credit for r in prepay_rows), Decimal("0.0000")))
+        prepay_op_net = q4(ending_prepay - opening_prepay_total + prepay_aje_cr)
+
+        opening_ap_total = q4(sum((-r.opening_balance for r in ap_rows), Decimal("0.0000")))
+        ap_aje_cr = q4(sum((r.aje_credit for r in ap_rows), Decimal("0.0000")))
+        ap_op_net = q4(ending_ap_accruals - opening_ap_total - ap_aje_cr)
+
+        other_dir_loan_movements = q4(dir_loan_net - opening_dir_loan_net - personal_split_total)
+
         lead_schedules = {
             "W/P A": {
                 "wp_ref": "W/P A",
                 "title": "Cash & Bank Reconciliation Schedule (貨幣資金與銀行調節底稿)",
                 "gl_balance": str(ending_cash),
-                "subledger_balance": str(ending_cash),
+                "subledger_balance": None,
+                "reconciliation_status": "NOT_PERFORMED",
                 "variance": "0.0000",
-                "prepared_by": "bookkeeper-and-split-agent",
-                "reviewed_by": "controller-reviewer-agent",
-                "tickmark": "✓ Agreed to External Bank Statement & Cash Flow Statement Ending Cash",
-                "evidence_sha256": "8f93b42a11c09d8723e9b55c14f8a2c3d9018472615243a9b8c7d6e5f4a3b2c1",
+                "prepared_by": "bookkeeper-maker-01",
+                "reviewed_by": "controller-checker-01",
+                "tickmark": "⚠ GL Cash Tied to Statement of Cash Flows; External Bank Feed NOT_PERFORMED (Standalone Desktop Mode)",
+                "evidence_sha256": None,
                 "agent_reasoning": (
-                    "Matched 100% of bank feed lines against AR customer settlements and AP supplier payments. "
-                    "Zero unpresented cheques or deposits in transit at period end."
+                    "Internal General Ledger cash accounts reconciled against Statement of Cash Flows operating, "
+                    "investing, and financing movements. External open banking feed and bank statement PDF OCR "
+                    "are not connected in standalone offline desktop mode; manual bank reconciliation is required."
                 ),
                 "items": [
-                    {"item": "Opening Bank Balance (1110)", "amount": str(opening_cash), "note": "Agreed to prior period signed W/P A"},
-                    {"item": "Customer Receipts Reconciled", "amount": str(cash_collected_from_customers), "note": "Matched via Open Banking feed"},
-                    {"item": "Supplier & Operating Outflows", "amount": str(-q4(total_op_cr)), "note": "Includes mixed expense payments"},
-                    {"item": "Ending Reconciled Bank Balance", "amount": str(ending_cash), "note": "✓ Matches Bank Statement PDF"},
+                    {"item": "Opening Bank Balance (1110)", "amount": str(opening_cash), "note": "Agreed to prior period opening GL"},
+                    {"item": "Customer Receipts Reconciled", "amount": str(cash_collected_from_customers), "note": "Operating cash inflows from GL revenue/AR"},
+                    {"item": "Supplier & Operating Outflows", "amount": str(-q4(total_op_cr)), "note": "Includes mixed expense payments and supplier disbursements"},
+                    {"item": "Ending Reconciled Bank Balance", "amount": str(ending_cash), "note": "GL ending balance; manual statement tie-out pending"},
                 ],
             },
             "W/P B": {
                 "wp_ref": "W/P B",
                 "title": "Accounts Receivable & Aging Schedule (應收帳款及帳齡分析底稿)",
                 "gl_balance": str(ending_ar),
-                "subledger_balance": str(ending_ar),
+                "subledger_balance": None,
+                "reconciliation_status": "GL_CONTROL_ACCOUNT_ONLY",
                 "variance": "0.0000",
-                "prepared_by": "bookkeeper-and-split-agent",
-                "reviewed_by": "controller-reviewer-agent",
-                "tickmark": "✓ Sub-ledger Aging agrees to GL Control Account 1210",
-                "evidence_sha256": "3b19c42e88a12f0091c7d64e55a1b2c3d4e5f60718293a4b5c6d7e8f9a0b1c2d",
-                "agent_reasoning": "All open customer invoices are within 0-30 days current terms; 0% Expected Credit Loss (ECL) required.",
+                "prepared_by": "bookkeeper-maker-01",
+                "reviewed_by": "controller-checker-01",
+                "tickmark": "✓ GL Control Account 1210 Tied to ETB; External Invoicing Aging Feed NOT_INTEGRATED",
+                "evidence_sha256": None,
+                "agent_reasoning": (
+                    "Trade AR control account balances tied to General Ledger trial balance. "
+                    "Automated debtor sub-ledger aging and ECL calculation not performed due to absence of external CRM/ERP sync."
+                ),
                 "items": [
-                    {"item": "0 - 30 Days Current Invoices", "amount": str(ending_ar), "note": "Enterprise SaaS & AI Advisory clients"},
-                    {"item": "31 - 90+ Days Overdue", "amount": "0.0000", "note": "No overdue balances"},
+                    {"item": "GL Trade Accounts Receivable Ending", "amount": str(ending_ar), "note": "Current balance in Account 1210"},
                 ],
             },
             "W/P C": {
@@ -471,15 +486,16 @@ class StandaloneWorkingPaperEngine:
                 "gl_balance": str(ending_prepay),
                 "subledger_balance": str(ending_prepay),
                 "variance": "0.0000",
-                "prepared_by": "close-and-workpaper-agent",
-                "reviewed_by": "controller-reviewer-agent",
-                "tickmark": "✓ Prepaid amortization AJE posted & Input Tax verified",
-                "evidence_sha256": "7d42e11a99c34b8812f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2",
-                "agent_reasoning": "Amortized annual cloud/insurance prepayments (1,500.00 AJE) and verified recoverable GST/VAT on business portion of expenses.",
+                "prepared_by": "bookkeeper-maker-01",
+                "reviewed_by": "controller-checker-01",
+                "tickmark": "✓ Prepaid amortization AJE posted & Input Tax verified against GL",
+                "evidence_sha256": None,
+                "agent_reasoning": "Amortized prepayments and verified recoverable GST/VAT input tax on business expenses.",
                 "items": [
-                    {"item": "Opening Prepayments & Input Tax", "amount": "4000.0000", "note": "Annual software & cloud reserve"},
-                    {"item": "Period Input Tax & Additions", "amount": str(q4(ending_prepay - Decimal("2500.0000"))), "note": "Verified tax invoices"},
-                    {"item": "Less: Month-End Prepaid Amortization (AJE)", "amount": "-1500.0000", "note": "Recognized in 6100 Operating Expense"},
+                    {"item": "Opening Prepayments & Input Tax", "amount": str(opening_prepay_total), "note": "Opening balance in accounts 1410/1420"},
+                    {"item": "Period Input Tax & Additions", "amount": str(prepay_op_net), "note": "Operating additions and recoverable tax"},
+                    {"item": "Less: Month-End Prepaid Amortization (AJE)", "amount": str(-prepay_aje_cr), "note": "Recognized in operating expenses"},
+                    {"item": "Ending Prepayments & Input Tax", "amount": str(ending_prepay), "note": "Agrees to Balance Sheet current assets"},
                 ],
             },
             "W/P DD": {
@@ -488,25 +504,30 @@ class StandaloneWorkingPaperEngine:
                 "gl_balance": str(dir_loan_net),
                 "subledger_balance": str(dir_loan_net),
                 "variance": "0.0000",
-                "prepared_by": "bookkeeper-and-split-agent",
-                "reviewed_by": "controller-reviewer-agent",
+                "prepared_by": "bookkeeper-maker-01",
+                "reviewed_by": "controller-checker-01",
                 "tickmark": (
                     "⚠ Debit Director Loan - Review Division 7A / PRC Art. 23"
                     if dir_loan_net > 0
                     else "✓ Net Credit Balance (Company owes Founder - Compliant)"
                 ),
-                "evidence_sha256": "5e91f00c44b23a1987d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d8e7f6a5b4",
+                "evidence_sha256": None,
                 "agent_reasoning": (
                     "Automatically isolated non-business portions of mixed expenses into Account 2190 (W/P DD) "
                     "so personal spending never pollutes P&L expenses or input VAT/GST claims."
                 ),
                 "items": [
-                    {"item": "Opening Founder Advance to Company (Credit)", "amount": "-15000.0000", "note": "Initial seed working capital lent by founder"},
+                    {"item": "Opening Founder Advance / Loan Net", "amount": str(opening_dir_loan_net), "note": "Opening GL balance in Account 2190"},
                     {
-                        "item": f"Personal Portion of Mixed Expenses ({len(personal_split_transactions)} tx)",
+                        "item": f"Personal Portion of Posted Mixed Expenses ({len(personal_split_transactions)} tx)",
                         "amount": str(personal_split_total),
                         "note": "Excluded from P&L & Input GST/VAT",
                     },
+                    *(
+                        [{"item": "Other Movements / Disallowances", "amount": str(other_dir_loan_movements), "note": "Direct settlements & adjustments"}]
+                        if other_dir_loan_movements != Decimal("0.0000")
+                        else []
+                    ),
                     {"item": "Ending Net Balance (+Due from Owner / -Owed to Owner)", "amount": str(dir_loan_net), "note": "Flows to Balance Sheet"},
                 ],
             },
@@ -516,13 +537,13 @@ class StandaloneWorkingPaperEngine:
                 "gl_balance": str(net_book_value_fa),
                 "subledger_balance": str(net_book_value_fa),
                 "variance": "0.0000",
-                "prepared_by": "close-and-workpaper-agent",
-                "reviewed_by": "controller-reviewer-agent",
-                "tickmark": "✓ Fixed Asset Register agrees to GL 1610/1650 & Cash Flow CapEx",
-                "evidence_sha256": "9a12b34c56d78e90f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4",
-                "agent_reasoning": "Calculated monthly straight-line depreciation (2,000.00 AJE) across AI servers and Mac Studio workstations.",
+                "prepared_by": "bookkeeper-maker-01",
+                "reviewed_by": "controller-checker-01",
+                "tickmark": "✓ Fixed Asset Gross Cost and Depreciation roll-forward agrees to GL and Investing Cash Flow",
+                "evidence_sha256": None,
+                "agent_reasoning": "Calculated monthly depreciation across equipment and verified gross additions against investing cash outflows.",
                 "items": [
-                    {"item": "Opening Cost (1610)", "amount": str(opening_fa_cost), "note": "Mac Studio & GPU Cluster"},
+                    {"item": "Opening Cost (1610)", "amount": str(opening_fa_cost), "note": "Opening gross fixed assets"},
                     {"item": "Period CapEx Additions", "amount": str(-capex_outflow), "note": "Agreed to Investing Cash Flow"},
                     {"item": "Ending Gross Cost", "amount": str(gross_fixed_assets), "note": "W/P F-COST"},
                     {"item": "Accumulated Depreciation (incl. Period AJE)", "amount": str(accum_depreciation), "note": "W/P F-ACCUM"},
@@ -533,16 +554,19 @@ class StandaloneWorkingPaperEngine:
                 "wp_ref": "W/P AA",
                 "title": "Accounts Payable & Accrued Expenses Schedule (應付帳款及月底應計費用底稿)",
                 "gl_balance": str(-ending_ap_accruals),
-                "subledger_balance": str(-ending_ap_accruals),
+                "subledger_balance": None,
+                "reconciliation_status": "GL_CONTROL_ACCOUNT_ONLY",
                 "variance": "0.0000",
-                "prepared_by": "close-and-workpaper-agent",
-                "reviewed_by": "controller-reviewer-agent",
-                "tickmark": "✓ 3-Way Matched Vendor Bills & Month-End Accruals Verified",
-                "evidence_sha256": "2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d",
-                "agent_reasoning": "Reconciled open vendor bills and accrued 3,500.00 for unbilled month-end cloud & accounting fees.",
+                "prepared_by": "bookkeeper-maker-01",
+                "reviewed_by": "controller-checker-01",
+                "tickmark": "✓ AP & Accruals GL balance verified; 3-Way PO/Invoice Matching: NOT_PERFORMED",
+                "evidence_sha256": None,
+                "agent_reasoning": "Reconciled open vendor payables and accrued expenses in GL. External 3-way PO/Invoice/GRN matching not performed.",
                 "items": [
-                    {"item": "Trade Accounts Payable (3-Way Matched)", "amount": str(q4(ending_ap_accruals - Decimal("3500.0000"))), "note": "Sub-ledger open vendor bills"},
-                    {"item": "Month-End Accrued Expenses (AJE)", "amount": "3500.0000", "note": "Unbilled cloud & audit accrual"},
+                    {"item": "Opening AP & Accruals", "amount": str(opening_ap_total), "note": "Opening GL balance"},
+                    {"item": "Period AP Invoices & Operating Movements", "amount": str(ap_op_net), "note": "Net vendor billings and disbursements"},
+                    {"item": "Month-End Accrued Expenses (AJE)", "amount": str(ap_aje_cr), "note": "Unbilled accruals"},
+                    {"item": "Ending Accounts Payable & Accrued Expenses", "amount": str(ending_ap_accruals), "note": "Agreed to Balance Sheet current liabilities"},
                 ],
             },
             "W/P CC": {
@@ -551,11 +575,11 @@ class StandaloneWorkingPaperEngine:
                 "gl_balance": str(-ending_tax_payable),
                 "subledger_balance": str(-ending_tax_payable),
                 "variance": "0.0000",
-                "prepared_by": "close-and-workpaper-agent",
-                "reviewed_by": "controller-reviewer-agent",
+                "prepared_by": "bookkeeper-maker-01",
+                "reviewed_by": "controller-checker-01",
                 "tickmark": f"✓ {reg_tax['relief_applied']}",
-                "evidence_sha256": "4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a",
-                "agent_reasoning": f"Computed indirect tax (VAT/GST/Use Tax) and Corporate/Schedule-C Income Tax provision under {jurisdiction} SME rules.",
+                "evidence_sha256": None,
+                "agent_reasoning": f"Computed indirect tax (VAT/GST/Use Tax) and statutory tax provision under {jurisdiction} SME rules.",
                 "items": [
                     {"item": k, "amount": v, "note": f"{jurisdiction} Statutory Return Box"}
                     for k, v in reg_tax["boxes"].items()
@@ -567,10 +591,10 @@ class StandaloneWorkingPaperEngine:
                 "gl_balance": str(-total_equity),
                 "subledger_balance": str(-total_equity),
                 "variance": "0.0000",
-                "prepared_by": "close-and-workpaper-agent",
-                "reviewed_by": "controller-reviewer-agent",
+                "prepared_by": "bookkeeper-maker-01",
+                "reviewed_by": "controller-checker-01",
                 "tickmark": "✓ Net Profit from W/P PL reconciled to Ending Equity",
-                "evidence_sha256": "6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c",
+                "evidence_sha256": None,
                 "agent_reasoning": "Verified opening share/owner capital plus current period net profit tie out to Balance Sheet Equity.",
                 "items": [
                     {"item": "Opening Share / Owner Capital & Retained Surplus", "amount": str(opening_equity_and_capital), "note": "Agreed to statutory register"},
@@ -584,10 +608,10 @@ class StandaloneWorkingPaperEngine:
                 "gl_balance": str(net_profit),
                 "subledger_balance": str(net_profit),
                 "variance": "0.0000",
-                "prepared_by": "close-and-workpaper-agent",
-                "reviewed_by": "controller-reviewer-agent",
+                "prepared_by": "bookkeeper-maker-01",
+                "reviewed_by": "controller-checker-01",
                 "tickmark": "✓ Cut-off tested; personal expenses excluded",
-                "evidence_sha256": "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b",
+                "evidence_sha256": None,
                 "agent_reasoning": "Verified revenue cut-off and confirmed all month-end depreciation, prepaid amortization, and accrual AJEs are reflected.",
                 "items": [
                     {"item": "Total Revenue (W/P PL-10)", "amount": str(total_revenue), "note": f"Gross Margin {gross_margin_pct:.1f}%"},
@@ -667,17 +691,18 @@ class StandaloneWorkingPaperEngine:
             {
                 "step": 1,
                 "code": "BANK_REC_WP_A",
-                "title": "Bank Feeds 100% Reconciled to Statement (銀行流水對帳完畢)",
+                "title": "Bank Feeds Reconciled to Statement (銀行流水對帳)",
                 "wp_ref": "W/P A",
-                "agent": "bookkeeper-and-split-agent",
-                "status": "COMPLETED",
+                "agent": "bookkeeper-maker-01",
+                "status": "NOT_PERFORMED",
+                "note": "Open Banking live feed not integrated in desktop standalone mode. Manual bank reconciliation required.",
             },
             {
                 "step": 2,
                 "code": "OWNER_SPLIT_WP_DD",
                 "title": "Mixed Personal/Business Expenses Apportioned (公私混用費用拆分與股東往來檢核)",
                 "wp_ref": "W/P DD",
-                "agent": "bookkeeper-and-split-agent",
+                "agent": "bookkeeper-maker-01",
                 "status": "WARNING" if dir_loan_asset > 0 else "COMPLETED",
             },
             {
@@ -685,7 +710,7 @@ class StandaloneWorkingPaperEngine:
                 "code": "PREPAY_FA_AJE_WP_CF",
                 "title": "Prepayments & Fixed Asset Depreciation AJEs Posted (預付攤銷與折舊提列)",
                 "wp_ref": "W/P F",
-                "agent": "close-and-workpaper-agent",
+                "agent": "bookkeeper-maker-01",
                 "status": "COMPLETED",
             },
             {
@@ -693,7 +718,7 @@ class StandaloneWorkingPaperEngine:
                 "code": "STATUTORY_TAX_WP_CC",
                 "title": f"Statutory Tax & {jurisdiction} Return Boxes Verified (稅務申報底稿與預留稅款計算)",
                 "wp_ref": "W/P CC",
-                "agent": "close-and-workpaper-agent",
+                "agent": "bookkeeper-maker-01",
                 "status": "COMPLETED",
             },
             {
@@ -701,7 +726,7 @@ class StandaloneWorkingPaperEngine:
                 "code": "THREE_STMT_PROOF",
                 "title": "ETB Cross-Foot, B/S Equation & Cash Flow Proof (三大報表平衡與現金流量勾稽)",
                 "wp_ref": "W/P BS",
-                "agent": "controller-reviewer-agent",
+                "agent": "controller-checker-01",
                 "status": "COMPLETED",
             },
             {
@@ -722,7 +747,7 @@ class StandaloneWorkingPaperEngine:
             "balance_sheet_variance": str(q4(total_assets - total_liab_and_equity)),
             "cash_flow_reconciles_to_bs_cash": computed_ending_cash == ending_cash,
             "cash_flow_variance": str(q4(computed_ending_cash - ending_cash)),
-            "net_profit_flows_to_equity": True,
+            "net_profit_flows_to_equity": (opening_equity_and_capital + net_profit == total_equity),
         }
 
         kpi_summary = {

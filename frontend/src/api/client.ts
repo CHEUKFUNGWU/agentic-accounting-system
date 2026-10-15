@@ -554,15 +554,24 @@ function buildFallbackPack(entityCode: string, period = "2026-10"): ThreeStateme
   };
 }
 
+let _isBackendOffline = false;
+
+export function isOfflineDemoMode(): boolean {
+  return _isBackendOffline;
+}
+
 export async function fetchWorkingPaperPack(
   entityCode: string,
   period = "2026-10"
 ): Promise<ThreeStatementWorkingPaperPack> {
   try {
     const res = await fetch(`${API_BASE_URL}/workpapers/${entityCode}/${period}`);
-    if (res.ok) return await res.json();
-  } catch {
-    // Fallback to deterministic in-browser engine if backend is offline
+    if (res.ok) {
+      _isBackendOffline = false;
+      return await res.json();
+    }
+  } catch (err) {
+    _isBackendOffline = true;
   }
   return buildFallbackPack(entityCode, period);
 }
@@ -576,34 +585,22 @@ export async function triggerMixedExpenseSplit(params: {
 }): Promise<{
   updated_working_paper_pack: ThreeStatementWorkingPaperPack;
 }> {
+  let res: Response;
   try {
-    const res = await fetch(`${API_BASE_URL}/webhooks/personal-expense-split`, {
+    res = await fetch(`${API_BASE_URL}/webhooks/personal-expense-split`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(params),
     });
-    if (res.ok) return await res.json();
-  } catch {
-    // Apply to local state fallback
+  } catch (err: any) {
+    throw new Error(`Network failure connecting to backend: ${err?.message || "Server unreachable"}`);
   }
-  const state = getOrInitLocalState(params.entity_code);
-  const gross = parseFloat(params.gross_amount_paid) || 0;
-  const rate = parseFloat(params.tax_rate) || 0;
-  const bizPct = parseFloat(params.business_use_pct) || 0.7;
-  const net = gross / (1 + rate);
-  const tax = gross - net;
-  const bizExp = net * bizPct;
-  const bizTax = tax * bizPct;
-  const personal = gross - bizExp - bizTax;
 
-  for (const r of state.rows) {
-    if (r.code === "1110") r.opCr += gross;
-    if (r.code === "6100") r.opDr += bizExp;
-    if (r.code === "1420") r.opDr += bizTax;
-    if (r.code === "2190") r.opDr += personal;
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(errorBody.detail || errorBody.message || `Server rejected mixed expense split (${res.status})`);
   }
-  state.splits += 1;
-  return { updated_working_paper_pack: buildFallbackPack(params.entity_code) };
+  return await res.json();
 }
 
 export async function postAdjustingWorkpaperEntry(params: {
@@ -616,23 +613,22 @@ export async function postAdjustingWorkpaperEntry(params: {
 }): Promise<{
   updated_working_paper_pack: ThreeStatementWorkingPaperPack;
 }> {
+  let res: Response;
   try {
-    const res = await fetch(`${API_BASE_URL}/workpapers/aje`, {
+    res = await fetch(`${API_BASE_URL}/workpapers/aje`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(params),
     });
-    if (res.ok) return await res.json();
-  } catch {
-    // Apply to local state fallback
+  } catch (err: any) {
+    throw new Error(`Network failure connecting to backend: ${err?.message || "Server unreachable"}`);
   }
-  const state = getOrInitLocalState(params.entity_code);
-  const amt = parseFloat(params.amount) || 0;
-  for (const r of state.rows) {
-    if (r.code === params.debit_account_code) r.ajeDr += amt;
-    if (r.code === params.credit_account_code) r.ajeCr += amt;
+
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(errorBody.detail || errorBody.message || `Server rejected AJE (${res.status})`);
   }
-  return { updated_working_paper_pack: buildFallbackPack(params.entity_code) };
+  return await res.json();
 }
 
 export async function lockWorkingPaperPack(
@@ -641,19 +637,22 @@ export async function lockWorkingPaperPack(
 ): Promise<{
   updated_working_paper_pack: ThreeStatementWorkingPaperPack;
 }> {
+  let res: Response;
   try {
-    const res = await fetch(`${API_BASE_URL}/workpapers/${entityCode}/${period}/lock`, {
+    res = await fetch(`${API_BASE_URL}/workpapers/${entityCode}/${period}/lock`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ cpa_principal_key: "cpa-griffin", period }),
     });
-    if (res.ok) return await res.json();
-  } catch {
-    // Apply to local state fallback
+  } catch (err: any) {
+    throw new Error(`Network failure connecting to backend: ${err?.message || "Server unreachable"}`);
   }
-  const state = getOrInitLocalState(entityCode);
-  state.locked = true;
-  return { updated_working_paper_pack: buildFallbackPack(entityCode, period) };
+
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(errorBody.detail || errorBody.message || `Server rejected pack lock (${res.status})`);
+  }
+  return await res.json();
 }
 
 export async function checkLiveBackendHealth(): Promise<boolean> {
@@ -719,8 +718,9 @@ export async function reviewJournal(params: {
   rejection_reason?: string;
   reviewer_principal_key?: string;
 }): Promise<any> {
+  let res: Response;
   try {
-    const res = await fetch(`${API_BASE_URL}/journals/${params.journal_id}/review`, {
+    res = await fetch(`${API_BASE_URL}/journals/${params.journal_id}/review`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -729,11 +729,15 @@ export async function reviewJournal(params: {
         rejection_reason: params.rejection_reason || "",
       }),
     });
-    if (res.ok) return await res.json();
-  } catch (err) {
-    console.error("Failed to review journal on backend:", err);
+  } catch (err: any) {
+    throw new Error(`Network failure connecting to backend: ${err?.message || "Server unreachable"}`);
   }
-  return { status: params.action === "APPROVE" ? "POSTED" : "REJECTED" };
+
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(errorBody.detail || errorBody.message || `Server rejected journal review (${res.status})`);
+  }
+  return await res.json();
 }
 
 export async function fetchDesktopCompanyFileInfo(): Promise<{

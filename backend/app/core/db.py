@@ -34,6 +34,7 @@ from sqlalchemy import (
     Text,
     create_engine,
     event,
+    func,
     select,
 )
 from sqlalchemy.ext.asyncio import (
@@ -122,6 +123,8 @@ class JournalEntryModel(Base):
     evidence_uris: Mapped[str] = mapped_column(Text, default="[]")  # JSON encoded list
     entry_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     prev_entry_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    block_index: Mapped[int] = mapped_column(Integer, default=0, index=True)
+    posted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     lines_json: Mapped[str] = mapped_column(Text, default="[]")  # JSON encoded lines
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)

@@ -230,17 +230,26 @@ async def get_desktop_company_file_info() -> Dict[str, Any]:
 
 @app.post("/api/v1/desktop/backup")
 async def backup_company_file() -> Dict[str, Any]:
-    import shutil
     from datetime import datetime
-    from app.core.db import get_default_db_path
+    from app.core.db import db_manager, get_default_db_path
 
     db_path = get_default_db_path()
     if not db_path.exists():
         raise HTTPException(status_code=404, detail="Company database file not found.")
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     backup_name = f"AgenticAccounting_Backup_{timestamp}.db"
     backup_path = db_path.parent / backup_name
-    shutil.copy2(db_path, backup_path)
+    backup_path.unlink(missing_ok=True)
+
+    if db_manager.is_sqlite:
+        escaped_path = backup_path.as_posix().replace("'", "''")
+        async with db_manager.engine.connect() as conn:
+            autocommit_conn = await conn.execution_options(isolation_level="AUTOCOMMIT")
+            await autocommit_conn.exec_driver_sql(f"VACUUM INTO '{escaped_path}';")
+    else:
+        import shutil
+        shutil.copy2(db_path, backup_path)
+
     return {
         "status": "BACKUP_CREATED",
         "backup_file": str(backup_path),

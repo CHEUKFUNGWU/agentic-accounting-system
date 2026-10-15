@@ -5,20 +5,22 @@ Enforces:
   2. Sub-ledger Control Account isolation (no manual journal entries to AR, AP, Cash, Inventory, FA control accounts)
   3. Fiscal Period cut-off (OPEN vs. SOFT_CLOSE vs. HARD_CLOSE/LOCKED)
   4. Maker-Checker-Auditor role separation (approver != creator; materiality & confidence thresholds)
-  5. SHA-256 cryptographic hash-chaining for POSTED entries
+  5. SHA-256 cryptographic hash-chaining including journal lines protection for POSTED entries
 """
 
 from __future__ import annotations
 
 import hashlib
+import json
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import Enum
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 
 class AgentRole(str, Enum):
+    MAKER_BOOKKEEPER = "MAKER_BOOKKEEPER"
     MAKER_AP = "MAKER_AP"
     MAKER_AR_REVREC = "MAKER_AR_REVREC"
     MAKER_BANK_REC = "MAKER_BANK_REC"
@@ -75,8 +77,8 @@ class AccountingInvariantError(Exception):
 class DeterministicSoDGuard:
     """Validates accounting invariants and Maker-Checker-Auditor governance before state transitions."""
 
-    OPERATIONAL_MODULES = {"AP", "AR", "BANK_REC", "INVENTORY"}
-    CLOSING_MODULES = {"FA", "LEASE", "REV_REC", "FX_REVAL", "IC_ELIM", "GL_MANUAL"}
+    OPERATIONAL_MODULES = {"AP", "AR", "BANK_REC", "INVENTORY", "EXPENSE_SPLIT"}
+    CLOSING_MODULES = {"FA", "LEASE", "REV_REC", "FX_REVAL", "IC_ELIM", "GL_MANUAL", "AJE"}
 
     @classmethod
     def validate_proposal_submission(
@@ -88,8 +90,8 @@ class DeterministicSoDGuard:
         evidence_uris: List[str],
         confidence_score: Decimal,
     ) -> None:
-        # 1. Verify Maker Role Permissions
-        if maker.role in (AgentRole.CHECKER_CONTROLLER, AgentRole.AUDITOR_INTERNAL):
+        # 1. Verify Maker Role Permissions: Must strictly be a Maker role
+        if not maker.role.value.startswith("MAKER_"):
             raise AccountingInvariantError(
                 f"SOD_ROLE_VIOLATION: Principal '{maker.agent_name}' with role '{maker.role}' cannot create proposals."
             )
@@ -122,7 +124,7 @@ class DeterministicSoDGuard:
         func_cr = sum((line.func_credit for line in lines), Decimal("0.0000"))
 
         for line in lines:
-            if (line.tx_debit > 0 and line.tx_credit > 0) or (line.tx_debit == 0 and line.tx_credit == 0):
+            if (line.tx_debit > 0 and line.tx_credit > 0) or (line.tx_debit <= 0 and line.tx_credit <= 0):
                 raise AccountingInvariantError(
                     f"LINE_EXCLUSIVITY_VIOLATION: Line {line.line_number} must have strictly positive debit OR credit."
                 )
@@ -176,18 +178,78 @@ class DeterministicSoDGuard:
         return JournalStatus.AWAITING_CPA
 
     @staticmethod
+    def compute_lines_sha256(lines: List[Dict[str, Any]]) -> str:
+        """Computes deterministic SHA-256 hash of line items to prevent line alteration."""
+        sorted_lines = sorted(lines, key=lambda l: l.get("line_number", 0))
+        canonical = json.dumps(
+            [
+                {
+                    "line_number": l.get("line_number"),
+                    "account_code": l.get("account_code"),
+                    "debit": str(l.get("debit", "0.0000")),
+                    "credit": str(l.get("credit", "0.0000")),
+                }
+                for l in sorted_lines
+            ],
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+    @staticmethod
     def compute_entry_sha256_hash(
         prev_entry_hash: str,
-        journal_id: UUID,
-        entity_id: UUID,
+        journal_id: str,
+        entity_code: str,
         accounting_date: str,
         func_debit: Decimal,
         func_credit: Decimal,
-        created_by: UUID,
-        approved_by: UUID,
+        lines_sha256: str,
+        created_by: str,
+        approved_by: str,
     ) -> str:
+        """Computes immutable cryptographic hash linking entry to previous block and line contents."""
         payload = (
-            f"{prev_entry_hash}|{journal_id}|{entity_id}|{accounting_date}|"
-            f"{func_debit:.4f}|{func_credit:.4f}|{created_by}|{approved_by}"
+            f"{prev_entry_hash}|{journal_id}|{entity_code}|{accounting_date}|"
+            f"{func_debit:.4f}|{func_credit:.4f}|{lines_sha256}|{created_by}|{approved_by}"
         )
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    @classmethod
+    def verify_hash_chain(cls, journals: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Validates cryptographic integrity and uninterrupted chaining of posted journals.
+        Returns {"valid": True} or details of tampering/breakage.
+        """
+        posted = [j for j in journals if j.get("status") == JournalStatus.POSTED.value and j.get("entry_hash")]
+        # Sort chronologically by posting sequence/timestamp
+        posted.sort(key=lambda j: j.get("created_at", ""))
+
+        prev_hash = "GENESIS_BLOCK_0000000000000000000000000000000000000000000000000000000000"
+        for idx, j in enumerate(posted):
+            expected_prev = j.get("prev_entry_hash")
+            if expected_prev != prev_hash:
+                return {
+                    "valid": False,
+                    "error": f"Chain broken at entry index {idx} ({j.get('journal_id')}): expected prev {prev_hash}, got {expected_prev}",
+                }
+            lines = j.get("lines", [])
+            lines_hash = cls.compute_lines_sha256(lines)
+            computed = cls.compute_entry_sha256_hash(
+                prev_entry_hash=expected_prev,
+                journal_id=str(j.get("journal_id")),
+                entity_code=str(j.get("entity_code")),
+                accounting_date=str(j.get("accounting_date")),
+                func_debit=Decimal(str(j.get("total_debit"))),
+                func_credit=Decimal(str(j.get("total_credit"))),
+                lines_sha256=lines_hash,
+                created_by=str(j.get("created_by_principal_id")),
+                approved_by=str(j.get("approved_by_principal_id")),
+            )
+            if computed != j.get("entry_hash"):
+                return {
+                    "valid": False,
+                    "error": f"Hash mismatch at entry {j.get('journal_id')}: computed {computed} vs stored {j.get('entry_hash')}",
+                }
+            prev_hash = computed
+        return {"valid": True, "verified_blocks_count": len(posted)}
