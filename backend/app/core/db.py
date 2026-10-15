@@ -168,14 +168,22 @@ class DatabaseManager:
 
     def __init__(self, db_url: Optional[str] = None):
         if not db_url:
+            db_url = os.environ.get("DATABASE_URL")
+        if not db_url:
             db_path = get_default_db_path()
             db_url = f"sqlite+aiosqlite:///{db_path}"
+        elif db_url.startswith("postgresql://") or db_url.startswith("postgres://"):
+            db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1).replace("postgres://", "postgresql+asyncpg://", 1)
+
         self.db_url = db_url
         self.is_sqlite = db_url.startswith("sqlite")
+        self.is_postgres = "postgres" in db_url
+        engine_kwargs: Dict[str, Any] = {"echo": False, "future": True}
+        if not self.is_sqlite:
+            engine_kwargs.update({"pool_size": 10, "max_overflow": 20, "pool_pre_ping": True})
         self.engine: AsyncEngine = create_async_engine(
             self.db_url,
-            echo=False,
-            future=True,
+            **engine_kwargs,
         )
         self.session_factory = async_sessionmaker(
             bind=self.engine,

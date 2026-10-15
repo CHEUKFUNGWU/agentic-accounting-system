@@ -184,7 +184,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           </Button>
 
           <Button variant="outline" onClick={onBackupDb} style={{ fontSize: "0.825rem" }}>
-            💾 備份帳套
+            💾 備份賬套
           </Button>
 
           {packStatus !== "CPA_SIGNED_LOCKED" && (

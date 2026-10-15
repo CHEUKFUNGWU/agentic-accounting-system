@@ -9,7 +9,7 @@ Generates:
   4. Statement 2: Standalone Balance Sheet (資產負債表底稿) with A = L + E Hard Check
   5. Statement 3: Standalone Cash Flow Statement (現金流量表底稿 - 間接法 Indirect + 直接法 Direct 雙軌調節)
   6. Statutory Tax Filing & Cash Tax Reserve Working Paper (W/P CC-TAX 各國報稅格位與安全可支用現金計算)
-  7. Month-End Close Readiness Checklist (月結關帳與底稿健康度檢核清單)
+  7. Month-End Close Readiness Checklist (月結關賬與底稿健康度檢核清單)
 """
 
 from __future__ import annotations
@@ -246,8 +246,8 @@ class StandaloneWorkingPaperEngine:
             "currency": currency,
             "current_assets": [
                 {"wp_ref": "W/P A", "label": "Cash & Bank Balances (貨幣資金 / 銀行存款)", "amount": str(ending_cash)},
-                {"wp_ref": "W/P B", "label": "Accounts Receivable, Net (應收帳款淨額)", "amount": str(ending_ar)},
-                {"wp_ref": "W/P C", "label": "Prepayments & Input VAT/GST (預付帳款及留抵稅額)", "amount": str(ending_prepay)},
+                {"wp_ref": "W/P B", "label": "Accounts Receivable, Net (應收賬款淨額)", "amount": str(ending_ar)},
+                {"wp_ref": "W/P C", "label": "Prepayments & Input VAT/GST (預付賬款及留抵稅額)", "amount": str(ending_prepay)},
                 *(
                     [{"wp_ref": "W/P DD", "label": "Due from Director / Owner (應收股東/業主往來)", "amount": str(dir_loan_asset)}]
                     if dir_loan_asset > 0
@@ -262,7 +262,7 @@ class StandaloneWorkingPaperEngine:
             ],
             "total_assets": str(total_assets),
             "current_liabilities": [
-                {"wp_ref": "W/P AA", "label": "Accounts Payable & Accrued Expenses (應付帳款及應計費用)", "amount": str(ending_ap_accruals)},
+                {"wp_ref": "W/P AA", "label": "Accounts Payable & Accrued Expenses (應付賬款及應計費用)", "amount": str(ending_ap_accruals)},
                 {"wp_ref": "W/P CC", "label": "Statutory Taxes Payable - GST/VAT/CIT (應交稅費)", "amount": str(ending_tax_payable)},
                 *(
                     [{"wp_ref": "W/P DD", "label": "Director's Loan / Due to Owner (應付股東/董事往來款)", "amount": str(dir_loan_liability)}]
@@ -320,7 +320,7 @@ class StandaloneWorkingPaperEngine:
             "indirect_method_operating": [
                 {"wp_ref": "W/P PL", "label": "Net Profit for the Period (本期淨利)", "amount": str(net_profit)},
                 {"wp_ref": "W/P F", "label": "Add back: Depreciation & Amortization (加：折舊及攤銷)", "amount": str(total_dep)},
-                {"wp_ref": "W/P B", "label": "Increase / Decrease in Accounts Receivable (應收帳款變動)", "amount": str(-delta_ar)},
+                {"wp_ref": "W/P B", "label": "Increase / Decrease in Accounts Receivable (應收賬款變動)", "amount": str(-delta_ar)},
                 {"wp_ref": "W/P C", "label": "Increase / Decrease in Prepayments & Input Tax (預付及留抵稅額變動)", "amount": str(-delta_prepay)},
                 {"wp_ref": "W/P AA", "label": "Increase / Decrease in Payables & Accruals (應付及應計費用變動)", "amount": str(delta_ap)},
                 {"wp_ref": "W/P CC", "label": "Increase / Decrease in Statutory Taxes Payable (應交稅費變動)", "amount": str(delta_tax)},
@@ -463,7 +463,7 @@ class StandaloneWorkingPaperEngine:
             },
             "W/P B": {
                 "wp_ref": "W/P B",
-                "title": "Accounts Receivable & Aging Schedule (應收帳款及帳齡分析底稿)",
+                "title": "Accounts Receivable & Aging Schedule (應收賬款及賬齡分析底稿)",
                 "gl_balance": str(ending_ar),
                 "subledger_balance": None,
                 "reconciliation_status": "GL_CONTROL_ACCOUNT_ONLY",
@@ -552,7 +552,7 @@ class StandaloneWorkingPaperEngine:
             },
             "W/P AA": {
                 "wp_ref": "W/P AA",
-                "title": "Accounts Payable & Accrued Expenses Schedule (應付帳款及月底應計費用底稿)",
+                "title": "Accounts Payable & Accrued Expenses Schedule (應付賬款及月底應計費用底稿)",
                 "gl_balance": str(-ending_ap_accruals),
                 "subledger_balance": None,
                 "reconciliation_status": "GL_CONTROL_ACCOUNT_ONLY",
@@ -637,7 +637,7 @@ class StandaloneWorkingPaperEngine:
                         "detail": (
                             f"股東往來呈現借方佔款 ({currency} {dir_loan_asset})，存在公私財產混同連帶責任風險，請於年度審計前清償。"
                             if dir_loan_asset > 0
-                            else f"公私帳務完全分離（W/P DD 貸方餘額 {currency} {dir_loan_liability} 為股東墊款），符合新公司法第23條要求。"
+                            else f"公私賬務完全分離（W/P DD 貸方餘額 {currency} {dir_loan_liability} 為股東墊款），符合新公司法第23條要求。"
                         ),
                     }
                 )
@@ -677,7 +677,7 @@ class StandaloneWorkingPaperEngine:
         if personal_split_transactions:
             compliance_checks.append(
                 {
-                    "rule": "Mixed Personal/Business Expense Apportionment (公私混用費用自動拆帳)",
+                    "rule": "Mixed Personal/Business Expense Apportionment (公私混用費用自動拆賬)",
                     "status": "APPLIED",
                     "detail": (
                         f"已自動拆分 {len(personal_split_transactions)} 筆公私混用支出；私人比例 ({currency} {personal_split_total}) "
@@ -686,12 +686,12 @@ class StandaloneWorkingPaperEngine:
                 }
             )
 
-        # 8. Month-End Close Readiness Checklist (月結關帳與底稿健康度清單)
+        # 8. Month-End Close Readiness Checklist (月結關賬與底稿健康度清單)
         close_checklist = [
             {
                 "step": 1,
                 "code": "BANK_REC_WP_A",
-                "title": "Bank Feeds Reconciled to Statement (銀行流水對帳)",
+                "title": "Bank Feeds Reconciled to Statement (銀行流水對賬)",
                 "wp_ref": "W/P A",
                 "agent": "bookkeeper-maker-01",
                 "status": "NOT_PERFORMED",

@@ -1,6 +1,7 @@
 import React from "react";
 import { LeadScheduleDetail } from "../types/accounting";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from "./ui/shadcn";
+import { useI18n, cleanLabel } from "../i18n";
 
 interface LeadSchedulesViewProps {
   currency: string;
@@ -13,6 +14,8 @@ export const LeadSchedulesView: React.FC<LeadSchedulesViewProps> = ({
   schedules,
   onOpenWpDrawer,
 }) => {
+  const { t, lang } = useI18n();
+
   const fmt = (val: string | number) => {
     const n = typeof val === "string" ? parseFloat(val) : val;
     if (isNaN(n)) return val;
@@ -34,10 +37,10 @@ export const LeadSchedulesView: React.FC<LeadSchedulesViewProps> = ({
     <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
       <div>
         <h2 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0 }}>
-          審計明細底稿庫 (Audit Lead Schedules)
+          {t.wp_title}
         </h2>
         <span style={{ fontSize: "0.8rem", color: "var(--muted-foreground)" }}>
-          總帳與子帳對帳勾稽明細（W/P A ~ W/P EQ）
+          {t.wp_subtitle}
         </span>
       </div>
 
@@ -56,37 +59,37 @@ export const LeadSchedulesView: React.FC<LeadSchedulesViewProps> = ({
                   </Badge>
                   {isBalanced ? (
                     <Badge variant="success" style={{ fontSize: "0.7rem" }}>
-                      勾稽相符 (0.00)
+                      {t.wp_balanced_status}
                     </Badge>
                   ) : (
                     <Badge variant="warning" style={{ fontSize: "0.7rem" }}>
-                      差額: {sched.variance}
+                      {t.wp_variance}: {sched.variance}
                     </Badge>
                   )}
                 </div>
                 <CardTitle style={{ fontSize: "0.95rem", marginTop: "0.35rem", fontWeight: 600 }}>
-                  {sched.title}
+                  {cleanLabel(sched.title, lang)}
                 </CardTitle>
               </CardHeader>
 
               <CardContent style={{ fontSize: "0.85rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px dashed var(--border)", paddingBottom: "0.35rem" }}>
-                  <span style={{ color: "var(--muted-foreground)" }}>總帳餘額:</span>
+                  <span style={{ color: "var(--muted-foreground)" }}>{t.wp_gl_balance}:</span>
                   <span className="tabular-nums" style={{ fontWeight: 600 }}>
                     {currency} {fmt(sched.gl_balance)}
                   </span>
                 </div>
 
                 <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px dashed var(--border)", paddingBottom: "0.35rem" }}>
-                  <span style={{ color: "var(--muted-foreground)" }}>子帳餘額:</span>
+                  <span style={{ color: "var(--muted-foreground)" }}>{t.wp_subledger_balance}:</span>
                   <span className="tabular-nums">
                     {currency} {fmt(sched.subledger_balance)}
                   </span>
                 </div>
 
                 <div style={{ fontSize: "0.75rem", color: "var(--muted-foreground)" }}>
-                  <div>編制人: <span style={{ color: "var(--foreground)" }}>{sched.prepared_by}</span></div>
-                  <div>覆核人: <span style={{ color: "var(--foreground)" }}>{sched.reviewed_by}</span></div>
+                  <div>{t.wp_prepared_by}: <span style={{ color: "var(--foreground)" }}>{sched.prepared_by}</span></div>
+                  <div>{t.wp_reviewed_by}: <span style={{ color: "var(--foreground)" }}>{sched.reviewed_by}</span></div>
                 </div>
 
                 <Button
@@ -94,7 +97,7 @@ export const LeadSchedulesView: React.FC<LeadSchedulesViewProps> = ({
                   onClick={() => onOpenWpDrawer(sched.wp_ref)}
                   style={{ width: "100%", fontSize: "0.8rem", marginTop: "0.5rem" }}
                 >
-                  查看審計明細 ↗
+                  {t.wp_view_detail} ↗
                 </Button>
               </CardContent>
             </Card>

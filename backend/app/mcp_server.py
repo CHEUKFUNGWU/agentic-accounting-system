@@ -173,7 +173,7 @@ def _get_or_init_etb(entity_code: str) -> List[ETBAccountRow]:
             ),
             ETBAccountRow(
                 account_code="1210",
-                account_name="Accounts Receivable Control (應收帳款)",
+                account_name="Accounts Receivable Control (應收賬款)",
                 account_type="ASSET",
                 fs_category="AR",
                 wp_ref="W/P B",
@@ -221,7 +221,7 @@ def _get_or_init_etb(entity_code: str) -> List[ETBAccountRow]:
             ),
             ETBAccountRow(
                 account_code="2110",
-                account_name="Accounts Payable & Accrued Expenses (應付帳款及應計費用)",
+                account_name="Accounts Payable & Accrued Expenses (應付賬款及應計費用)",
                 account_type="LIABILITY",
                 fs_category="AP_ACCRUAL",
                 wp_ref="W/P AA",

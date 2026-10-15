@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { isMyGo } from "mygo-runtime";
 import { DesktopBridge } from "../mygo";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from "./ui/shadcn";
+import { useI18n } from "../i18n";
 
 interface DesktopManagerViewProps {
   storageType: string;
@@ -18,6 +19,7 @@ export const DesktopManagerView: React.FC<DesktopManagerViewProps> = ({
   appPlatform,
   onBackupDb,
 }) => {
+  const { t, lang } = useI18n();
   const [backupLoading, setBackupLoading] = useState(false);
   const [lastBackupFile, setLastBackupFile] = useState<string | null>(null);
   const [folderStatus, setFolderStatus] = useState<string | null>(null);
@@ -46,14 +48,14 @@ export const DesktopManagerView: React.FC<DesktopManagerViewProps> = ({
 
   const handleOpenFolder = async () => {
     if (!isNativeDesktop) {
-      setFolderStatus(`帳套目錄：${filePath}`);
+      setFolderStatus(`${t.card_path}：${filePath}`);
       return;
     }
     try {
       const openedPath = await DesktopBridge.openDataFolder();
-      setFolderStatus(`已在系統檔案總管/訪達中開啟：${openedPath}`);
+      setFolderStatus(`${lang === "en" ? "Opened in file manager: " : lang === "zh-CN" ? "已在文件管理器中打开：" : "已在檔案總管中開啟："}${openedPath}`);
     } catch (err: any) {
-      setFolderStatus(`無法調用系統檔案總管: ${err?.message || err}`);
+      setFolderStatus(`${lang === "en" ? "Failed to open folder: " : "無法開啟資料夾: "}${err?.message || err}`);
     }
   };
 
@@ -64,10 +66,10 @@ export const DesktopManagerView: React.FC<DesktopManagerViewProps> = ({
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
               <CardTitle style={{ fontSize: "1.15rem", fontWeight: 700 }}>
-                帳套文件與資料管理 (Company File & Database Management)
+                {t.db_view_title}
               </CardTitle>
               <span style={{ fontSize: "0.8rem", color: "var(--muted-foreground)" }}>
-                本地嵌入式存儲引擎與備份管理
+                {t.db_view_subtitle}
               </span>
             </div>
             <Badge variant="outline" style={{ fontSize: "0.75rem" }}>
@@ -80,40 +82,50 @@ export const DesktopManagerView: React.FC<DesktopManagerViewProps> = ({
           {/* Storage Specs Grid */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem" }}>
             <div style={{ border: "1px solid var(--border)", padding: "1rem", borderRadius: "var(--radius)" }}>
-              <div style={{ fontSize: "0.8rem", color: "var(--muted-foreground)" }}>存儲架構</div>
+              <div style={{ fontSize: "0.8rem", color: "var(--muted-foreground)" }}>{t.card_engine}</div>
               <div style={{ fontWeight: 600, fontSize: "1.05rem", marginTop: "0.25rem" }}>{storageType}</div>
-              <span style={{ fontSize: "0.75rem", color: "var(--muted-foreground)" }}>本地獨立事務日誌庫</span>
+              <span style={{ fontSize: "0.75rem", color: "var(--muted-foreground)" }}>
+                {storageType.includes("PostgreSQL")
+                  ? (lang === "en" ? "Enterprise Multi-Tenant ACID Cluster" : lang === "zh-CN" ? "企业级高并发 ACID 集群" : "企業級高併發 ACID 集群")
+                  : (lang === "en" ? "Embedded Local Transaction Ledger" : lang === "zh-CN" ? "本地嵌入式事务日志库" : "本地嵌入式事務日誌庫")}
+              </span>
             </div>
 
             <div style={{ border: "1px solid var(--border)", padding: "1rem", borderRadius: "var(--radius)" }}>
-              <div style={{ fontSize: "0.8rem", color: "var(--muted-foreground)" }}>帳套資料大小</div>
+              <div style={{ fontSize: "0.8rem", color: "var(--muted-foreground)" }}>{t.card_size}</div>
               <div style={{ fontWeight: 600, fontSize: "1.05rem", marginTop: "0.25rem" }} className="tabular-nums">
                 {fileSizeFormatted}
               </div>
-              <span style={{ fontSize: "0.75rem", color: "var(--muted-foreground)" }}>即時無延遲本地讀寫</span>
+              <span style={{ fontSize: "0.75rem", color: "var(--muted-foreground)" }}>
+                {storageType.includes("PostgreSQL") ? (lang === "en" ? "Managed Cloud RDS / Cluster" : "雲端託管資料庫") : (lang === "en" ? "Low Latency Local I/O" : "低延遲本地讀寫")}
+              </span>
             </div>
 
             <div style={{ border: "1px solid var(--border)", padding: "1rem", borderRadius: "var(--radius)" }}>
-              <div style={{ fontSize: "0.8rem", color: "var(--muted-foreground)" }}>執行環境</div>
-              <div style={{ fontWeight: 600, fontSize: "1.05rem", marginTop: "0.25rem" }}>
-                {isNativeDesktop ? "原生桌面應用程式" : "瀏覽器客戶端 (Web)"}
+              <div style={{ fontSize: "0.8rem", color: "var(--muted-foreground)" }}>
+                {lang === "en" ? "Runtime Environment" : lang === "zh-CN" ? "运行环境" : "執行環境"}
               </div>
-              <span style={{ fontSize: "0.75rem", color: "var(--muted-foreground)" }}>本地私有數據庫</span>
+              <div style={{ fontWeight: 600, fontSize: "1.05rem", marginTop: "0.25rem" }}>
+                {isNativeDesktop ? (lang === "en" ? "Desktop Native (MyGo)" : "原生桌面應用程式") : (lang === "en" ? "Web Client" : "瀏覽器客戶端 (Web)")}
+              </div>
+              <span style={{ fontSize: "0.75rem", color: "var(--muted-foreground)" }}>
+                {storageType.includes("PostgreSQL") ? "PostgreSQL 16+" : "SQLite WAL"}
+              </span>
             </div>
           </div>
 
-          {/* Database File Location */}
+          {/* Database File / Connection Location */}
           <div style={{ border: "1px solid var(--border)", padding: "1rem", borderRadius: "var(--radius)", backgroundColor: "#fafafa" }}>
-            <div style={{ fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.35rem" }}>帳套資料庫本機路徑:</div>
+            <div style={{ fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.35rem" }}>{t.card_path}:</div>
             <code style={{ fontSize: "0.8rem", wordBreak: "break-all", color: "#3f3f46" }}>
               {filePath}
             </code>
             <div style={{ marginTop: "0.75rem", display: "flex", gap: "0.5rem" }}>
               <Button variant="outline" onClick={handleOpenFolder} style={{ fontSize: "0.8rem" }}>
-                在檔案總管中定位
+                {lang === "en" ? "Reveal in Explorer" : lang === "zh-CN" ? "在文件管理器中定位" : "在檔案總管中定位"}
               </Button>
               <Button variant="outline" onClick={() => navigator.clipboard?.writeText(filePath)} style={{ fontSize: "0.8rem" }}>
-                複製路徑
+                {t.copy_path}
               </Button>
             </div>
             {folderStatus && (
@@ -125,13 +137,13 @@ export const DesktopManagerView: React.FC<DesktopManagerViewProps> = ({
           <div style={{ border: "1px solid var(--border)", padding: "1rem", borderRadius: "var(--radius)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
               <div>
-                <div style={{ fontWeight: 600, fontSize: "0.9rem" }}>建立即時帳套快照備份</div>
+                <div style={{ fontWeight: 600, fontSize: "0.9rem" }}>{t.backup_snapshot_title}</div>
                 <div style={{ fontSize: "0.8rem", color: "var(--muted-foreground)" }}>
-                  將當前 SQLite WAL 帳套文件完整備份至本地獨立副本
+                  {t.backup_snapshot_desc}
                 </div>
               </div>
               <Button variant="default" onClick={handleBackup} disabled={backupLoading} style={{ fontSize: "0.85rem" }}>
-                {backupLoading ? "備份中..." : "立即備份帳套"}
+                {backupLoading ? t.backup_in_progress : t.backup_now}
               </Button>
             </div>
 
@@ -147,7 +159,7 @@ export const DesktopManagerView: React.FC<DesktopManagerViewProps> = ({
                   color: "#166534",
                 }}
               >
-                備份成功：{lastBackupFile}
+                {lang === "en" ? "Backup created successfully: " : lang === "zh-CN" ? "备份成功：" : "備份成功："}{lastBackupFile}
               </div>
             )}
           </div>

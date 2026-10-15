@@ -26,6 +26,7 @@ import { PersonalSplitModal } from "./PersonalSplitModal";
 import { TaxAndCloseView } from "./TaxAndCloseView";
 import { ThreeStatementsView } from "./ThreeStatementsView";
 import { Badge, Button } from "./ui/shadcn";
+import { useI18n, LanguageSwitcher } from "../i18n";
 
 const ENTITY_OPTIONS = [
   { code: "AU-OPC-01", label: "AU-OPC-01: Spark AI Studio Pty Ltd", sub: "AASB Tier 2 • 澳洲一人公司" },
@@ -37,6 +38,7 @@ const ENTITY_OPTIONS = [
 ];
 
 export const AgentGovernanceDashboard: React.FC = () => {
+  const { t } = useI18n();
   const [entityCode, setEntityCode] = useState<string>("AU-OPC-01");
   const [period, setPeriod] = useState<string>("2026-10");
   const [pack, setPack] = useState<ThreeStatementWorkingPaperPack | null>(null);
@@ -178,9 +180,9 @@ export const AgentGovernanceDashboard: React.FC = () => {
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", backgroundColor: "#ffffff" }}>
         <div style={{ textAlign: "center" }}>
           <div style={{ fontSize: "1.1rem", fontWeight: 600, marginBottom: "0.25rem" }}>
-            正在載入帳套資料庫...
+            正在載入賬套資料庫...
           </div>
-          <span style={{ fontSize: "0.85rem", color: "var(--muted-foreground)" }}>連接本地會計分類帳與底稿引擎</span>
+          <span style={{ fontSize: "0.85rem", color: "var(--muted-foreground)" }}>連接本地會計分類賬與底稿引擎</span>
         </div>
       </div>
     );
@@ -247,7 +249,7 @@ export const AgentGovernanceDashboard: React.FC = () => {
             data-active={activeTab === "STATEMENTS"}
             onClick={() => setActiveTab("STATEMENTS")}
           >
-            財務報表 (Financial Statements)
+            {t.nav_statements}
           </button>
 
           <button
@@ -256,7 +258,7 @@ export const AgentGovernanceDashboard: React.FC = () => {
             data-active={activeTab === "ETB"}
             onClick={() => setActiveTab("ETB")}
           >
-            試算表 (Trial Balance / ETB)
+            {t.nav_etb}
           </button>
 
           <button
@@ -266,7 +268,7 @@ export const AgentGovernanceDashboard: React.FC = () => {
             onClick={() => setActiveTab("JOURNALS")}
             style={{ justifyContent: "space-between" }}
           >
-            <span>日記帳與憑證 (Journals)</span>
+            <span>{t.nav_journals}</span>
             {pendingJournals.length > 0 && (
               <span
                 style={{
@@ -289,7 +291,7 @@ export const AgentGovernanceDashboard: React.FC = () => {
             data-active={activeTab === "SCHEDULES"}
             onClick={() => setActiveTab("SCHEDULES")}
           >
-            審計底稿 (Lead Schedules)
+            {t.nav_workpapers}
           </button>
 
           <button
@@ -298,7 +300,7 @@ export const AgentGovernanceDashboard: React.FC = () => {
             data-active={activeTab === "TAX_CLOSE"}
             onClick={() => setActiveTab("TAX_CLOSE")}
           >
-            月末關帳與稅務 (Close & Tax)
+            {t.nav_close_tax}
           </button>
 
           <button
@@ -307,15 +309,20 @@ export const AgentGovernanceDashboard: React.FC = () => {
             data-active={activeTab === "DESKTOP"}
             onClick={() => setActiveTab("DESKTOP")}
           >
-            帳套文件管理 (Company File)
+            {t.nav_database}
           </button>
         </nav>
 
-        {/* Sidebar Footer: Period & DB Status */}
+        {/* Sidebar Footer: Language, Period & DB Status */}
         <div className="acc-sidebar-footer">
+          <div style={{ marginBottom: "0.6rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.7rem", color: "var(--muted-foreground)" }}>語言 / Language</span>
+            <LanguageSwitcher />
+          </div>
+
           <div style={{ marginBottom: "0.5rem" }}>
             <label style={{ display: "block", fontSize: "0.7rem", color: "var(--muted-foreground)", marginBottom: "0.2rem" }}>
-              當前會計期間:
+              {t.current_period}:
             </label>
             <select
               value={period}
@@ -323,9 +330,9 @@ export const AgentGovernanceDashboard: React.FC = () => {
               className="sh-select"
               style={{ fontSize: "0.75rem", padding: "0.25rem 0.4rem" }}
             >
-              <option value="2026-10">2026-10 (當前月結期)</option>
-              <option value="2026-09">2026-09 (前期)</option>
-              <option value="2026-Q3">2026-Q3 (第三季)</option>
+              <option value="2026-10">2026-10</option>
+              <option value="2026-09">2026-09</option>
+              <option value="2026-Q3">2026-Q3</option>
             </select>
           </div>
 
@@ -340,16 +347,16 @@ export const AgentGovernanceDashboard: React.FC = () => {
                 }}
               />
               <span style={{ fontSize: "0.75rem", color: "var(--muted-foreground)" }}>
-                {isLiveBackend ? "本地資料庫在線" : "離線模式"}
+                {isLiveBackend ? t.db_connected : "Offline"}
               </span>
             </div>
 
             {pack.pack_status === "CPA_SIGNED_LOCKED" ? (
               <Badge variant="default" style={{ fontSize: "0.7rem", padding: "0.15rem 0.4rem" }}>
-                已封存
+                {t.status_locked}
               </Badge>
             ) : (
-              <span style={{ fontSize: "0.75rem", color: "#d97706" }}>待簽核</span>
+              <span style={{ fontSize: "0.75rem", color: "#d97706" }}>{t.status_awaiting_cpa}</span>
             )}
           </div>
         </div>
@@ -361,12 +368,12 @@ export const AgentGovernanceDashboard: React.FC = () => {
         <header className="acc-topbar">
           <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
             <h1 style={{ fontSize: "1.1rem", fontWeight: 700, margin: 0 }}>
-              {activeTab === "STATEMENTS" && "財務報表 (Financial Statements)"}
-              {activeTab === "ETB" && "延伸試算表 (Extended Trial Balance)"}
-              {activeTab === "JOURNALS" && "日記帳簿與憑證審核 (General Ledger & Journals)"}
-              {activeTab === "SCHEDULES" && "審計明細底稿庫 (Audit Lead Schedules)"}
-              {activeTab === "TAX_CLOSE" && "月末關帳與稅務申報 (Month-End Close & Tax)"}
-              {activeTab === "DESKTOP" && "本機帳套文件管理 (Company File Management)"}
+              {activeTab === "STATEMENTS" && t.nav_statements}
+              {activeTab === "ETB" && t.nav_etb}
+              {activeTab === "JOURNALS" && t.nav_journals}
+              {activeTab === "SCHEDULES" && t.nav_workpapers}
+              {activeTab === "TAX_CLOSE" && t.nav_close_tax}
+              {activeTab === "DESKTOP" && t.nav_database}
             </h1>
             <span style={{ fontSize: "0.8rem", color: "var(--muted-foreground)" }}>
               {pack.legal_name} • {pack.currency}
@@ -380,7 +387,7 @@ export const AgentGovernanceDashboard: React.FC = () => {
                 onClick={() => setReviewModalOpen(true)}
                 style={{ fontSize: "0.8rem", padding: "0.3rem 0.65rem" }}
               >
-                待覆核分錄 ({pendingJournals.length})
+                {t.btn_review} ({pendingJournals.length})
               </Button>
             )}
 
@@ -389,7 +396,7 @@ export const AgentGovernanceDashboard: React.FC = () => {
               onClick={handleBackupDb}
               style={{ fontSize: "0.8rem", padding: "0.3rem 0.65rem" }}
             >
-              備份帳套
+              {t.backup_btn}
             </Button>
           </div>
         </header>

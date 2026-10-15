@@ -6,6 +6,7 @@ import {
   ReconciliationProofs,
 } from "../types/accounting";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from "./ui/shadcn";
+import { useI18n, cleanLabel } from "../i18n";
 
 interface ThreeStatementsViewProps {
   currency: string;
@@ -26,6 +27,7 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
   proofs,
   onOpenWpDrawer,
 }) => {
+  const { t, lang } = useI18n();
   const [activeStatement, setActiveStatement] = useState<"PL" | "BS" | "CFS">("PL");
   const [cashFlowMethod, setCashFlowMethod] = useState<"INDIRECT" | "DIRECT">("INDIRECT");
 
@@ -67,7 +69,7 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
               onClick={() => setActiveStatement("PL")}
               style={{ fontSize: "0.85rem", padding: "0.35rem 0.85rem" }}
             >
-              損益表 (Income Statement)
+              {t.tab_pnl}
             </button>
             <button
               type="button"
@@ -76,7 +78,7 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
               onClick={() => setActiveStatement("BS")}
               style={{ fontSize: "0.85rem", padding: "0.35rem 0.85rem" }}
             >
-              資產負債表 (Balance Sheet)
+              {t.tab_bs}
             </button>
             <button
               type="button"
@@ -85,7 +87,7 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
               onClick={() => setActiveStatement("CFS")}
               style={{ fontSize: "0.85rem", padding: "0.35rem 0.85rem" }}
             >
-              現金流量表 (Cash Flow)
+              {t.tab_cfs}
             </button>
           </div>
         </div>
@@ -94,16 +96,16 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
           {/* Audit Proof Validation Badge */}
           {proofs.balance_sheet_equation_balanced ? (
             <Badge variant="success" style={{ fontSize: "0.75rem" }}>
-              平衡: 資產 ≡ 負債與權益
+              {t.balance_proof_balanced}
             </Badge>
           ) : (
             <Badge variant="warning" style={{ fontSize: "0.75rem" }}>
-              不平衡 (差異: {proofs.balance_sheet_variance})
+              {t.balance_proof_imbalanced}
             </Badge>
           )}
 
           <Button variant="outline" onClick={handlePrint} style={{ fontSize: "0.8rem", padding: "0.35rem 0.75rem" }}>
-            列印報表
+            {t.print_report}
           </Button>
         </div>
       </div>
@@ -115,10 +117,10 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
               <div>
                 <CardTitle style={{ fontSize: "1.15rem", fontWeight: 700 }}>
-                  單體損益表 (Income Statement)
+                  {t.pnl_title}
                 </CardTitle>
                 <span style={{ fontSize: "0.8rem", color: "var(--muted-foreground)" }}>
-                  會計期間：{incomeStatement.period} • 幣別：{currency}
+                  {t.accounting_period}：{incomeStatement.period} • {t.currency_label}：{currency}
                 </span>
               </div>
               <Badge
@@ -127,7 +129,7 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
                 onClick={() => onOpenWpDrawer("W/P PL")}
                 style={{ fontSize: "0.75rem", cursor: "pointer" }}
               >
-                W/P PL 總審計底稿 ↗
+                W/P PL ↗
               </Badge>
             </div>
           </CardHeader>
@@ -136,10 +138,10 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
               <table className="sh-table" style={{ fontSize: "0.875rem" }}>
                 <thead>
                   <tr style={{ background: "#fafafa" }}>
-                    <th style={{ width: "110px" }}>底稿索引</th>
-                    <th>會計報表項目</th>
-                    <th style={{ textAlign: "right", width: "160px" }}>金額 ({currency})</th>
-                    <th style={{ textAlign: "right", width: "100px" }}>比率</th>
+                    <th style={{ width: "110px" }}>{t.wp_ref_col}</th>
+                    <th>{t.account_name_col}</th>
+                    <th style={{ textAlign: "right", width: "160px" }}>{t.amount_col} ({currency})</th>
+                    <th style={{ textAlign: "right", width: "100px" }}>{t.ratio_col}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -169,7 +171,7 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
                             <span style={{ color: "var(--muted-foreground)" }}>-</span>
                           )}
                         </td>
-                        <td style={{ paddingLeft: isSub ? "0.75rem" : "1.5rem" }}>{item.label}</td>
+                        <td style={{ paddingLeft: isSub ? "0.75rem" : "1.5rem" }}>{cleanLabel(item.label, lang)}</td>
                         <td
                           className={`tabular-nums ${isNet ? "acc-double-underline" : ""}`}
                           style={{
@@ -198,10 +200,10 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
               <div>
                 <CardTitle style={{ fontSize: "1.15rem", fontWeight: 700 }}>
-                  單體資產負債表 (Balance Sheet)
+                  {t.bs_title}
                 </CardTitle>
                 <span style={{ fontSize: "0.8rem", color: "var(--muted-foreground)" }}>
-                  截止日期：{balanceSheet.as_of_period} • 幣別：{currency}
+                  {t.accounting_period}：{balanceSheet.as_of_period} • {t.currency_label}：{currency}
                 </span>
               </div>
               <Badge
@@ -210,7 +212,7 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
                 onClick={() => onOpenWpDrawer("W/P BS")}
                 style={{ fontSize: "0.75rem", cursor: "pointer" }}
               >
-                W/P BS 總審計底稿 ↗
+                W/P BS ↗
               </Badge>
             </div>
           </CardHeader>
@@ -227,13 +229,13 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
                     borderBottom: "1px solid var(--border)",
                   }}
                 >
-                  資產 (ASSETS)
+                  {lang === "en" ? "Assets" : lang === "zh-CN" ? "资产" : "資產"}
                 </div>
                 <table className="sh-table" style={{ fontSize: "0.875rem" }}>
                   <tbody>
                     <tr style={{ background: "#fdfdfd" }}>
                       <td colSpan={3} style={{ fontWeight: 600, fontSize: "0.8rem", color: "var(--muted-foreground)" }}>
-                        流動資產 (Current Assets)
+                        {t.row_current_assets}
                       </td>
                     </tr>
                     {balanceSheet.current_assets.map((item, idx) => (
@@ -250,7 +252,7 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
                             </Badge>
                           )}
                         </td>
-                        <td>{item.label}</td>
+                        <td>{cleanLabel(item.label, lang)}</td>
                         <td className="tabular-nums" style={{ textAlign: "right" }}>
                           {fmt(item.amount)}
                         </td>
@@ -258,7 +260,7 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
                     ))}
                     <tr className="sh-row-subtotal">
                       <td>-</td>
-                      <td>流動資產小計</td>
+                      <td>{t.row_total_current_assets}</td>
                       <td className="tabular-nums" style={{ textAlign: "right" }}>
                         {fmt(balanceSheet.total_current_assets)}
                       </td>
@@ -266,7 +268,7 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
 
                     <tr style={{ background: "#fdfdfd" }}>
                       <td colSpan={3} style={{ fontWeight: 600, fontSize: "0.8rem", color: "var(--muted-foreground)", paddingTop: "0.75rem" }}>
-                        非流動資產 (Non-Current Assets)
+                        {t.row_non_current_assets}
                       </td>
                     </tr>
                     {balanceSheet.non_current_assets.map((item, idx) => (
@@ -283,7 +285,7 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
                             </Badge>
                           )}
                         </td>
-                        <td>{item.label}</td>
+                        <td>{cleanLabel(item.label, lang)}</td>
                         <td className="tabular-nums" style={{ textAlign: "right" }}>
                           {fmt(item.amount)}
                         </td>
@@ -291,7 +293,7 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
                     ))}
                     <tr className="sh-row-subtotal" style={{ borderTop: "2px solid var(--border)" }}>
                       <td>-</td>
-                      <td style={{ fontWeight: 700 }}>總資產 (Total Assets)</td>
+                      <td style={{ fontWeight: 700 }}>{t.row_total_assets}</td>
                       <td className="tabular-nums acc-double-underline" style={{ textAlign: "right", fontWeight: 700 }}>
                         {fmt(balanceSheet.total_assets)}
                       </td>
@@ -311,13 +313,13 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
                     borderBottom: "1px solid var(--border)",
                   }}
                 >
-                  負債與所有者權益 (LIABILITIES & EQUITY)
+                  {t.row_total_liabilities_equity}
                 </div>
                 <table className="sh-table" style={{ fontSize: "0.875rem" }}>
                   <tbody>
                     <tr style={{ background: "#fdfdfd" }}>
                       <td colSpan={3} style={{ fontWeight: 600, fontSize: "0.8rem", color: "var(--muted-foreground)" }}>
-                        流動負債 (Current Liabilities)
+                        {t.row_current_liabilities}
                       </td>
                     </tr>
                     {balanceSheet.current_liabilities.map((item, idx) => (
@@ -334,7 +336,7 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
                             </Badge>
                           )}
                         </td>
-                        <td>{item.label}</td>
+                        <td>{cleanLabel(item.label, lang)}</td>
                         <td className="tabular-nums" style={{ textAlign: "right" }}>
                           {fmt(item.amount)}
                         </td>
@@ -342,7 +344,7 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
                     ))}
                     <tr className="sh-row-subtotal">
                       <td>-</td>
-                      <td>負債總額 (Total Liabilities)</td>
+                      <td>{t.row_total_liabilities}</td>
                       <td className="tabular-nums" style={{ textAlign: "right" }}>
                         {fmt(balanceSheet.total_liabilities)}
                       </td>
@@ -350,7 +352,7 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
 
                     <tr style={{ background: "#fdfdfd" }}>
                       <td colSpan={3} style={{ fontWeight: 600, fontSize: "0.8rem", color: "var(--muted-foreground)", paddingTop: "0.75rem" }}>
-                        所有者權益 (Equity)
+                        {t.row_equity}
                       </td>
                     </tr>
                     {balanceSheet.equity.map((item, idx) => (
@@ -367,7 +369,7 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
                             </Badge>
                           )}
                         </td>
-                        <td>{item.label}</td>
+                        <td>{cleanLabel(item.label, lang)}</td>
                         <td className="tabular-nums" style={{ textAlign: "right" }}>
                           {fmt(item.amount)}
                         </td>
@@ -375,14 +377,14 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
                     ))}
                     <tr className="sh-row-subtotal">
                       <td>-</td>
-                      <td>權益總額 (Total Equity)</td>
+                      <td>{t.row_total_equity}</td>
                       <td className="tabular-nums" style={{ textAlign: "right" }}>
                         {fmt(balanceSheet.total_equity)}
                       </td>
                     </tr>
                     <tr className="sh-row-subtotal" style={{ borderTop: "2px solid var(--border)" }}>
                       <td>-</td>
-                      <td style={{ fontWeight: 700 }}>總負債與權益 (Total Liabilities & Equity)</td>
+                      <td style={{ fontWeight: 700 }}>{t.row_total_liabilities_equity}</td>
                       <td className="tabular-nums acc-double-underline" style={{ textAlign: "right", fontWeight: 700 }}>
                         {fmt(balanceSheet.total_liabilities_and_equity)}
                       </td>
@@ -401,10 +403,10 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
               <div>
                 <CardTitle style={{ fontSize: "1.15rem", fontWeight: 700 }}>
-                  單體現金流量表 (Cash Flow Statement)
+                  {t.cfs_title}
                 </CardTitle>
                 <span style={{ fontSize: "0.8rem", color: "var(--muted-foreground)" }}>
-                  會計期間：{cashFlow.period} • 幣別：{currency}
+                  {t.accounting_period}：{cashFlow.period} • {t.currency_label}：{currency}
                 </span>
               </div>
               <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
@@ -416,7 +418,7 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
                     onClick={() => setCashFlowMethod("INDIRECT")}
                     style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
                   >
-                    間接法 (IAS 7 / US GAAP)
+                    {lang === "en" ? "Indirect Method" : lang === "zh-CN" ? "间接法" : "間接法"}
                   </button>
                   <button
                     type="button"
@@ -425,7 +427,7 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
                     onClick={() => setCashFlowMethod("DIRECT")}
                     style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
                   >
-                    直接法 (CAS / SME)
+                    {lang === "en" ? "Direct Method" : lang === "zh-CN" ? "直接法" : "直接法"}
                   </button>
                 </div>
                 <Badge
@@ -434,7 +436,7 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
                   onClick={() => onOpenWpDrawer("W/P CFS")}
                   style={{ fontSize: "0.75rem", cursor: "pointer" }}
                 >
-                  W/P CFS 底稿 ↗
+                  W/P CFS ↗
                 </Badge>
               </div>
             </div>
@@ -444,15 +446,15 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
               <table className="sh-table" style={{ fontSize: "0.875rem" }}>
                 <thead>
                   <tr style={{ background: "#fafafa" }}>
-                    <th style={{ width: "110px" }}>底稿索引</th>
-                    <th>現金流量項目</th>
-                    <th style={{ textAlign: "right", width: "160px" }}>金額 ({currency})</th>
+                    <th style={{ width: "110px" }}>{t.wp_ref_col}</th>
+                    <th>{t.account_name_col}</th>
+                    <th style={{ textAlign: "right", width: "160px" }}>{t.amount_col} ({currency})</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr style={{ background: "#fdfdfd" }}>
                     <td colSpan={3} style={{ fontWeight: 600, fontSize: "0.8rem", color: "var(--muted-foreground)" }}>
-                      一、經營活動現金流量 (Operating Activities)
+                      {lang === "en" ? "1. Operating Activities" : lang === "zh-CN" ? "一、经营活动现金流量" : "一、營業活動現金流量"}
                     </td>
                   </tr>
                   {(cashFlowMethod === "INDIRECT"
@@ -472,7 +474,7 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
                           </Badge>
                         )}
                       </td>
-                      <td style={{ paddingLeft: "1.5rem" }}>{item.label}</td>
+                      <td style={{ paddingLeft: "1.5rem" }}>{cleanLabel(item.label, lang)}</td>
                       <td className="tabular-nums" style={{ textAlign: "right" }}>
                         {fmt(item.amount)}
                       </td>
@@ -480,7 +482,7 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
                   ))}
                   <tr className="sh-row-subtotal">
                     <td>-</td>
-                    <td>經營活動產生之現金流量淨額</td>
+                    <td>{t.row_cfs_op}</td>
                     <td className="tabular-nums" style={{ textAlign: "right" }}>
                       {fmt(cashFlow.net_cash_from_operating_activities)}
                     </td>
@@ -488,7 +490,7 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
 
                   <tr style={{ background: "#fdfdfd" }}>
                     <td colSpan={3} style={{ fontWeight: 600, fontSize: "0.8rem", color: "var(--muted-foreground)", paddingTop: "0.75rem" }}>
-                      二、投資活動現金流量 (Investing Activities)
+                      {lang === "en" ? "2. Investing Activities" : lang === "zh-CN" ? "二、投资活动现金流量" : "二、投資活動現金流量"}
                     </td>
                   </tr>
                   {cashFlow.investing_activities.map((item, idx) => (
@@ -505,7 +507,7 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
                           </Badge>
                         )}
                       </td>
-                      <td style={{ paddingLeft: "1.5rem" }}>{item.label}</td>
+                      <td style={{ paddingLeft: "1.5rem" }}>{cleanLabel(item.label, lang)}</td>
                       <td className="tabular-nums" style={{ textAlign: "right" }}>
                         {fmt(item.amount)}
                       </td>
@@ -513,7 +515,7 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
                   ))}
                   <tr className="sh-row-subtotal">
                     <td>-</td>
-                    <td>投資活動產生之現金流量淨額</td>
+                    <td>{t.row_cfs_inv}</td>
                     <td className="tabular-nums" style={{ textAlign: "right" }}>
                       {fmt(cashFlow.net_cash_from_investing_activities)}
                     </td>
@@ -521,7 +523,7 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
 
                   <tr style={{ background: "#fdfdfd" }}>
                     <td colSpan={3} style={{ fontWeight: 600, fontSize: "0.8rem", color: "var(--muted-foreground)", paddingTop: "0.75rem" }}>
-                      三、籌資活動現金流量 (Financing Activities)
+                      {lang === "en" ? "3. Financing Activities" : lang === "zh-CN" ? "三、筹资活动现金流量" : "三、籌資活動現金流量"}
                     </td>
                   </tr>
                   {cashFlow.financing_activities.map((item, idx) => (
@@ -538,7 +540,7 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
                           </Badge>
                         )}
                       </td>
-                      <td style={{ paddingLeft: "1.5rem" }}>{item.label}</td>
+                      <td style={{ paddingLeft: "1.5rem" }}>{cleanLabel(item.label, lang)}</td>
                       <td className="tabular-nums" style={{ textAlign: "right" }}>
                         {fmt(item.amount)}
                       </td>
@@ -546,7 +548,7 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
                   ))}
                   <tr className="sh-row-subtotal">
                     <td>-</td>
-                    <td>籌資活動產生之現金流量淨額</td>
+                    <td>{t.row_cfs_fin}</td>
                     <td className="tabular-nums" style={{ textAlign: "right" }}>
                       {fmt(cashFlow.net_cash_from_financing_activities)}
                     </td>
@@ -554,21 +556,21 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
 
                   <tr className="sh-row-subtotal" style={{ borderTop: "2px solid var(--border)" }}>
                     <td>-</td>
-                    <td style={{ fontWeight: 600 }}>本期現金及約當現金淨增加額</td>
+                    <td style={{ fontWeight: 600 }}>{t.row_cfs_net_change}</td>
                     <td className="tabular-nums" style={{ textAlign: "right", fontWeight: 600 }}>
                       {fmt(cashFlow.net_increase_in_cash)}
                     </td>
                   </tr>
                   <tr>
                     <td>-</td>
-                    <td>期初現金餘額</td>
+                    <td>{t.row_cfs_open_cash}</td>
                     <td className="tabular-nums" style={{ textAlign: "right" }}>
                       {fmt(cashFlow.opening_cash_balance)}
                     </td>
                   </tr>
                   <tr className="sh-row-subtotal" style={{ borderTop: "1px solid var(--border)" }}>
                     <td>W/P A</td>
-                    <td style={{ fontWeight: 700 }}>期末現金餘額 (Agreed to Balance Sheet)</td>
+                    <td style={{ fontWeight: 700 }}>{t.row_cfs_close_cash}</td>
                     <td className="tabular-nums acc-double-underline" style={{ textAlign: "right", fontWeight: 700 }}>
                       {fmt(cashFlow.ending_cash_balance)}
                     </td>

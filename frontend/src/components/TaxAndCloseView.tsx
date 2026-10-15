@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { CloseChecklistItem, StatutoryTaxWorkpaper } from "../types/accounting";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Dialog, Progress } from "./ui/shadcn";
+import { useI18n, cleanLabel } from "../i18n";
 
 interface TaxAndCloseViewProps {
   currency: string;
@@ -19,6 +20,7 @@ export const TaxAndCloseView: React.FC<TaxAndCloseViewProps> = ({
   onLockPack,
   onOpenWpDrawer,
 }) => {
+  const { t, lang } = useI18n();
   const [confirmLockOpen, setConfirmLockOpen] = useState(false);
 
   const fmt = (val: string | number) => {
@@ -41,24 +43,24 @@ export const TaxAndCloseView: React.FC<TaxAndCloseViewProps> = ({
       <Dialog
         open={confirmLockOpen}
         onOpenChange={(v) => !v && setConfirmLockOpen(false)}
-        title="確認簽核並封存本期底稿 (Sign-Off & Lock Working Papers)"
-        description="本操作將由執業會計師正式簽署並鎖定本會計期間底稿。封存後所有分錄與報表轉為唯讀，禁止追加調整。"
+        title={t.cpa_confirm_modal_title}
+        description={t.cpa_confirm_modal_desc}
       >
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
           <div style={{ backgroundColor: "#fefce8", border: "1px solid #fef08a", padding: "0.75rem", borderRadius: "var(--radius)", fontSize: "0.85rem", color: "#854d0e" }}>
-            <strong>審計合規確認：</strong>
+            <strong>{lang === "en" ? "Audit Compliance Verification:" : "审计划定核验确认："}</strong>
             <ul style={{ margin: "0.35rem 0 0", paddingLeft: "1.25rem" }}>
-              <li>三大財務報表數學平衡驗證通過 (A = L + E 差額為 0.00)</li>
-              <li>現金流量表與資產負債表貨幣資金勾稽無誤</li>
-              <li>法定稅款提列已完成計算 ({currency} {fmt(taxWorkpaper.recommended_tax_vault_reserve)})</li>
+              <li>{lang === "en" ? "Three Financial Statements mathematical proof verified (A = L + E, variance 0.00)" : lang === "zh-CN" ? "三大财务报表数学平衡验证通过（资产 ＝ 负债 ＋ 股东权益，差额为 0.00）" : "三大財務報表數學平衡驗證通過（資產 ＝ 負債 ＋ 股東權益，差額為 0.00）"}</li>
+              <li>{lang === "en" ? "Cash Flow ending cash agreed to Balance Sheet cash & equivalents" : lang === "zh-CN" ? "现金流量表与资产负债表货币资金勾稽一致" : "現金流量表與資產負債表銀行存款勾稽一致"}</li>
+              <li>{lang === "en" ? "Mandatory tax provision reserve calculated" : lang === "zh-CN" ? "法定税费准备金已完成计提测算" : "法定稅費準備金已完成提列試算"} ({currency} {fmt(taxWorkpaper.recommended_tax_vault_reserve)})</li>
             </ul>
           </div>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
             <Button variant="ghost" onClick={() => setConfirmLockOpen(false)}>
-              取消
+              {t.cancel}
             </Button>
             <Button variant="default" onClick={handleConfirmLock}>
-              確認簽核封存 (Lock Period)
+              {t.cpa_confirm_btn}
             </Button>
           </div>
         </div>
@@ -69,7 +71,7 @@ export const TaxAndCloseView: React.FC<TaxAndCloseViewProps> = ({
         <Card style={{ backgroundColor: "#ffffff" }}>
           <CardHeader style={{ paddingBottom: "0.25rem" }}>
             <span style={{ fontSize: "0.85rem", color: "var(--muted-foreground)", fontWeight: 500 }}>
-              安全可支用運營現金 (Safe-to-Spend Operating Cash)
+              {lang === "en" ? "Safe-to-Spend Operating Cash" : lang === "zh-CN" ? "安全可支用运营资金" : "安全可支用營運資金"}
             </span>
           </CardHeader>
           <CardContent>
@@ -77,7 +79,7 @@ export const TaxAndCloseView: React.FC<TaxAndCloseViewProps> = ({
               {currency} {fmt(taxWorkpaper.safe_to_spend_operating_cash)}
             </div>
             <p style={{ margin: "0.35rem 0 0", fontSize: "0.8rem", color: "var(--muted-foreground)" }}>
-              = 銀行總餘額 ({fmt(taxWorkpaper.ending_cash_balance)}) 扣除 法定預留稅款 ({fmt(taxWorkpaper.recommended_tax_vault_reserve)})
+              {lang === "en" ? `= Total Cash (${fmt(taxWorkpaper.ending_cash_balance)}) minus Mandatory Tax Reserve (${fmt(taxWorkpaper.recommended_tax_vault_reserve)})` : `= 银行存款余额 (${fmt(taxWorkpaper.ending_cash_balance)}) 扣除 法定预留税费 (${fmt(taxWorkpaper.recommended_tax_vault_reserve)})`}
             </p>
           </CardContent>
         </Card>
@@ -85,7 +87,7 @@ export const TaxAndCloseView: React.FC<TaxAndCloseViewProps> = ({
         <Card style={{ backgroundColor: "#ffffff" }}>
           <CardHeader style={{ paddingBottom: "0.25rem" }}>
             <span style={{ fontSize: "0.85rem", color: "var(--muted-foreground)", fontWeight: 500 }}>
-              法定稅務儲備準備 (Mandatory Tax Reserve)
+              {lang === "en" ? "Mandatory Tax Provision Reserve" : lang === "zh-CN" ? "法定税务储备准备金" : "法定稅務儲備準備金"}
             </span>
           </CardHeader>
           <CardContent>
@@ -93,7 +95,7 @@ export const TaxAndCloseView: React.FC<TaxAndCloseViewProps> = ({
               {currency} {fmt(taxWorkpaper.total_statutory_tax_payable)}
             </div>
             <p style={{ margin: "0.35rem 0 0", fontSize: "0.8rem", color: "var(--muted-foreground)" }}>
-              包含增值稅/消費稅、預扣稅 (WHT) 及企業所得稅準備金
+              {lang === "en" ? "Includes VAT/GST, withholding taxes, and CIT provisions" : "包含增值税/消费税、预扣税及企业所得税拨备"}
             </p>
           </CardContent>
         </Card>
@@ -105,10 +107,10 @@ export const TaxAndCloseView: React.FC<TaxAndCloseViewProps> = ({
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
             <div>
               <CardTitle style={{ fontSize: "1.1rem", fontWeight: 700 }}>
-                法定稅務申報底稿 ({taxWorkpaper.return_form_name})
+                {lang === "en" ? "Statutory Tax Filing Schedule" : "法定税务申报底稿"} ({taxWorkpaper.return_form_name})
               </CardTitle>
               <span style={{ fontSize: "0.8rem", color: "var(--muted-foreground)" }}>
-                適用政策：{taxWorkpaper.relief_applied}
+                {lang === "en" ? "Policy Applied: " : "适用政策："}{taxWorkpaper.relief_applied}
               </span>
             </div>
             <Badge
@@ -117,7 +119,7 @@ export const TaxAndCloseView: React.FC<TaxAndCloseViewProps> = ({
               onClick={() => onOpenWpDrawer("W/P CC")}
               style={{ fontSize: "0.75rem", cursor: "pointer" }}
             >
-              W/P CC 稅務底稿 ↗
+              W/P CC ↗
             </Badge>
           </div>
         </CardHeader>
@@ -126,8 +128,8 @@ export const TaxAndCloseView: React.FC<TaxAndCloseViewProps> = ({
             <table className="sh-table" style={{ fontSize: "0.875rem" }}>
               <thead>
                 <tr style={{ background: "#fafafa" }}>
-                  <th>申報格位 / 稅務項目</th>
-                  <th style={{ textAlign: "right", width: "200px" }}>申報金額 ({currency})</th>
+                  <th>{lang === "en" ? "Statutory Box / Return Line Item" : "申报格位 / 税务项目"}</th>
+                  <th style={{ textAlign: "right", width: "200px" }}>{t.amount_col} ({currency})</th>
                 </tr>
               </thead>
               <tbody>
@@ -151,19 +153,19 @@ export const TaxAndCloseView: React.FC<TaxAndCloseViewProps> = ({
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
             <div>
               <CardTitle style={{ fontSize: "1.1rem", fontWeight: 700 }}>
-                月末關帳與底稿核驗清單 (Month-End Close Checklist)
+                {t.close_title}
               </CardTitle>
               <span style={{ fontSize: "0.8rem", color: "var(--muted-foreground)" }}>
-                完成進度：{completedCount} / {checklist.length} ({progressPct}%)
+                {lang === "en" ? "Progress: " : "完成进度："}{completedCount} / {checklist.length} ({progressPct}%)
               </span>
             </div>
             {packStatus !== "CPA_SIGNED_LOCKED" ? (
               <Button variant="default" onClick={() => setConfirmLockOpen(true)} style={{ fontSize: "0.85rem" }}>
-                CPA 簽核封存本期底稿
+                {t.cpa_sign_btn}
               </Button>
             ) : (
               <Badge variant="success" style={{ fontSize: "0.8rem", padding: "0.3rem 0.6rem" }}>
-                本期底稿已簽核封存 (Locked)
+                {t.status_locked}
               </Badge>
             )}
           </div>
@@ -175,18 +177,18 @@ export const TaxAndCloseView: React.FC<TaxAndCloseViewProps> = ({
             <table className="sh-table" style={{ fontSize: "0.875rem" }}>
               <thead>
                 <tr style={{ background: "#fafafa" }}>
-                  <th style={{ width: "60px" }}>步驟</th>
-                  <th>關帳核驗程序</th>
-                  <th style={{ width: "110px" }}>關聯底稿</th>
-                  <th style={{ width: "180px" }}>責任人 / 智能體</th>
-                  <th style={{ width: "100px", textAlign: "center" }}>狀態</th>
+                  <th style={{ width: "60px" }}>#</th>
+                  <th>{t.close_checklist}</th>
+                  <th style={{ width: "110px" }}>{t.wp_ref_col}</th>
+                  <th style={{ width: "180px" }}>{lang === "en" ? "Assignee / Agent" : "责任人 / 智能体"}</th>
+                  <th style={{ width: "100px", textAlign: "center" }}>{t.col_status}</th>
                 </tr>
               </thead>
               <tbody>
                 {checklist.map((item) => (
                   <tr key={item.step}>
                     <td style={{ fontWeight: 600, color: "var(--muted-foreground)" }}>{item.step}</td>
-                    <td style={{ fontWeight: 500 }}>{item.title}</td>
+                    <td style={{ fontWeight: 500 }}>{cleanLabel(item.title, lang)}</td>
                     <td>
                       <Badge
                         variant="secondary"
@@ -201,15 +203,15 @@ export const TaxAndCloseView: React.FC<TaxAndCloseViewProps> = ({
                     <td style={{ textAlign: "center" }}>
                       {item.status === "COMPLETED" ? (
                         <Badge variant="success" style={{ fontSize: "0.7rem" }}>
-                          通過
+                          {lang === "en" ? "Completed" : "通过"}
                         </Badge>
                       ) : item.status === "WARNING" ? (
                         <Badge variant="warning" style={{ fontSize: "0.7rem" }}>
-                          待注意
+                          {lang === "en" ? "Warning" : "待注意"}
                         </Badge>
                       ) : (
                         <Badge variant="outline" style={{ fontSize: "0.7rem" }}>
-                          未完成
+                          {lang === "en" ? "Pending" : "未完成"}
                         </Badge>
                       )}
                     </td>

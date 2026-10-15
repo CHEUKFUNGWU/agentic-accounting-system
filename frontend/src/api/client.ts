@@ -104,11 +104,11 @@ function getOrInitLocalState(entityCode: string) {
       locked: false,
       rows: [
         { code: "1110", name: "Cash at Bank - Operating Account (銀行存款)", type: "ASSET", cat: "CASH", wp: "W/P A", open: 85000, opDr: 142000, opCr: 64500, ajeDr: 0, ajeCr: 0 },
-        { code: "1210", name: "Accounts Receivable Control (應收帳款)", type: "ASSET", cat: "AR", wp: "W/P B", open: 18000, opDr: 165000, opCr: 142000, ajeDr: 0, ajeCr: 0 },
+        { code: "1210", name: "Accounts Receivable Control (應收賬款)", type: "ASSET", cat: "AR", wp: "W/P B", open: 18000, opDr: 165000, opCr: 142000, ajeDr: 0, ajeCr: 0 },
         { code: "1420", name: "Prepayments & Input VAT/GST (預付費用及進項稅額)", type: "ASSET", cat: "PREPAY_TAX", wp: "W/P C", open: 4000, opDr: 6500, opCr: 0, ajeDr: 0, ajeCr: 1500 },
         { code: "1610", name: "Computer & AI Server Equipment - Cost (固定資產原值)", type: "ASSET", cat: "FA", wp: "W/P F", open: 36000, opDr: 12000, opCr: 0, ajeDr: 0, ajeCr: 0 },
         { code: "1650", name: "Accumulated Depreciation (累計折舊)", type: "ASSET", cat: "CONTRA", wp: "W/P F", open: -6000, opDr: 0, opCr: 0, ajeDr: 0, ajeCr: 2000 },
-        { code: "2110", name: "Accounts Payable & Accrued Expenses (應付帳款及應計費用)", type: "LIABILITY", cat: "AP", wp: "W/P AA", open: -12000, opDr: 52500, opCr: 58000, ajeDr: 0, ajeCr: 3500 },
+        { code: "2110", name: "Accounts Payable & Accrued Expenses (應付賬款及應計費用)", type: "LIABILITY", cat: "AP", wp: "W/P AA", open: -12000, opDr: 52500, opCr: 58000, ajeDr: 0, ajeCr: 3500 },
         { code: "2190", name: "Director's Loan / Owner's Current Account (股東/業主往來)", type: "LIABILITY", cat: "DIR", wp: "W/P DD", open: -15000, opDr: 0, opCr: 0, ajeDr: 0, ajeCr: 0 },
         { code: "2210", name: "Statutory Taxes Payable - GST/VAT/CIT (應交稅費)", type: "LIABILITY", cat: "TAX", wp: "W/P CC", open: -10000, opDr: 0, opCr: 15000, ajeDr: 0, ajeCr: 11200 },
         { code: "3100", name: "Share Capital / Owner's Capital & Opening Surplus (實收資本及留存)", type: "EQUITY", cat: "EQ", wp: "W/P EQ", open: -100000, opDr: 0, opCr: 0, ajeDr: 0, ajeCr: 0 },
@@ -255,8 +255,8 @@ function buildFallbackPack(entityCode: string, period = "2026-10"): ThreeStateme
       currency: meta.currency,
       current_assets: [
         { wp_ref: "W/P A", label: "Cash & Bank Balances (貨幣資金 / 銀行存款)", amount: f4(cash) },
-        { wp_ref: "W/P B", label: "Accounts Receivable, Net (應收帳款淨額)", amount: f4(ar) },
-        { wp_ref: "W/P C", label: "Prepayments & Input VAT/GST (預付帳款及留抵稅額)", amount: f4(prepay) },
+        { wp_ref: "W/P B", label: "Accounts Receivable, Net (應收賬款淨額)", amount: f4(ar) },
+        { wp_ref: "W/P C", label: "Prepayments & Input VAT/GST (預付賬款及留抵稅額)", amount: f4(prepay) },
         ...(dirAsset > 0
           ? [{ wp_ref: "W/P DD", label: "Due from Director / Owner (應收股東/業主往來)", amount: f4(dirAsset) }]
           : []),
@@ -269,7 +269,7 @@ function buildFallbackPack(entityCode: string, period = "2026-10"): ThreeStateme
       ],
       total_assets: f4(totalAssets),
       current_liabilities: [
-        { wp_ref: "W/P AA", label: "Accounts Payable & Accrued Expenses (應付帳款及應計費用)", amount: f4(ap) },
+        { wp_ref: "W/P AA", label: "Accounts Payable & Accrued Expenses (應付賬款及應計費用)", amount: f4(ap) },
         { wp_ref: "W/P CC", label: "Statutory Taxes Payable - GST/VAT/CIT (應交稅費)", amount: f4(taxPay) },
         ...(dirLiab > 0
           ? [{ wp_ref: "W/P DD", label: "Director's Loan / Due to Owner (應付股東/董事往來款)", amount: f4(dirLiab) }]
@@ -290,7 +290,7 @@ function buildFallbackPack(entityCode: string, period = "2026-10"): ThreeStateme
       indirect_method_operating: [
         { wp_ref: "W/P PL", label: "Net Profit for the Period (本期淨利)", amount: f4(netProfit) },
         { wp_ref: "W/P F", label: "Add back: Depreciation & Amortization (加：折舊及攤銷)", amount: f4(dep) },
-        { wp_ref: "W/P B", label: "Change in Accounts Receivable (應收帳款變動)", amount: f4(-dAr) },
+        { wp_ref: "W/P B", label: "Change in Accounts Receivable (應收賬款變動)", amount: f4(-dAr) },
         { wp_ref: "W/P C", label: "Change in Prepayments & Input Tax (預付及留抵稅額變動)", amount: f4(-dPrepay) },
         { wp_ref: "W/P AA", label: "Change in Payables & Accruals (應付及應計費用變動)", amount: f4(dAp) },
         { wp_ref: "W/P CC", label: "Change in Statutory Taxes Payable (應交稅費變動)", amount: f4(dTax) },
@@ -333,7 +333,7 @@ function buildFallbackPack(entityCode: string, period = "2026-10"): ThreeStateme
       },
       "W/P B": {
         wp_ref: "W/P B",
-        title: "Accounts Receivable & Aging Schedule (應收帳款及帳齡分析底稿)",
+        title: "Accounts Receivable & Aging Schedule (應收賬款及賬齡分析底稿)",
         gl_balance: f4(ar),
         subledger_balance: f4(ar),
         variance: "0.0000",
@@ -393,7 +393,7 @@ function buildFallbackPack(entityCode: string, period = "2026-10"): ThreeStateme
       },
       "W/P AA": {
         wp_ref: "W/P AA",
-        title: "Accounts Payable & Accrued Expenses Schedule (應付帳款及月底應計費用底稿)",
+        title: "Accounts Payable & Accrued Expenses Schedule (應付賬款及月底應計費用底稿)",
         gl_balance: f4(-ap),
         subledger_balance: f4(-ap),
         variance: "0.0000",
@@ -504,7 +504,7 @@ function buildFallbackPack(entityCode: string, period = "2026-10"): ThreeStateme
       safe_to_spend_operating_cash: f4(cash - taxPay),
     },
     close_checklist: [
-      { step: 1, code: "BANK_REC_WP_A", title: "Bank Feeds 100% Reconciled to Statement (銀行流水對帳完畢)", wp_ref: "W/P A", agent: "bookkeeper-and-split-agent", status: "COMPLETED" },
+      { step: 1, code: "BANK_REC_WP_A", title: "Bank Feeds 100% Reconciled to Statement (銀行流水對賬完畢)", wp_ref: "W/P A", agent: "bookkeeper-and-split-agent", status: "COMPLETED" },
       { step: 2, code: "OWNER_SPLIT_WP_DD", title: "Mixed Personal/Business Expenses Apportioned (公私混用費用拆分與股東往來檢核)", wp_ref: "W/P DD", agent: "bookkeeper-and-split-agent", status: dirAsset > 0 ? "WARNING" : "COMPLETED" },
       { step: 3, code: "PREPAY_FA_AJE_WP_CF", title: "Prepayments & Fixed Asset Depreciation AJEs Posted (預付攤銷與折舊提列)", wp_ref: "W/P F", agent: "close-and-workpaper-agent", status: "COMPLETED" },
       { step: 4, code: "STATUTORY_TAX_WP_CC", title: "Statutory Tax Return Boxes Verified (稅務申報底稿與預留稅款計算)", wp_ref: "W/P CC", agent: "close-and-workpaper-agent", status: "COMPLETED" },
@@ -518,12 +518,12 @@ function buildFallbackPack(entityCode: string, period = "2026-10"): ThreeStateme
         detail:
           dirAsset > 0
             ? `股東/董事往來出現借方佔款 (${meta.currency} ${f4(dirAsset)})，請注意澳洲 Division 7A 或中國新公司法第23條財產混同風險。`
-            : `公私帳務完全分離（W/P DD 貸方餘額 ${meta.currency} ${f4(dirLiab)} 為創辦人墊款），無資金混同風險。`,
+            : `公私賬務完全分離（W/P DD 貸方餘額 ${meta.currency} ${f4(dirLiab)} 為創辦人墊款），無資金混同風險。`,
       },
       ...(state.splits > 0
         ? [
             {
-              rule: "Mixed Personal/Business Expense Apportionment (公私混用費用自動拆帳)" as const,
+              rule: "Mixed Personal/Business Expense Apportionment (公私混用費用自動拆賬)" as const,
               status: "APPLIED" as const,
               detail: `已自動拆分 ${state.splits} 筆公私混用支出，私人比例已隔離至 W/P DD（股東/業主往來）。`,
             },

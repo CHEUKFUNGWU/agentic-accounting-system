@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Dialog } from "./ui/shadcn";
+import { useI18n } from "../i18n";
 
 interface JournalEntryItem {
   journal_id: string;
@@ -39,6 +40,7 @@ export const JournalLedgerView: React.FC<JournalLedgerViewProps> = ({
   onOpenAjeModal,
   onOpenSplitModal,
 }) => {
+  const { t, lang } = useI18n();
   const [filterStatus, setFilterStatus] = useState<string>("ALL");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [rejectModalJournalId, setRejectModalJournalId] = useState<string | null>(null);
@@ -68,27 +70,27 @@ export const JournalLedgerView: React.FC<JournalLedgerViewProps> = ({
       <Dialog
         open={!!rejectModalJournalId}
         onOpenChange={(open) => !open && setRejectModalJournalId(null)}
-        title="退回憑證分錄 (Reject Journal Entry)"
-        description="請填寫審計退回理由，退回後該分錄將標記為 REJECTED 且不計入試算表"
+        title={lang === "en" ? "Reject Journal Entry" : lang === "zh-CN" ? "驳回凭证分录" : "駁回憑證分錄"}
+        description={lang === "en" ? "Please provide audit rejection reason. Entry will be marked REJECTED." : lang === "zh-CN" ? "请填写审核驳回理由，驳回后该分录将标记为 REJECTED 且不计入试算表" : "請填寫審計駁回理由，駁回後該分錄將標記為 REJECTED 且不計入試算表"}
       >
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
           <div>
             <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 500, marginBottom: "0.35rem" }}>
-              退回理由說明 (Audit Rejection Reason):
+              {t.reject_reason_prompt}
             </label>
             <textarea
               className="sh-input"
               rows={3}
               value={rejectionReasonInput}
               onChange={(e) => setRejectionReasonInput(e.target.value)}
-              placeholder="例：單據憑證不足、個人開支拆分比例需補件、科目選用有誤..."
+              placeholder={t.reject_reason_placeholder}
               style={{ width: "100%", resize: "vertical", fontFamily: "inherit", fontSize: "0.85rem" }}
               required
             />
           </div>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
             <Button variant="ghost" onClick={() => setRejectModalJournalId(null)}>
-              取消
+              {t.cancel}
             </Button>
             <Button
               variant="default"
@@ -96,7 +98,7 @@ export const JournalLedgerView: React.FC<JournalLedgerViewProps> = ({
               onClick={handleConfirmReject}
               disabled={!rejectionReasonInput.trim()}
             >
-              確認退回
+              {t.confirm_reject}
             </Button>
           </div>
         </div>
@@ -107,22 +109,22 @@ export const JournalLedgerView: React.FC<JournalLedgerViewProps> = ({
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.75rem" }}>
             <div>
               <CardTitle style={{ fontSize: "1.15rem", fontWeight: 700 }}>
-                日記帳與憑證審核 (General Ledger & Audit Trail)
+                {t.journal_title}
               </CardTitle>
               <span style={{ fontSize: "0.8rem", color: "var(--muted-foreground)" }}>
-                幣別：{currency} • 嚴格落實製單 (Maker) 與審核 (Checker) 權責分離
+                {t.currency_label}：{currency} • {t.journal_subtitle}
               </span>
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
               {onOpenSplitModal && (
                 <Button variant="outline" onClick={onOpenSplitModal} style={{ fontSize: "0.8rem", padding: "0.35rem 0.75rem" }}>
-                  公私費用拆分
+                  {t.btn_split_expense}
                 </Button>
               )}
               {onOpenAjeModal && (
                 <Button variant="default" onClick={onOpenAjeModal} style={{ fontSize: "0.8rem", padding: "0.35rem 0.75rem" }}>
-                  + 提列調整分錄 (AJE)
+                  {t.btn_add_aje}
                 </Button>
               )}
             </div>
@@ -132,11 +134,11 @@ export const JournalLedgerView: React.FC<JournalLedgerViewProps> = ({
           <div style={{ display: "flex", marginTop: "0.5rem" }}>
             <div className="sh-tabs-list" style={{ padding: "0.15rem" }}>
               {[
-                { key: "ALL", label: "全部" },
-                { key: "POSTED", label: "已過帳 (Posted)" },
-                { key: "PENDING_CHECKER", label: "待覆核 (Pending)" },
-                { key: "AWAITING_CPA", label: "待會計師 (Awaiting CPA)" },
-                { key: "REJECTED", label: "已退回 (Rejected)" },
+                { key: "ALL", label: t.filter_all },
+                { key: "POSTED", label: t.filter_posted },
+                { key: "PENDING_CHECKER", label: t.filter_pending },
+                { key: "AWAITING_CPA", label: lang === "en" ? "Awaiting CPA" : lang === "zh-CN" ? "待会计师签核" : "待會計師簽核" },
+                { key: "REJECTED", label: t.filter_rejected },
               ].map((tab) => (
                 <button
                   key={tab.key}
@@ -158,20 +160,20 @@ export const JournalLedgerView: React.FC<JournalLedgerViewProps> = ({
             <table className="sh-table" style={{ fontSize: "0.85rem" }}>
               <thead>
                 <tr style={{ background: "#fafafa" }}>
-                  <th style={{ width: "105px" }}>記帳日期</th>
-                  <th style={{ width: "110px" }}>來源模組</th>
-                  <th>憑證摘要與審計說明</th>
-                  <th style={{ textAlign: "right", width: "130px" }}>金額 ({currency})</th>
-                  <th style={{ width: "160px" }}>製單 / 覆核</th>
-                  <th style={{ width: "100px", textAlign: "center" }}>狀態</th>
-                  <th style={{ width: "140px", textAlign: "right" }}>操作</th>
+                  <th style={{ width: "105px" }}>{t.col_date}</th>
+                  <th style={{ width: "110px" }}>{lang === "en" ? "Source" : lang === "zh-CN" ? "来源模块" : "來源模組"}</th>
+                  <th>{t.col_description}</th>
+                  <th style={{ textAlign: "right", width: "130px" }}>{t.amount_col} ({currency})</th>
+                  <th style={{ width: "160px" }}>{lang === "en" ? "Maker / Checker" : lang === "zh-CN" ? "制单 / 复核" : "製單 / 覆核"}</th>
+                  <th style={{ width: "100px", textAlign: "center" }}>{t.col_status}</th>
+                  <th style={{ width: "140px", textAlign: "right" }}>{t.col_actions}</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
                     <td colSpan={7} style={{ textAlign: "center", padding: "3rem", color: "var(--muted-foreground)" }}>
-                      無符合條件之日記帳記錄
+                      {t.no_journals}
                     </td>
                   </tr>
                 ) : (
@@ -189,10 +191,10 @@ export const JournalLedgerView: React.FC<JournalLedgerViewProps> = ({
                             </Badge>
                           </td>
                           <td>
-                            <div style={{ fontWeight: 500 }}>{j.ai_reasoning_summary || "日常運營會計分錄"}</div>
+                            <div style={{ fontWeight: 500 }}>{j.ai_reasoning_summary || (lang === "en" ? "General Operating Journal Entry" : lang === "zh-CN" ? "日常运营会计分录" : "日常營運會計分錄")}</div>
                             {j.entry_hash && (
                               <div style={{ fontSize: "0.7rem", color: "var(--muted-foreground)", fontFamily: "monospace" }}>
-                                指紋: {j.entry_hash.slice(0, 16)}...
+                                {lang === "en" ? "Hash: " : "指纹: "}{j.entry_hash.slice(0, 16)}...
                               </div>
                             )}
                           </td>
@@ -200,21 +202,21 @@ export const JournalLedgerView: React.FC<JournalLedgerViewProps> = ({
                             {fmt(j.total_debit)}
                           </td>
                           <td style={{ fontSize: "0.75rem", color: "var(--muted-foreground)" }}>
-                            <div>製單: <span style={{ color: "var(--foreground)" }}>{j.created_by_principal_key}</span></div>
-                            <div>覆核: <span style={{ color: "var(--foreground)" }}>{j.approved_by_principal_key || "-"}</span></div>
+                            <div>{lang === "en" ? "Maker: " : lang === "zh-CN" ? "制单: " : "製單: "}<span style={{ color: "var(--foreground)" }}>{j.created_by_principal_key}</span></div>
+                            <div>{lang === "en" ? "Checker: " : lang === "zh-CN" ? "复核: " : "覆核: "}<span style={{ color: "var(--foreground)" }}>{j.approved_by_principal_key || "-"}</span></div>
                           </td>
                           <td style={{ textAlign: "center" }}>
                             {j.status === "POSTED" ? (
                               <Badge variant="success" style={{ fontSize: "0.7rem" }}>
-                                已過帳
+                                {t.filter_posted}
                               </Badge>
                             ) : j.status === "REJECTED" ? (
                               <Badge variant="warning" style={{ fontSize: "0.7rem", color: "#dc2626", borderColor: "#fca5a5" }}>
-                                已退回
+                                {t.filter_rejected}
                               </Badge>
                             ) : (
                               <Badge variant="warning" style={{ fontSize: "0.7rem" }}>
-                                待覆核
+                                {t.filter_pending}
                               </Badge>
                             )}
                           </td>
@@ -227,14 +229,14 @@ export const JournalLedgerView: React.FC<JournalLedgerViewProps> = ({
                                     onClick={() => onReviewJournal(j.journal_id, "APPROVE")}
                                     style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem" }}
                                   >
-                                    通過
+                                    {t.btn_approve}
                                   </Button>
                                   <Button
                                     variant="secondary"
                                     onClick={() => setRejectModalJournalId(j.journal_id)}
                                     style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem" }}
                                   >
-                                    退回
+                                    {t.btn_reject}
                                   </Button>
                                 </>
                               )}
@@ -244,7 +246,7 @@ export const JournalLedgerView: React.FC<JournalLedgerViewProps> = ({
                                   onClick={() => setExpandedId(isExpanded ? null : j.journal_id)}
                                   style={{ fontSize: "0.75rem", padding: "0.2rem 0.4rem" }}
                                 >
-                                  {isExpanded ? "收合" : "明細"}
+                                  {isExpanded ? (lang === "en" ? "Collapse" : "收起") : (lang === "en" ? "Lines" : "明细")}
                                 </Button>
                               )}
                             </div>
@@ -256,16 +258,16 @@ export const JournalLedgerView: React.FC<JournalLedgerViewProps> = ({
                           <tr style={{ background: "#fcfcfc" }}>
                             <td colSpan={7} style={{ padding: "0.75rem 1.5rem" }}>
                               <div style={{ fontWeight: 600, fontSize: "0.75rem", marginBottom: "0.35rem", color: "var(--muted-foreground)" }}>
-                                分錄科目明細 (Entry Lines):
+                                {lang === "en" ? "Entry Lines:" : lang === "zh-CN" ? "分录科目明细:" : "分錄科目明細:"}
                               </div>
                               <table style={{ width: "100%", fontSize: "0.8rem", borderCollapse: "collapse" }}>
                                 <thead>
                                   <tr style={{ borderBottom: "1px solid var(--border)", color: "var(--muted-foreground)" }}>
                                     <th style={{ textAlign: "left", width: "40px" }}>#</th>
-                                    <th style={{ textAlign: "left", width: "100px" }}>科目代碼</th>
-                                    <th style={{ textAlign: "left" }}>備註說明</th>
-                                    <th style={{ textAlign: "right", width: "120px" }}>借方 (DR)</th>
-                                    <th style={{ textAlign: "right", width: "120px" }}>貸方 (CR)</th>
+                                    <th style={{ textAlign: "left", width: "100px" }}>{t.col_acc_code}</th>
+                                    <th style={{ textAlign: "left" }}>{lang === "en" ? "Memo" : lang === "zh-CN" ? "备注说明" : "備註說明"}</th>
+                                    <th style={{ textAlign: "right", width: "120px" }}>{t.dr_label}</th>
+                                    <th style={{ textAlign: "right", width: "120px" }}>{t.cr_label}</th>
                                   </tr>
                                 </thead>
                                 <tbody>

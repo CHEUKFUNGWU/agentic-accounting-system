@@ -215,17 +215,35 @@ async def get_desktop_company_file_info() -> Dict[str, Any]:
     import sys
     from app.core.db import db_manager, get_default_db_path
 
-    db_path = get_default_db_path()
-    exists = db_path.exists()
-    size_bytes = db_path.stat().st_size if exists else 0
-    return {
-        "storage_type": "SQLite WAL" if db_manager.is_sqlite else "PostgreSQL",
-        "file_path": str(db_path),
-        "file_size_bytes": size_bytes,
-        "file_size_formatted": f"{size_bytes / 1024:.1f} KB",
-        "exists": exists,
-        "app_platform": sys.platform,
-    }
+    if db_manager.is_sqlite:
+        db_path = get_default_db_path()
+        exists = db_path.exists()
+        size_bytes = db_path.stat().st_size if exists else 0
+        return {
+            "storage_type": "SQLite WAL (本地開發 / 離線模式)",
+            "engine": "SQLite WAL",
+            "file_path": str(db_path),
+            "file_size_bytes": size_bytes,
+            "file_size_formatted": f"{size_bytes / 1024:.1f} KB",
+            "exists": exists,
+            "app_platform": sys.platform,
+            "is_postgres": False,
+        }
+    else:
+        # PostgreSQL Production Engine
+        sanitized_url = db_manager.db_url
+        if "@" in sanitized_url:
+            sanitized_url = "postgresql://" + sanitized_url.split("@")[-1]
+        return {
+            "storage_type": "PostgreSQL 16+ (生產企業級集群)",
+            "engine": "PostgreSQL",
+            "file_path": sanitized_url,
+            "file_size_bytes": 0,
+            "file_size_formatted": "Cloud Managed / RDS",
+            "exists": True,
+            "app_platform": sys.platform,
+            "is_postgres": True,
+        }
 
 
 @app.post("/api/v1/desktop/backup")

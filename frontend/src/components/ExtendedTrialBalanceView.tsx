@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { ETBTotals, ETBWorksheetRow } from "../types/accounting";
 import { Badge, Card, CardContent, CardHeader, CardTitle } from "./ui/shadcn";
+import { useI18n, cleanLabel } from "../i18n";
 
 interface ExtendedTrialBalanceViewProps {
   currency: string;
@@ -15,6 +16,7 @@ export const ExtendedTrialBalanceView: React.FC<ExtendedTrialBalanceViewProps> =
   totals,
   onOpenWpDrawer,
 }) => {
+  const { t, lang } = useI18n();
   const [filterType, setFilterType] = useState<string>("ALL");
   const [searchKeyword, setSearchKeyword] = useState<string>("");
 
@@ -39,21 +41,21 @@ export const ExtendedTrialBalanceView: React.FC<ExtendedTrialBalanceViewProps> =
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
           <div>
             <CardTitle style={{ fontSize: "1.15rem", fontWeight: 700 }}>
-              延伸試算表 (Extended Trial Balance)
+              {t.etb_title}
             </CardTitle>
             <span style={{ fontSize: "0.8rem", color: "var(--muted-foreground)" }}>
-              幣別：{currency} • 期初餘額 → 本期發生額 → 未調整試算表 (UTB) → 調整分錄 (AJE) → 調整後試算表 (ATB)
+              {t.currency_label}：{currency} • {t.etb_subtitle}
             </span>
           </div>
           <div style={{ display: "flex", gap: "0.5rem" }}>
             <Badge variant="success" style={{ fontSize: "0.75rem" }}>
-              UTB 平衡
+              UTB {t.balanced}
             </Badge>
             <Badge variant="success" style={{ fontSize: "0.75rem" }}>
-              AJE 平衡
+              AJE {t.balanced}
             </Badge>
             <Badge variant="success" style={{ fontSize: "0.75rem" }}>
-              ATB 平衡
+              ATB {t.balanced}
             </Badge>
           </div>
         </div>
@@ -71,16 +73,16 @@ export const ExtendedTrialBalanceView: React.FC<ExtendedTrialBalanceViewProps> =
                 style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
               >
                 {type === "ALL"
-                  ? "全部科目 (All)"
+                  ? lang === "en" ? "All" : "全部科目"
                   : type === "ASSET"
-                  ? "資產 (Assets)"
+                  ? lang === "en" ? "Assets" : lang === "zh-CN" ? "资产" : "資產"
                   : type === "LIABILITY"
-                  ? "負債 (Liabilities)"
+                  ? lang === "en" ? "Liabilities" : lang === "zh-CN" ? "负债" : "負債"
                   : type === "EQUITY"
-                  ? "所有者權益 (Equity)"
+                  ? lang === "en" ? "Equity" : lang === "zh-CN" ? "股东权益" : "股東權益"
                   : type === "REVENUE"
-                  ? "營業收入 (Revenue)"
-                  : "成本與費用 (Expenses)"}
+                  ? lang === "en" ? "Revenue" : "收入"
+                  : lang === "en" ? "Expenses" : lang === "zh-CN" ? "费用" : "費用"}
               </button>
             ))}
           </div>
@@ -88,7 +90,7 @@ export const ExtendedTrialBalanceView: React.FC<ExtendedTrialBalanceViewProps> =
           <div style={{ width: "240px" }}>
             <input
               type="text"
-              placeholder="搜尋科目代號或名稱..."
+              placeholder={lang === "en" ? "Search account code or name..." : lang === "zh-CN" ? "搜索科目代码或名称..." : "搜尋科目代碼或名稱..."}
               value={searchKeyword}
               onChange={(e) => setSearchKeyword(e.target.value)}
               className="sh-input"
@@ -103,41 +105,41 @@ export const ExtendedTrialBalanceView: React.FC<ExtendedTrialBalanceViewProps> =
           <table className="sh-table" style={{ fontSize: "0.8rem" }}>
             <thead style={{ position: "sticky", top: 0, zIndex: 10, background: "#fafafa" }}>
               <tr>
-                <th rowSpan={2} style={{ width: "65px" }}>科目代號</th>
-                <th rowSpan={2} style={{ minWidth: "220px" }}>會計科目名稱 (Chart of Accounts)</th>
-                <th rowSpan={2} style={{ width: "70px" }}>底稿</th>
+                <th rowSpan={2} style={{ width: "65px" }}>{t.col_acc_code}</th>
+                <th rowSpan={2} style={{ minWidth: "220px" }}>{t.col_acc_name}</th>
+                <th rowSpan={2} style={{ width: "70px" }}>{t.wp_ref_col}</th>
                 <th colSpan={2} style={{ textAlign: "center", borderLeft: "1px solid var(--border)" }}>
-                  本期日常發生額
+                  {t.col_period_activity}
                 </th>
                 <th colSpan={2} style={{ textAlign: "center", borderLeft: "1px solid var(--border)" }}>
-                  未調整試算表 (UTB)
+                  UTB
                 </th>
                 <th colSpan={2} style={{ textAlign: "center", borderLeft: "1px solid var(--border)" }}>
-                  期末調整分錄 (AJE)
+                  {t.col_aje}
                 </th>
                 <th colSpan={2} style={{ textAlign: "center", borderLeft: "1px solid var(--border)" }}>
-                  調整後試算表 (ATB)
+                  {t.col_ending_tb}
                 </th>
                 <th rowSpan={2} style={{ width: "120px", borderLeft: "1px solid var(--border)" }}>
-                  報表歸屬
+                  {lang === "en" ? "Statement" : "报表归属"}
                 </th>
               </tr>
               <tr>
-                <th style={{ textAlign: "right", borderLeft: "1px solid var(--border)", width: "85px" }}>借方 DR</th>
-                <th style={{ textAlign: "right", width: "85px" }}>貸方 CR</th>
-                <th style={{ textAlign: "right", borderLeft: "1px solid var(--border)", width: "85px" }}>借方 DR</th>
-                <th style={{ textAlign: "right", width: "85px" }}>貸方 CR</th>
-                <th style={{ textAlign: "right", borderLeft: "1px solid var(--border)", width: "85px" }}>借方 DR</th>
-                <th style={{ textAlign: "right", width: "85px" }}>貸方 CR</th>
-                <th style={{ textAlign: "right", borderLeft: "1px solid var(--border)", width: "85px" }}>借方 DR</th>
-                <th style={{ textAlign: "right", width: "85px" }}>貸方 CR</th>
+                <th style={{ textAlign: "right", borderLeft: "1px solid var(--border)", width: "85px" }}>{t.dr_label}</th>
+                <th style={{ textAlign: "right", width: "85px" }}>{t.cr_label}</th>
+                <th style={{ textAlign: "right", borderLeft: "1px solid var(--border)", width: "85px" }}>{t.dr_label}</th>
+                <th style={{ textAlign: "right", width: "85px" }}>{t.cr_label}</th>
+                <th style={{ textAlign: "right", borderLeft: "1px solid var(--border)", width: "85px" }}>{t.dr_label}</th>
+                <th style={{ textAlign: "right", width: "85px" }}>{t.cr_label}</th>
+                <th style={{ textAlign: "right", borderLeft: "1px solid var(--border)", width: "85px" }}>{t.dr_label}</th>
+                <th style={{ textAlign: "right", width: "85px" }}>{t.cr_label}</th>
               </tr>
             </thead>
             <tbody>
               {filteredRows.map((r) => (
                 <tr key={r.account_code}>
                   <td style={{ fontWeight: 600 }}>{r.account_code}</td>
-                  <td>{r.account_name}</td>
+                  <td>{cleanLabel(r.account_name, lang)}</td>
                   <td>
                     {r.wp_ref ? (
                       <Badge
@@ -185,7 +187,7 @@ export const ExtendedTrialBalanceView: React.FC<ExtendedTrialBalanceViewProps> =
             <tfoot style={{ position: "sticky", bottom: 0, zIndex: 10, background: "#f4f4f5", fontWeight: 700 }}>
               <tr style={{ borderTop: "2px solid var(--border)" }}>
                 <td colSpan={3} style={{ textAlign: "center" }}>
-                  試算表合計 (Total Verification Proofs)
+                  {t.total_label}
                 </td>
                 <td className="tabular-nums" style={{ textAlign: "right", borderLeft: "1px solid var(--border)" }}>
                   {fmt(totals.total_op_dr)}
@@ -212,7 +214,7 @@ export const ExtendedTrialBalanceView: React.FC<ExtendedTrialBalanceViewProps> =
                   {fmt(totals.total_adjusted_cr)}
                 </td>
                 <td style={{ borderLeft: "1px solid var(--border)", color: "#16a34a" }}>
-                  ✓ 借貸平衡
+                  ✓ {t.balanced}
                 </td>
               </tr>
             </tfoot>
