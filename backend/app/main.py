@@ -204,7 +204,7 @@ async def review_journal_endpoint(journal_id: str, body: JournalReviewRequest) -
 
 
 @app.get("/api/v1/journals/pending")
-async def get_pending_journals(entity_code: Optional[str] = None) -> Dict[str, Any]:
+async def get_pending_journals(entity_code: str | None = None) -> Dict[str, Any]:
     journals = await repo.get_journals(entity_code=entity_code)
     pending = [j for j in journals if j.get("status") in ("PENDING_CHECKER", "AWAITING_CPA")]
     return {"pending_count": len(pending), "journals": pending}

@@ -384,17 +384,6 @@ async def propose_expense_with_personal_split(
     biz_recoverable_tax = q4(total_tax * biz_pct)
     personal_drawing_or_loan = q4(gross - biz_expense - biz_recoverable_tax)
 
-    etb = _get_or_init_etb(entity_code)
-    for row in etb:
-        if row.account_code == "1110":
-            row.period_op_credit = q4(row.period_op_credit + gross)
-        elif row.account_code == "6100":
-            row.period_op_debit = q4(row.period_op_debit + biz_expense)
-        elif row.account_code == "1420":
-            row.period_op_debit = q4(row.period_op_debit + biz_recoverable_tax)
-        elif row.account_code == "2190":
-            row.period_op_debit = q4(row.period_op_debit + personal_drawing_or_loan)
-
     split_entry = {
         "journal_id": str(uuid4()),
         "entity_code": entity_code,
@@ -415,14 +404,14 @@ async def propose_expense_with_personal_split(
         "entity_code": entity_code,
         "book_scope": "PRIMARY_STANDALONE",
         "source_module": "EXPENSE_SPLIT",
-        "status": JournalStatus.POSTED.value,
+        "status": JournalStatus.PENDING_CHECKER.value,
         "accounting_date": date.today().isoformat(),
         "currency": entity["currency"],
         "total_debit": str(gross),
         "total_credit": str(gross),
         "created_by_principal_key": agent_principal_key,
         "created_by_principal_id": str(maker.principal_id),
-        "approved_by_principal_key": "controller-checker-01",
+        "approved_by_principal_key": None,
         "ai_confidence_score": "0.9700",
         "ai_reasoning_summary": (
             f"Mixed Expense Apportionment ({split_entry['business_use_pct']} Business): "
@@ -444,15 +433,19 @@ async def propose_expense_with_personal_split(
 
     await repo.save_personal_split(split_entry)
     await repo.save_journal(JOURNAL_LEDGER[journal_id])
-    await repo.save_etb_accounts(entity_code, etb)
 
     await orchestrator.publish_outbox_event(
-        event_type="workpaper.personal_split_applied",
+        event_type="workpaper.personal_split_proposed",
         entity_code=entity_code,
         aggregate_id=journal_id,
         payload=split_entry,
     )
-    return {"status": "APPLIED_TO_ETB_AND_WP_DD", "split_entry": split_entry, "journal": JOURNAL_LEDGER[journal_id]}
+    return {
+        "status": "PROPOSED_AWAITING_REVIEW",
+        "journal_id": journal_id,
+        "split_entry": split_entry,
+        "journal": JOURNAL_LEDGER[journal_id],
+    }
 
 
 @mcp.tool()
@@ -561,6 +554,8 @@ async def review_and_approve_proposal(
     if action.upper() == "REJECT":
         journal["status"] = JournalStatus.REJECTED.value
         journal["rejection_reason"] = rejection_reason
+        if rejection_reason:
+            journal["ai_reasoning_summary"] = f"REJECTED: {rejection_reason}"
         await repo.save_journal(journal)
         await orchestrator.publish_outbox_event(
             event_type="proposal.rejected",
@@ -568,7 +563,7 @@ async def review_and_approve_proposal(
             aggregate_id=journal_id,
             payload={"rejected_by": reviewer.agent_name, "reason": rejection_reason},
         )
-        return {"status": "REJECTED", "journal": journal}
+        return {"status": "SUCCESS", "action": "REJECTED", "journal": journal}
 
     created_by_str = journal.get("created_by_principal_id")
     if not created_by_str:
@@ -592,6 +587,20 @@ async def review_and_approve_proposal(
     journal["status"] = new_status.value
 
     if new_status == JournalStatus.POSTED:
+        # Apply posted lines to ETB
+        etb = _get_or_init_etb(entity_code)
+        for line in journal.get("lines", []):
+            acc_code = line["account_code"]
+            dr = Decimal(str(line.get("debit", "0.0000")))
+            cr = Decimal(str(line.get("credit", "0.0000")))
+            for row in etb:
+                if row.account_code == acc_code:
+                    if dr > Decimal("0.0000"):
+                        row.period_op_debit = q4(row.period_op_debit + dr)
+                    if cr > Decimal("0.0000"):
+                        row.period_op_credit = q4(row.period_op_credit + cr)
+        await repo.save_etb_accounts(entity_code, etb)
+
         prev_hash = await repo.get_latest_posted_hash(entity_code)
         entry_hash = DeterministicSoDGuard.compute_entry_sha256_hash(
             prev_entry_hash=prev_hash,
@@ -612,7 +621,13 @@ async def review_and_approve_proposal(
             aggregate_id=journal_id,
             payload={"posted_by": reviewer.agent_name, "entry_hash": entry_hash},
         )
-        return {"status": "POSTED", "journal": journal, "entry_hash": entry_hash}
+        return {
+            "status": "SUCCESS",
+            "action": "APPROVED",
+            "entry_status": "POSTED",
+            "journal": journal,
+            "entry_hash": entry_hash,
+        }
     else:
         await repo.save_journal(journal)
         await orchestrator.publish_outbox_event(
@@ -622,7 +637,9 @@ async def review_and_approve_proposal(
             payload={"reviewer": reviewer.agent_name, "reason": "Exceeds materiality threshold"},
         )
         return {
-            "status": "AWAITING_CPA",
+            "status": "SUCCESS",
+            "action": "AWAITING_CPA",
+            "entry_status": "AWAITING_CPA",
             "journal": journal,
             "note": "Exceeds auto-approve materiality threshold; escalated to Human CPA.",
         }

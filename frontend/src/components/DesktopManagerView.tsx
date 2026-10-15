@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import { isMyGo } from "mygo-runtime";
+import { DesktopBridge } from "../mygo";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from "./ui/shadcn";
 
 interface DesktopManagerViewProps {
@@ -18,16 +20,40 @@ export const DesktopManagerView: React.FC<DesktopManagerViewProps> = ({
 }) => {
   const [backupLoading, setBackupLoading] = useState(false);
   const [lastBackupFile, setLastBackupFile] = useState<string | null>(null);
+  const [folderStatus, setFolderStatus] = useState<string | null>(null);
+  const isNativeDesktop = isMyGo();
 
   const handleBackup = async () => {
     setBackupLoading(true);
     try {
+      if (isNativeDesktop) {
+        const desktopRes = await DesktopBridge.backupDatabase();
+        if (desktopRes.success) {
+          setLastBackupFile(desktopRes.backupPath);
+          return;
+        }
+      }
       const res = await onBackupDb();
       if (res.backup_file) {
         setLastBackupFile(res.backup_file);
       }
+    } catch (err: any) {
+      console.error("Backup failed:", err);
     } finally {
       setBackupLoading(false);
+    }
+  };
+
+  const handleOpenFolder = async () => {
+    if (!isNativeDesktop) {
+      setFolderStatus(`帳套目錄：${filePath}`);
+      return;
+    }
+    try {
+      const openedPath = await DesktopBridge.openDataFolder();
+      setFolderStatus(`已在系統檔案總管/訪達中開啟：${openedPath}`);
+    } catch (err: any) {
+      setFolderStatus(`無法調用系統檔案總管: ${err?.message || err}`);
     }
   };
 
@@ -94,7 +120,19 @@ export const DesktopManagerView: React.FC<DesktopManagerViewProps> = ({
             <Button variant="default" onClick={handleBackup} disabled={backupLoading}>
               {backupLoading ? "備份生成中..." : "💾 一鍵生成帳套備份快照 (.db)"}
             </Button>
+            <Button variant="secondary" onClick={handleOpenFolder}>
+              📂 打開本機帳套目錄 (Finder / Explorer)
+            </Button>
+            <Badge variant={isNativeDesktop ? "success" : "outline"} style={{ fontSize: "0.75rem" }}>
+              {isNativeDesktop ? "● MyGo 原生引擎在線" : "○ 瀏覽器預覽模式"}
+            </Badge>
           </div>
+
+          {folderStatus && (
+            <div style={{ padding: "0.5rem 0.75rem", backgroundColor: "var(--secondary)", borderRadius: "var(--radius)", fontSize: "0.8rem" }}>
+              {folderStatus}
+            </div>
+          )}
 
           {lastBackupFile && (
             <div style={{ padding: "0.75rem", backgroundColor: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "var(--radius)", fontSize: "0.8rem", color: "#166534" }}>

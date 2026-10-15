@@ -6,6 +6,7 @@ Domain Dataclasses and the persistent DatabaseManager (SQLite WAL / PostgreSQL).
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 from uuid import UUID
@@ -282,9 +283,9 @@ class AccountingRepository:
                 amount=aje["amount"],
                 wp_ref=aje["wp_ref"],
                 memo=aje["memo"],
-                created_at=aje["created_at"],
+                created_at=aje.get("created_at") or datetime.now(timezone.utc).isoformat(),
             )
-            session.add(model)
+            await session.merge(model)
             await session.commit()
 
     async def get_custom_ajes(self, entity_code: str) -> List[Dict[str, Any]]:
