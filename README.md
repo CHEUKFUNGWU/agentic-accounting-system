@@ -5,7 +5,7 @@ This repository manages product knowledge, requirements, versions, acceptance, a
 ## Current workspace stage
 
 - The English product workflow, directory structure, and collaboration rules are established.
-- No formal requirements or version commitments have been registered in this workspace.
+- Roadmap candidates are registered in the requirement pool. Individual requirement definitions and version commitments remain unapproved.
 - Existing application documentation is retained below. Its claims are not automatically approved product baselines or release evidence.
 
 ## Workspace entry points
@@ -16,6 +16,7 @@ This repository manages product knowledge, requirements, versions, acceptance, a
 | Register discussions, documents, and other inputs | [Raw inputs](01-inputs/README.md) |
 | Find product background and terminology | [Product knowledge](02-product/README.md) |
 | Explore the problem space, module map, and decisions | [Planning](03-planning/README.md) |
+| Review the product roadmap and release gates | [Draft roadmap](03-planning/product-roadmap.md), [Accounting controls](03-planning/accounting-control-matrix.md), [UX workflows](03-planning/ux-workflow-blueprint.md) |
 | View or register candidate requirements | [Requirement pool](04-requirement-pool/README.md) |
 | Define and advance an individual requirement | [Requirement work packages](05-requirements/README.md) |
 | Plan and track a version | [Versions](06-versions/README.md) |
