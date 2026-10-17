@@ -3,6 +3,7 @@
 | Source ID | Date | Material | Type | Provider | Repository location | Applicable scope | Processing state |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | SRC-0001 | 2026-10-17 | English product workspace setup request | User instruction, English summary | Repository owner via chat | [Workspace setup request](2026-10-17-workspace-setup.md) | Documentation structure and collaboration rules | Applied to initial workspace setup |
+| SRC-0002 | 2026-10-17 | Monolith Ledger UI archive and direct-adoption instruction | User-supplied React source archive | Repository owner via chat | [UI adoption source record](2026-10-17-monolith-ui.md) | Default frontend interface | Imported; automated checks passed |
 
 ## Registration rules
 

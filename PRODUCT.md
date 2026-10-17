@@ -20,7 +20,7 @@ The repository supports entity and period selection, documents, vouchers, a ledg
 
 ## Capabilities and Constraints
 
-Existing React 18, TypeScript and Vite frontend, with installed Lucide icons and Radix UI components. Preserve the user's ongoing application and backend changes. Deliver the redesign through an independent interactive prototype entry. Prototype actions and financial figures must be clearly identified as demonstrations, not live postings or compliance decisions.
+Existing React 18, TypeScript and Vite frontend, with installed Lucide icons and Radix UI components. Preserve the user's ongoing application and backend changes. The owner subsequently selected the supplied Monolith Ledger interface for direct adoption as the default UI. Its original sample-data behavior is retained, with the backend-connected workspace preserved at `/connected.html`. The earlier independent review prototype remains at `/prototype.html`. See `SRC-0002` in the source register and `docs/monolith-ui.md` for data boundaries.
 
 ## Evidence on Hand
 

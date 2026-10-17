@@ -22,6 +22,7 @@ This repository manages product knowledge, requirements, versions, acceptance, a
 | Record reviews, acceptance, and retrospectives | [Reviews](07-reviews/README.md) |
 | Find shared assets | [Assets](90-assets/README.md) |
 | Find closed or superseded materials | [Archive](99-archive/README.md) |
+| Open the adopted Monolith UI | [Frontend entry points and verification](docs/monolith-ui.md) |
 | Read backend setup instructions | [Backend README](backend/README.md) |
 
 ## Application overview

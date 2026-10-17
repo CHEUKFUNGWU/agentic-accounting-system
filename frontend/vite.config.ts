@@ -13,11 +13,13 @@ export default defineConfig({
   build: {
     rollupOptions: {
       input: {
-        // Superseded build kept for reference until the app replaces it.
+        // Supplied Monolith UI is the default web and desktop entry.
         main: resolve(__dirname, "index.html"),
-        // The application (role-scoped shell, six pages).
+        // Both existing public entry URLs open the supplied interface.
         app: resolve(__dirname, "app.html"),
         prototype: resolve(__dirname, "prototype.html"),
+        connected: resolve(__dirname, "connected.html"),
+        classic: resolve(__dirname, "classic.html"),
       },
     },
   },
