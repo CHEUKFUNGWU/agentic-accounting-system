@@ -1,6 +1,6 @@
 from decimal import Decimal
 import pytest
-from app.mcp_server import ENTITIES, generate_three_statements_working_paper
+from app.mcp_server import ENTITIES, generate_three_statements_reporting
 
 @pytest.mark.asyncio
 async def test_three_financial_statements_mathematical_proofs():
@@ -12,13 +12,13 @@ async def test_three_financial_statements_mathematical_proofs():
       4. Lead Schedules: Subledger balances tie to General Ledger accounts (Delta == 0.0000)
     """
     for entity_code in ENTITIES.keys():
-        pack = await generate_three_statements_working_paper(entity_code=entity_code, period="2026-10")
+        pack = await generate_three_statements_reporting(entity_code=entity_code, period="2026-10")
         assert pack.get("status") != "ERROR"
 
-        proofs = pack["reconciliation_proofs"]
-        bs = pack["balance_sheet_wp"]
-        cf = pack["cash_flow_statement_wp"]
-        lead = pack["lead_schedules"]
+        proofs = pack["consistency_checks"]
+        bs = pack["balance_sheet"]
+        cf = pack["cash_flow_statement"]
+        lead = pack["detail_schedules"]
 
         # 1. Fundamental Balance Sheet Equation: Assets == Liabilities + Equity
         assert proofs["balance_sheet_equation_balanced"] is True
@@ -44,17 +44,17 @@ async def test_three_financial_statements_mathematical_proofs():
         assert direct_op_cash == net_op_cash, f"[{entity_code}] Direct CF discrepancy"
 
         # 4. Lead Schedules: W/P A transparently flags external unperformed bank feed, while internal roll-forwards tie to GL
-        wp_a = lead["W/P A"]
+        wp_a = lead["CASH"]
         assert wp_a["reconciliation_status"] == "NOT_PERFORMED"
         assert wp_a["evidence_sha256"] is None
         assert Decimal(wp_a["gl_balance"]) == bs_cash
 
         # W/P DD (Director's Loan & Drawings) rolls forward accurately
-        wp_dd = lead["W/P DD"]
+        wp_dd = lead["DIRECTOR"]
         assert wp_dd["variance"] == "0.0000"
         assert Decimal(wp_dd["gl_balance"]) == Decimal(pack["kpi_summary"]["director_loan_net"])
 
         # W/P EQ (Equity) rolls forward to Balance Sheet total equity
-        wp_eq = lead["W/P EQ"]
+        wp_eq = lead["EQ"]
         assert wp_eq["variance"] == "0.0000"
         assert Decimal(wp_eq["gl_balance"]) == -Decimal(bs["total_equity"])

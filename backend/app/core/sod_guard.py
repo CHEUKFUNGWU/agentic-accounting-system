@@ -4,7 +4,7 @@ Enforces:
   1. Dual-currency double-entry balance (sum(DR) == sum(CR) in both TX and Functional currencies)
   2. Sub-ledger Control Account isolation (no manual journal entries to AR, AP, Cash, Inventory, FA control accounts)
   3. Fiscal Period cut-off (OPEN vs. SOFT_CLOSE vs. HARD_CLOSE/LOCKED)
-  4. Maker-Checker-Auditor role separation (approver != creator; materiality & confidence thresholds)
+  4. Maker-Checker-Auditor role separation (approver != creator; declared uncertainty required for JUDGEMENT)
   5. SHA-256 cryptographic hash-chaining including journal lines protection for POSTED entries
 """
 
@@ -167,7 +167,7 @@ class DeterministicSoDGuard:
         if reviewer.role == AgentRole.HUMAN_CPA:
             return JournalStatus.POSTED
 
-        # Controller Agent can auto-post only within materiality & confidence gates
+        # A machine may only auto-post where the basis is verifiable, never on JUDGEMENT
         if (
             not involves_intercompany_or_statutory_adj
             and total_func_debit <= reviewer.max_auto_approve_func_amount

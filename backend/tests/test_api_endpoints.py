@@ -28,15 +28,15 @@ async def test_desktop_company_file_and_backup_endpoints(client: AsyncClient):
     assert "backup_file" in backup_data
 
 @pytest.mark.asyncio
-async def test_working_papers_and_aje_endpoints(client: AsyncClient):
+async def test_reporting_and_aje_endpoints(client: AsyncClient):
     # 1. Fetch working paper pack
-    resp = await client.get("/api/v1/workpapers/AU-OPC-01/2026-10")
+    resp = await client.get("/api/v1/reporting/AU-OPC-01/2026-10")
     assert resp.status_code == 200
     pack = resp.json()
     assert pack["entity_code"] == "AU-OPC-01"
-    assert "balance_sheet_wp" in pack
-    assert "income_statement_wp" in pack
-    assert "cash_flow_statement_wp" in pack
+    assert "balance_sheet" in pack
+    assert "income_statement" in pack
+    assert "cash_flow_statement" in pack
 
     # 2. Post Adjusting Journal Entry
     aje_payload = {
@@ -45,12 +45,20 @@ async def test_working_papers_and_aje_endpoints(client: AsyncClient):
         "credit_account_code": "2110",
         "amount": "1500.0000",
         "memo": "Endpoint test accrued review fees",
-        "wp_ref": "W/P AA",
+        "statement_ref": "AP",
     }
-    aje_resp = await client.post("/api/v1/workpapers/aje", json=aje_payload)
+    aje_resp = await client.post("/api/v1/reporting/aje", json=aje_payload)
     assert aje_resp.status_code == 200
     res_data = aje_resp.json()
-    assert res_data["aje_result"]["status"] == "AJE_POSTED"
+    assert res_data["aje_result"]["status"] == "AJE_PENDING_REVIEW"
+    journal_id = res_data["aje_result"]["journal_id"]
+    from app.core.repository import repo
+    from app.core.ledger import get_lines
+
+    journal = await repo.get_journal(journal_id)
+    assert journal["status"] == "PENDING_CHECKER"
+    assert not any(line["journal_id"] == journal_id for line in await get_lines("AU-OPC-01"))
+    assert res_data["reporting_pack"]["trial_balance_totals"] == pack["trial_balance_totals"]
 
 @pytest.mark.asyncio
 async def test_personal_split_and_review_workflow_endpoints(client: AsyncClient):

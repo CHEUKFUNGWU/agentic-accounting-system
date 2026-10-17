@@ -20,6 +20,7 @@ import sqlite3
 import pytest
 
 from app.core.repository import repo
+from app.core.ledger import trial_balance_from_ledger
 from app.core.sod_guard import AgentRole, DeterministicSoDGuard
 from app import mcp_server as m
 
@@ -43,7 +44,7 @@ async def test_1_prevent_double_approval_and_duplicate_posting():
     assert prop["status"] == "PROPOSED_AWAITING_REVIEW"
     j_id = prop["journal_id"]
 
-    cash_before = next(r for r in m._get_or_init_etb("AU-OPC-01") if r.account_code == "1110").period_op_credit
+    cash_before = next(r for r in (await trial_balance_from_ledger("AU-OPC-01", "2026-10")) if r.account_code == "1110").period_op_credit
 
     # First approval -> POSTED
     r1 = await m.review_and_approve_proposal(
@@ -54,7 +55,7 @@ async def test_1_prevent_double_approval_and_duplicate_posting():
     assert r1["status"] == "SUCCESS"
     assert r1["entry_status"] == "POSTED"
 
-    cash_after_1st = next(r for r in m._get_or_init_etb("AU-OPC-01") if r.account_code == "1110").period_op_credit
+    cash_after_1st = next(r for r in (await trial_balance_from_ledger("AU-OPC-01", "2026-10")) if r.account_code == "1110").period_op_credit
     assert cash_after_1st == cash_before + Decimal("1100.0000")
 
     # Second approval -> Must be rejected with ERROR, ETB must remain unchanged
@@ -66,7 +67,7 @@ async def test_1_prevent_double_approval_and_duplicate_posting():
     assert r2["status"] == "ERROR"
     assert "CANNOT_REVIEW_FINALIZED_JOURNAL" in get_err(r2)
 
-    cash_after_2nd = next(r for r in m._get_or_init_etb("AU-OPC-01") if r.account_code == "1110").period_op_credit
+    cash_after_2nd = next(r for r in (await trial_balance_from_ledger("AU-OPC-01", "2026-10")) if r.account_code == "1110").period_op_credit
     assert cash_after_2nd == cash_after_1st, "Cash account was double credited!"
 
 
@@ -199,38 +200,37 @@ async def test_4_range_validation_for_business_pct_and_tax_rate():
 @pytest.mark.asyncio
 async def test_5_aje_account_existence_prevalidation_prevents_etb_corruption():
     """Finding 9 & 10: Non-existent accounts in AJE or line items are rejected before mutating ETB."""
-    etb_rows_before = m._get_or_init_etb("AU-OPC-01")
+    etb_rows_before = (await trial_balance_from_ledger("AU-OPC-01", "2026-10"))
     r_6100_before = next(row for row in etb_rows_before if row.account_code == "6100")
-    initial_6100_debit = r_6100_before.aje_debit
+    initial_6100_debit = r_6100_before.adjustment_debit
 
     # Attempt AJE where credit account 9999 does not exist
-    r = await m.propose_adjusting_workpaper_entry(
+    r = await m.propose_adjusting_entry(
         entity_code="AU-OPC-01",
         debit_account_code="6100",
         credit_account_code="9999",  # Non-existent
         amount="5000.00",
         memo="Bad account AJE",
-        wp_ref="W/P AA",
-        maker_principal_key="bookkeeper-maker-01",
+        statement_ref="AP",
     )
     assert r["status"] == "ERROR"
     assert "COA_MISSING_ACCOUNT" in get_err(r)
 
     # Verify debit account 6100 was NOT modified (no partial mutation / corruption)
-    etb_rows_after = m._get_or_init_etb("AU-OPC-01")
+    etb_rows_after = (await trial_balance_from_ledger("AU-OPC-01", "2026-10"))
     r_6100_after = next(row for row in etb_rows_after if row.account_code == "6100")
-    assert r_6100_after.aje_debit == initial_6100_debit
+    assert r_6100_after.adjustment_debit == initial_6100_debit
 
     # Confirm ETB is still balanced
-    pack = await m.generate_three_statements_working_paper("AU-OPC-01")
-    assert pack["reconciliation_proofs"]["etb_adjustments_balanced"] is True
+    pack = await m.generate_three_statements_reporting("AU-OPC-01")
+    assert pack["consistency_checks"]["adjustments_balanced"] is True
 
 
 @pytest.mark.asyncio
 async def test_6_cpa_pack_lock_authorization_and_post_lock_protection():
     """Finding 6 & 7: Only authorized HUMAN_CPA can lock packs, and no entries are allowed post-lock."""
     # 6a. Unauthorized principal "nobody" cannot lock pack
-    r_unauth = await m.lock_and_sign_working_paper_pack(
+    r_unauth = await m.lock_and_sign_reporting_pack(
         entity_code="AU-OPC-01",
         period="2026-10",
         cpa_principal_key="nobody",
@@ -239,23 +239,22 @@ async def test_6_cpa_pack_lock_authorization_and_post_lock_protection():
     assert "UNAUTHORIZED_SIGNER" in get_err(r_unauth)
 
     # 6b. Legitimate CPA locks pack
-    r_lock = await m.lock_and_sign_working_paper_pack(
+    r_lock = await m.lock_and_sign_reporting_pack(
         entity_code="AU-OPC-01",
         period="2026-10",
         cpa_principal_key="cpa-griffin",
     )
     assert r_lock.get("status") != "ERROR"
-    assert r_lock["pack_status"] == "CPA_SIGNED_LOCKED"
+    assert r_lock["reporting_status"] == "REVIEWED_AND_LOCKED"
 
     # 6c. AJE after lock must be blocked
-    r_aje = await m.propose_adjusting_workpaper_entry(
+    r_aje = await m.propose_adjusting_entry(
         entity_code="AU-OPC-01",
         debit_account_code="6100",
         credit_account_code="2110",
         amount="100.00",
         memo="Attempt post lock AJE",
-        wp_ref="W/P AA",
-        maker_principal_key="bookkeeper-maker-01",
+        statement_ref="AP",
     )
     assert r_aje["status"] == "ERROR"
     assert "PERIOD_CUTOFF_VIOLATION" in get_err(r_aje)
@@ -274,8 +273,8 @@ async def test_6_cpa_pack_lock_authorization_and_post_lock_protection():
     assert "PERIOD_CUTOFF_VIOLATION" in get_err(r_exp)
 
     # Unlock entity so subsequent tests are not blocked
-    m.PACK_STATUS_STATE["AU-OPC-01"] = "READY_FOR_CPA"
-    await repo.set_pack_status("AU-OPC-01", "READY_FOR_CPA")
+    m.PACK_STATUS_STATE["AU-OPC-01"] = "READY"
+    await repo.set_reporting_status("AU-OPC-01", "READY")
 
 
 @pytest.mark.asyncio
@@ -338,8 +337,8 @@ async def test_8_wp_dd_lead_schedule_strictly_excludes_rejected_splits():
     """Finding 9: W/P DD must strictly exclude REJECTED or PENDING splits."""
     entity = "SG-OPC-01"
 
-    pack_before = await m.generate_three_statements_working_paper(entity)
-    dd_before_amt = Decimal(pack_before["lead_schedules"]["W/P DD"]["items"][1]["amount"])
+    pack_before = await m.generate_three_statements_reporting(entity)
+    dd_before_amt = Decimal(pack_before["detail_schedules"]["DIRECTOR"]["items"][1]["amount"])
 
     # Propose mixed expense
     prop = await m.propose_expense_with_personal_split(
@@ -361,8 +360,8 @@ async def test_8_wp_dd_lead_schedule_strictly_excludes_rejected_splits():
         rejection_reason="Not business related",
     )
 
-    pack_after = await m.generate_three_statements_working_paper(entity)
-    dd_after_amt = Decimal(pack_after["lead_schedules"]["W/P DD"]["items"][1]["amount"])
+    pack_after = await m.generate_three_statements_reporting(entity)
+    dd_after_amt = Decimal(pack_after["detail_schedules"]["DIRECTOR"]["items"][1]["amount"])
 
     assert dd_after_amt == dd_before_amt, "Rejected split was incorrectly included in W/P DD lead schedule!"
 
@@ -380,7 +379,7 @@ async def test_9_sqlite_vacuum_into_atomic_backup():
     # Verify backup is a valid SQLite database with readable tables
     conn = sqlite3.connect(b_file)
     cur = conn.cursor()
-    cur.execute("SELECT count(*) FROM etb_accounts;")
+    cur.execute("SELECT count(*) FROM trial_balance_accounts;")
     count = cur.fetchone()[0]
     assert count > 0, "Backup database is empty!"
     conn.close()

@@ -1,16 +1,18 @@
 """
 FastAPI Application Gateway for SME, OPC & Sole Proprietor Agentic Accounting System.
 Mounts:
-  1. Stateless Streamable HTTP MCP Server at `/mcp` (`modelcontextprotocol/python-sdk`)
+  1. One role-scoped Stateless Streamable HTTP MCP Server per accounting position
+     (`/mcp/<role>`, `modelcontextprotocol/python-sdk`)
   2. Hybrid Event-Driven Orchestrator lifespan worker
-  3. REST & SSE Endpoints at `/api/v1/*` for the shadcn/ui Three-Statement Working Paper Command Center
+  3. REST & SSE Endpoints at `/api/v1/*` for the shadcn/ui Three-Statement schedule Command Center
 """
 
 from __future__ import annotations
 
 import asyncio
 import json
-from contextlib import asynccontextmanager
+import logging
+from contextlib import AsyncExitStack, asynccontextmanager
 from typing import Any, AsyncGenerator, Dict
 
 from fastapi import FastAPI, HTTPException
@@ -18,37 +20,66 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from app.api_documents import router as document_router
+from app.api_vouchers import router as voucher_router
+from app.mcp_roles import mount_role_servers
 from app.core.repository import repo
+from app.core.ledger import migrate_entity_core
 from app.mcp_server import (
     ENTITIES,
     JOURNAL_LEDGER,
     PRINCIPALS,
-    generate_three_statements_working_paper,
-    lock_and_sign_working_paper_pack,
-    mcp,
-    propose_adjusting_workpaper_entry,
+    generate_three_statements_reporting,
+    lock_and_sign_reporting_pack,
+    propose_adjusting_entry,
     propose_expense_with_personal_split,
     review_and_approve_proposal,
     sync_state_from_db,
 )
 from app.orchestrator.event_bus import orchestrator
 
+logger = logging.getLogger("agentic_accounting.api")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await repo.init_seed_data_if_needed()
     await sync_state_from_db()
-    await orchestrator.start()
-    yield
-    await orchestrator.stop()
+
+    # Build the general-ledger core for every entity: chart of accounts, fiscal
+    # periods, tax codes, and the migration vouchers that carry the old seeded
+    # trial balance into the ledger as dated, traceable entries. Idempotent.
+    from app.core.ledger import migrate_entity_core
+
+    for code, meta in ENTITIES.items():
+        result = await migrate_entity_core(
+            code, meta.get("jurisdiction", ""), currency=meta.get("currency", "AUD")
+        )
+        if result.get("status") == "MIGRATED":
+            logger.info("Ledger core migrated for %s: %s", code, result)
+
+    # Starlette's Mount does NOT run a sub-app's lifespan, and every mounted MCP
+    # server needs its streamable session manager running. Without this every
+    # request dies with "Task group is not initialized. Make sure to use run()."
+    from app.mcp_roles import ROLE_SERVERS
+
+    async with AsyncExitStack() as stack:
+        for server in ROLE_SERVERS.values():
+            await stack.enter_async_context(server.session_manager.run())
+
+        await orchestrator.start()
+        try:
+            yield
+        finally:
+            await orchestrator.stop()
 
 
 app = FastAPI(
-    title="SME, OPC & Sole Proprietor Agentic Accounting System (3-Statement Working Papers + Stateless MCP)",
+    title="SME, OPC & Sole Proprietor Agentic Accounting System (3-Statement schedules + Stateless MCP)",
     version="0.4.0",
     description=(
-        "Standalone Three Financial Statement Working Paper Engine (ETB, Lead Schedules, P&L, B/S, Cash Flow, "
-        "Statutory Tax Workpaper & Close Checklist) with Stateless Streamable HTTP MCP Gateway."
+        "Standalone Three Financial Statement schedule Engine (trial balance, detail schedules, P&L, B/S, Cash Flow, "
+        "Statutory Tax Schedule & Close Checklist) with Stateless Streamable HTTP MCP Gateway."
     ),
     lifespan=lifespan,
 )
@@ -61,8 +92,69 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-if hasattr(mcp, "streamable_http_app"):
-    app.mount("/mcp", mcp.streamable_http_app())
+# One MCP surface per accounting position: a tool a position may not use is not
+# registered on that surface at all. The legacy single /mcp mount was removed —
+# it shared one tool list with every caller and took the acting principal as a
+# request argument, so any client could claim to be the CPA. Nothing called it.
+MCP_ROLE_SURFACES: Dict[str, str] = mount_role_servers(app)
+
+
+# Recording path (vouchers, attachments, general ledger) lives in its own module
+# so the shipping reporting endpoints stay untouched.
+app.include_router(voucher_router)
+app.include_router(document_router)
+
+@app.get("/api/v1/audit/agent-activity")
+async def agent_activity(entity_code: str = "AU-OPC-01", limit: int = 50) -> Dict[str, Any]:
+    """Every tool call an agent made against the role-scoped MCP surfaces."""
+    rows = await repo.get_audit_logs(entity_code=entity_code, limit=limit)
+    return {"count": len(rows), "activity": rows}
+
+
+@app.get("/api/v1/audit/no-human-review")
+async def no_human_review(entity_code: str = "AU-OPC-01") -> Dict[str, Any]:
+    """
+    Posted entries whose preparer AND reviewer were machines.
+
+    This is the question an auditor asks about an agentic ledger, and it used to
+    be unanswerable: the vouchers carried the maker and reviewer, but nothing
+    recorded who (or what) they were.
+    """
+    from app.core.positions import position_for_principal
+
+    journals = await repo.get_journals(entity_code=entity_code)
+    rows = []
+    for j in journals:
+        if j.get("status") not in ("POSTED", "REVERSED"):
+            continue
+        preparer = position_for_principal(j.get("created_by_principal_key") or "")
+        reviewer = position_for_principal(j.get("approved_by_principal_key") or "")
+        if (preparer and preparer.is_human) or (reviewer and reviewer.is_human):
+            continue
+        rows.append(
+            {
+                "voucher_no": j.get("voucher_no"),
+                "basis": j.get("basis"),
+                "amount": j.get("total_debit"),
+                "prepared_by": preparer.position_id if preparer else j.get("created_by_principal_key"),
+                "reviewed_by": reviewer.position_id if reviewer else j.get("approved_by_principal_key"),
+                "requires_human_sampling": (j.get("basis") or "") in ("JUDGEMENT", "EXTRACTED", "MANUAL"),
+            }
+        )
+    return {
+        "entity_code": entity_code,
+        "fully_automated_count": len(rows),
+        "needs_sampling_count": len([r for r in rows if r["requires_human_sampling"]]),
+        "entries": rows,
+    }
+
+
+@app.get("/api/v1/mcp/surfaces")
+async def list_mcp_surfaces() -> Dict[str, Any]:
+    """Inventory of role-scoped MCP surfaces and the tools each one exposes."""
+    from app.mcp_roles import describe_surfaces
+
+    return {"surfaces": await describe_surfaces()}
 
 
 class PersonalExpenseSplitWebhook(BaseModel):
@@ -74,16 +166,16 @@ class PersonalExpenseSplitWebhook(BaseModel):
     evidence_uri: str = Field(default="s3://agentic-evidence-vault/2026/10/mixed-receipt-101.pdf")
 
 
-class AdjustingWorkpaperEntryRequest(BaseModel):
+class AdjustingEntryRequest(BaseModel):
     entity_code: str = Field(default="AU-OPC-01")
     debit_account_code: str = Field(..., examples=["6100", "6410", "7500"])
     credit_account_code: str = Field(..., examples=["2110", "1650", "1420", "2210"])
     amount: str = Field(..., examples=["1800.0000"])
-    memo: str = Field(..., examples=["Month-end accrued external CPA review fee (W/P AA)"])
-    wp_ref: str = Field(default="W/P AA")
+    memo: str = Field(..., examples=["Month-end accrued external CPA review fee (AA)"])
+    statement_ref: str = Field(default="AP")
 
 
-class LockWorkpaperRequest(BaseModel):
+class LockScheduleRequest(BaseModel):
     cpa_principal_key: str = Field(default="cpa-griffin")
     period: str = Field(default="2026-10")
 
@@ -100,7 +192,7 @@ async def get_system_overview() -> Dict[str, Any]:
     return {
         "target_segments": ["SME (中小企業)", "OPC (One-Person Company / 一人有限公司)", "Sole Proprietor (個體工商戶 / Sole Trader)"],
         "mcp_transport": "Stateless Streamable HTTP (2026-07-28 Spec)",
-        "mcp_endpoint": "/mcp",
+        "mcp_endpoints": MCP_ROLE_SURFACES,
         "entities": ENTITIES,
         "agent_principals": {
             k: {
@@ -115,16 +207,16 @@ async def get_system_overview() -> Dict[str, Any]:
     }
 
 
-@app.get("/api/v1/workpapers/{entity_code}/{period}")
-async def get_three_statement_working_paper_pack(entity_code: str, period: str = "2026-10") -> Dict[str, Any]:
-    pack = await generate_three_statements_working_paper(entity_code=entity_code, period=period)
+@app.get("/api/v1/reporting/{entity_code}/{period}")
+async def get_three_statement_reporting_pack(entity_code: str, period: str = "2026-10") -> Dict[str, Any]:
+    pack = await generate_three_statements_reporting(entity_code=entity_code, period=period)
     if pack.get("status") == "ERROR":
         raise HTTPException(status_code=404, detail=pack["reason"])
     return pack
 
 
 @app.post("/api/v1/webhooks/personal-expense-split")
-async def ingest_mixed_expense_and_update_workpapers(body: PersonalExpenseSplitWebhook) -> Dict[str, Any]:
+async def ingest_mixed_expense(body: PersonalExpenseSplitWebhook) -> Dict[str, Any]:
     maker_res = await propose_expense_with_personal_split(
         agent_principal_key="bookkeeper-maker-01",
         entity_code=body.entity_code,
@@ -136,39 +228,39 @@ async def ingest_mixed_expense_and_update_workpapers(body: PersonalExpenseSplitW
     )
     if maker_res.get("status") == "ERROR":
         raise HTTPException(status_code=400, detail=maker_res["reason"])
-    updated_pack = await generate_three_statements_working_paper(entity_code=body.entity_code, period="2026-10")
+    updated_pack = await generate_three_statements_reporting(entity_code=body.entity_code, period="2026-10")
     return {
         "maker_result": maker_res,
-        "updated_working_paper_pack": updated_pack,
+        "reporting_pack": updated_pack,
     }
 
 
-@app.post("/api/v1/workpapers/aje")
-async def post_adjusting_workpaper_entry(body: AdjustingWorkpaperEntryRequest) -> Dict[str, Any]:
-    res = await propose_adjusting_workpaper_entry(
+@app.post("/api/v1/reporting/aje")
+async def post_adjusting_entry(body: AdjustingEntryRequest) -> Dict[str, Any]:
+    res = await propose_adjusting_entry(
         entity_code=body.entity_code,
         debit_account_code=body.debit_account_code,
         credit_account_code=body.credit_account_code,
         amount=body.amount,
         memo=body.memo,
-        wp_ref=body.wp_ref,
+        statement_ref=body.statement_ref,
     )
     if res.get("status") == "ERROR":
         raise HTTPException(status_code=400, detail=res["reason"])
-    updated_pack = await generate_three_statements_working_paper(entity_code=body.entity_code, period="2026-10")
-    return {"aje_result": res, "updated_working_paper_pack": updated_pack}
+    updated_pack = await generate_three_statements_reporting(entity_code=body.entity_code, period="2026-10")
+    return {"aje_result": res, "reporting_pack": updated_pack}
 
 
-@app.post("/api/v1/workpapers/{entity_code}/{period}/lock")
-async def lock_working_paper_pack_endpoint(entity_code: str, period: str, body: LockWorkpaperRequest) -> Dict[str, Any]:
-    updated_pack = await lock_and_sign_working_paper_pack(
+@app.post("/api/v1/reporting/{entity_code}/{period}/lock")
+async def lock_reporting_pack_endpoint(entity_code: str, period: str, body: LockScheduleRequest) -> Dict[str, Any]:
+    updated_pack = await lock_and_sign_reporting_pack(
         entity_code=entity_code,
         cpa_principal_key=body.cpa_principal_key,
         period=period,
     )
     if updated_pack.get("status") == "ERROR":
         raise HTTPException(status_code=400, detail=updated_pack["reason"])
-    return {"updated_working_paper_pack": updated_pack}
+    return {"reporting_pack": updated_pack}
 
 
 @app.get("/api/v1/ledger/journals")

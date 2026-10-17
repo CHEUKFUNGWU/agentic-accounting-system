@@ -25,6 +25,12 @@ def cleanup_temp_dir():
 async def initialize_test_database():
     await db_manager.init_db()
     await repo.init_seed_data_if_needed()
+    from app.core.ledger import migrate_entity_core
+    from app.mcp_server import ENTITIES, sync_state_from_db
+
+    await sync_state_from_db()
+    for code, meta in ENTITIES.items():
+        await migrate_entity_core(code, meta["jurisdiction"], currency=meta["currency"])
 
 @pytest_asyncio.fixture
 async def client():

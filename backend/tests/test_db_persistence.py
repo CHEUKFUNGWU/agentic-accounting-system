@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from app.core.db import db_manager, get_default_db_path
 from app.core.repository import repo
-from app.core.working_papers import ETBAccountRow
+from app.core.reporting import TrialBalanceAccountRow
 
 @pytest.mark.asyncio
 async def test_sqlite_wal_persistence_and_seed_data():
@@ -22,7 +22,7 @@ async def test_sqlite_wal_persistence_and_seed_data():
     assert "US-SOLE-01" in entities
 
     # Verify ETB accounts
-    etb_rows = await repo.get_etb_accounts("AU-OPC-01")
+    etb_rows = await repo.get_trial_balance_accounts("AU-OPC-01")
     assert len(etb_rows) == 14
     cash_row = next(r for r in etb_rows if r.account_code == "1110")
     assert cash_row.opening_balance == Decimal("85000.0000")
@@ -59,7 +59,7 @@ async def test_personal_split_and_aje_persistence():
         "debit_account_code": "6100",
         "credit_account_code": "2110",
         "amount": "1250.0000",
-        "wp_ref": "W/P AA",
+        "statement_ref": "AP",
         "memo": "Accrued audit fee test",
     }
     await repo.save_custom_aje(aje_entry)
