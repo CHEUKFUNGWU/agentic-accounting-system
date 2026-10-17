@@ -9,6 +9,7 @@ export default defineConfig({
   resolve: { alias: { "@": path.resolve(__dirname, "src") } },
   server: {
     port: 5173,
+    proxy: { "/api": process.env.VITE_BACKEND_URL || "http://127.0.0.1:8000" },
   },
   build: {
     rollupOptions: {

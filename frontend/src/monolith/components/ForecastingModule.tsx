@@ -1,3 +1,4 @@
+import { useDurableState } from '../useDurableState';
 import React, { useState, useMemo } from 'react';
 import {
   JournalEntry,
@@ -19,6 +20,10 @@ import {
 
 interface ForecastingModuleProps {
   entries: JournalEntry[];
+  savedDrivers: ForecastDrivers;
+  savedOverrides: Record<string, number>;
+  onSave: (drivers: ForecastDrivers, overrides: Record<string, number>) => void;
+  saving: boolean;
 }
 
 type ColLetter = 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H';
@@ -33,13 +38,15 @@ interface SelectedForecastCell {
   formula: string;
 }
 
-export const ForecastingModule: React.FC<ForecastingModuleProps> = ({ entries }) => {
-  const [drivers, setDrivers] = useState<ForecastDrivers>(
-    FORECAST_SCENARIO_PRESETS.base
-  );
+export const ForecastingModule: React.FC<ForecastingModuleProps> = ({ entries, savedDrivers, savedOverrides, onSave, saving }) => {
+  const saved = useMemo(() => ({ drivers: savedDrivers, overrides: savedOverrides }), [savedDrivers, savedOverrides]);
+  const [plan, setPlan] = useDurableState(saved, (next) => onSave(next.drivers, next.overrides), saving);
+  const { drivers, overrides: cellOverrides } = plan;
+  const setDrivers = (change: React.SetStateAction<ForecastDrivers>) => setPlan(previous => ({ ...previous, drivers: typeof change === 'function' ? change(previous.drivers) : change }));
+  const setCellOverrides = (change: React.SetStateAction<Record<string, number>>) => setPlan(previous => ({ ...previous, overrides: typeof change === 'function' ? change(previous.overrides) : change }));
   const [viewMode, setViewMode] = useState<'sheet' | 'chart'>('sheet');
   // Cell-level overrides keyed by `${rowKey}-${quarterIdx}` (for quarterIdx 1..4 = Q1..Q4 2027E)
-  const [cellOverrides, setCellOverrides] = useState<Record<string, number>>({});
+
 
   const baseForecast = useMemo(
     () => computeRollingForecast(entries, drivers),
@@ -263,7 +270,7 @@ export const ForecastingModule: React.FC<ForecastingModuleProps> = ({ entries })
               Rolling 4-Quarter Forecast (Q1–Q4 2027E)
             </h2>
             <span className="px-2 py-0.5 text-[11px] font-mono bg-zinc-100 border border-zinc-200 text-zinc-700">
-              public.rolling_forecast_2027 · 10 rows
+              Rolling forecast 2027 · 10 rows
             </span>
             {overrideCount > 0 && (
               <span className="px-2 py-0.5 text-[11px] font-mono bg-zinc-950 text-white">

@@ -327,3 +327,38 @@ test('Receivables, Payables, Fixed Assets, and Period Close summaries and export
 
 
 
+
+test('draft journals do not affect the ledger, trial balance, or cash statements', () => {
+  const draft = { ...INITIAL_JOURNAL_ENTRIES[0], id: 'DRAFT-TEST', status: 'Draft' as const };
+  assert.deepEqual(computeTrialBalance([...INITIAL_JOURNAL_ENTRIES, draft]), computeTrialBalance(INITIAL_JOURNAL_ENTRIES));
+  assert.deepEqual(computeFinancialStatements([...INITIAL_JOURNAL_ENTRIES, draft]), computeFinancialStatements(INITIAL_JOURNAL_ENTRIES));
+});
+
+test('non-cash depreciation reduces net assets and profit while preserving cash reconciliation', async () => {
+  const { CHART_OF_ACCOUNTS } = await import('./accountingLogic.ts');
+  const accounts = [...CHART_OF_ACCOUNTS,
+    { code: '1590', name: 'Accumulated depreciation', category: 'Asset' as const, normalBalance: 'credit' as const, openingBalance: 0 },
+    { code: '6900', name: 'Depreciation expense', category: 'Expense' as const, normalBalance: 'debit' as const, openingBalance: 0 }];
+  const entry = { id: 'DEPR-TEST', date: '2026-10-17', reference: 'DEPR', memo: 'Depreciation', source: 'System Accrual' as const, status: 'Posted' as const,
+    lines: [{ id: 'a', accountCode: '6900', accountName: 'Depreciation expense', description: 'Monthly', debit: 100, credit: 0 },
+      { id: 'b', accountCode: '1590', accountName: 'Accumulated depreciation', description: 'Monthly', debit: 0, credit: 100 }] };
+  const before = computeFinancialStatements(INITIAL_JOURNAL_ENTRIES, accounts);
+  const after = computeFinancialStatements([...INITIAL_JOURNAL_ENTRIES, entry], accounts);
+  assert.equal(after.totalAssets, before.totalAssets - 100);
+  assert.equal(after.netIncome, before.netIncome - 100);
+  assert.equal(after.cashFlow.endingCash, before.cashFlow.endingCash);
+  assert.equal(after.isBalanceSheetBalanced, true);
+  assert.equal(after.cashFlow.isCashReconciled, true);
+});
+
+test('live cash Sankey changes only for posted cash movements', async () => {
+  const { buildLiveCashSankeyDataset } = await import('./accountingLogic.ts');
+  const dataset = buildLiveCashSankeyDataset(INITIAL_JOURNAL_ENTRIES);
+  const draft = { ...INITIAL_JOURNAL_ENTRIES[0], id: 'DRAFT', status: 'Draft' as const };
+  assert.deepEqual(buildLiveCashSankeyDataset([...INITIAL_JOURNAL_ENTRIES, draft]), dataset);
+  for (const link of dataset.links) {
+    assert(link.value > 0);
+    assert(dataset.nodes.some(node => node.id === link.source));
+    assert(dataset.nodes.some(node => node.id === link.target));
+  }
+});

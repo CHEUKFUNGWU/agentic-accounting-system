@@ -70,6 +70,7 @@ export interface LedgerCashItem {
 }
 
 export interface TaxJurisdictionSchedule {
+  provisionJournalId?: string;
   id: string;
   jurisdiction: string;
   taxType: 'Federal Corporate Income' | 'State Sales & Use' | 'International VAT / GST' | 'Payroll & Withholding';
@@ -839,7 +840,7 @@ export function computeGeneralLedgerByAccount(
   accounts: Account[] = CHART_OF_ACCOUNTS
 ): AccountGeneralLedger[] {
   // Sort entries chronologically ascending to compute accurate running balances
-  const sortedEntries = [...entries].sort((a, b) => a.date.localeCompare(b.date));
+  const sortedEntries = entries.filter(entry => entry.status === 'Posted').sort((a, b) => a.date.localeCompare(b.date));
 
   return accounts.map((account) => {
     let running = account.openingBalance;
@@ -1025,7 +1026,7 @@ export function computeFinancialStatements(
 
   const assets = glList
     .filter((g) => g.account.category === 'Asset')
-    .map((g) => ({ code: g.account.code, name: g.account.name, amount: g.endingBalance }));
+    .map((g) => ({ code: g.account.code, name: g.account.name, amount: g.account.normalBalance === 'credit' ? -g.endingBalance : g.endingBalance }));
   const totalAssets = assets.reduce((s, a) => s + a.amount, 0);
 
   const liabilities = glList
@@ -1054,6 +1055,7 @@ export function computeFinancialStatements(
   const stockGl = getGl('3010');
 
   const workingCapitalAdjustments = [
+    { code: '6900', name: 'Add back non-cash depreciation', amount: getGl('6900')?.endingBalance || 0 },
     {
       code: '1100',
       name: 'Change in Accounts Receivable',
@@ -1199,7 +1201,7 @@ export function formatCurrency(amount: number, showSign = false): string {
   const abs = Math.abs(amount);
   const formatted = abs.toLocaleString('en-US', {
     minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    maximumFractionDigits: Number.isInteger(abs) ? 0 : 2,
   });
   if (amount < 0) return `-$${formatted}`;
   if (showSign && amount > 0) return `+$${formatted}`;
@@ -1734,7 +1736,11 @@ export type AuditAction =
   | 'Run Depreciation'
   | 'Post Amortization'
   | 'Lock Period'
-  | 'Unlock Period';
+  | 'Unlock Period'
+  | 'Toggle Close Task'
+  | 'Update Tax Schedule'
+  | 'Update Budget'
+  | 'Update Forecast';
 
 export interface AuditLogEntry {
   id: string; // e.g. "AUD-2026-1005"
@@ -2225,7 +2231,7 @@ export function computeFixedAssetMetrics(assets: FixedAssetItem[]): FixedAssetsS
   const rows: ComputedFixedAssetRow[] = assets.map((asset) => {
     const depreciableBase = Math.max(0, asset.costBasis - asset.salvageValue);
     const rawMonthly =
-      asset.usefulLifeMonths > 0 ? Math.round(depreciableBase / asset.usefulLifeMonths) : 0;
+      asset.usefulLifeMonths > 0 ? Math.round((depreciableBase / asset.usefulLifeMonths) * 100) / 100 : 0;
     const remainingDepreciable = Math.max(0, depreciableBase - asset.accumulatedDepreciation);
     const monthlyDepreciation =
       asset.status === 'Fully Depreciated' ? 0 : Math.min(rawMonthly, remainingDepreciable);
@@ -2427,3 +2433,40 @@ export function computePeriodCloseSummary(
 
 
 
+
+/** Cash movement graph derived from the same posted journals as the ledger. */
+export function buildLiveCashSankeyDataset(entries: JournalEntry[]): PeriodSankeyDataset {
+  let inflow = 0;
+  let outflow = 0;
+  for (const entry of entries) {
+    if (entry.status !== 'Posted') continue;
+    for (const line of entry.lines) {
+      if (line.accountCode !== '1010') continue;
+      inflow += line.debit;
+      outflow += line.credit;
+    }
+  }
+  const openingUsed = Math.max(0, outflow - inflow);
+  const retained = Math.max(0, inflow - outflow);
+  const available = inflow + openingUsed;
+  const template = SANKEY_DATASETS['Q4-2026'].nodes;
+  const node = (id: string, label: string, value: number, column: SankeyNodeData['column'], category: SankeyNodeData['category']): SankeyNodeData => ({
+    ...template[0], id, label, value, column, category,
+  });
+  return {
+    periodLabel: 'Q4 2026', subtitle: 'Posted operating cash movements',
+    nodes: [
+      node('gross_inflow', 'Cash receipts', inflow, 0, 'inflow'),
+      node('opening_cash', 'Opening cash used', openingUsed, 0, 'inflow'),
+      node('cash_pool', 'Cash available', available, 1, 'hub'),
+      node('opex_pool', 'Cash payments', outflow, 2, 'outflow'),
+      node('net_treasury', 'Cash retained', retained, 2, 'retained'),
+    ].filter(item => item.value > 0),
+    links: [
+      { id: 'cash-receipts', source: 'gross_inflow', target: 'cash_pool', value: inflow, label: 'Receipts' },
+      { id: 'cash-opening', source: 'opening_cash', target: 'cash_pool', value: openingUsed, label: 'Opening cash' },
+      { id: 'cash-payments', source: 'cash_pool', target: 'opex_pool', value: outflow, label: 'Payments' },
+      { id: 'cash-retained', source: 'cash_pool', target: 'net_treasury', value: retained, label: 'Retained cash' },
+    ].filter(item => item.value > 0),
+  };
+}

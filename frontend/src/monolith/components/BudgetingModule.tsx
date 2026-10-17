@@ -1,3 +1,4 @@
+import { useDurableState } from '../useDurableState';
 import React, { useState, useMemo } from 'react';
 import {
   JournalEntry,
@@ -20,6 +21,9 @@ import {
 
 interface BudgetingModuleProps {
   entries: JournalEntry[];
+  savedAllocations: BudgetAllocationItem[];
+  onSave: (allocations: BudgetAllocationItem[]) => void;
+  saving: boolean;
 }
 
 type ColLetter = 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H' | 'I';
@@ -43,10 +47,8 @@ const DEPARTMENTS: BudgetAllocationItem['department'][] = [
   'Tax',
 ];
 
-export const BudgetingModule: React.FC<BudgetingModuleProps> = ({ entries }) => {
-  const [allocations, setAllocations] = useState<BudgetAllocationItem[]>(
-    INITIAL_BUDGET_ALLOCATIONS
-  );
+export const BudgetingModule: React.FC<BudgetingModuleProps> = ({ entries, savedAllocations, onSave, saving }) => {
+  const [allocations, setAllocations] = useDurableState(savedAllocations, onSave, saving);
   const [viewMode, setViewMode] = useState<'sheet' | 'standard'>('sheet');
   const [categoryFilter, setCategoryFilter] = useState<'ALL' | 'Revenue' | 'Expense'>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -284,7 +286,7 @@ export const BudgetingModule: React.FC<BudgetingModuleProps> = ({ entries }) => 
               Budget vs. Actual (Q4 2026)
             </h2>
             <span className="px-2 py-0.5 text-[11px] font-mono bg-zinc-100 border border-zinc-200 text-zinc-700">
-              public.budget_allocations · {filteredRows.length} rows
+              Budget allocations · {filteredRows.length} rows
             </span>
             {editCount > 0 && (
               <span className="px-2 py-0.5 text-[11px] font-mono bg-zinc-950 text-white">
@@ -924,7 +926,7 @@ export const BudgetingModule: React.FC<BudgetingModuleProps> = ({ entries }) => 
                         className="w-full py-2 px-3 text-left text-xs font-mono text-zinc-500 hover:text-zinc-950 flex items-center gap-2 cursor-pointer"
                       >
                         <Plus className="w-3.5 h-3.5" />
-                        <span>+ Insert new budget row into public.budget_allocations</span>
+                        <span>+ Insert new budget row into Budget allocations</span>
                       </button>
                     </td>
                   </tr>

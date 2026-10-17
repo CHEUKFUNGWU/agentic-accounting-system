@@ -59,7 +59,7 @@ export const TaxReportingModule: React.FC<TaxReportingModuleProps> = ({
   const handleTriggerProvisionPost = (s: TaxJurisdictionSchedule) => {
     const computed = computeTaxScheduleLiability(s);
     onPostTaxProvisionJournal(computed.netPayable, s.jurisdiction, s.formCode);
-    onUpdateSchedule(s.id, { status: 'Filed' });
+
   };
 
   return (
@@ -249,12 +249,12 @@ export const TaxReportingModule: React.FC<TaxReportingModuleProps> = ({
             <button
               type="button"
               onClick={() => handleTriggerProvisionPost(activeSchedule)}
-              disabled={activeSchedule.status === 'Filed'}
+              disabled={activeSchedule.status === 'Filed' || !!activeSchedule.provisionJournalId}
               className="w-full py-2 px-4 text-xs font-mono font-semibold bg-zinc-950 text-white hover:bg-zinc-800 disabled:bg-zinc-200 disabled:text-zinc-500 transition-colors cursor-pointer"
             >
               {activeSchedule.status === 'Filed'
                 ? 'Filed'
-                : `File & Post ${formatCurrency(activeComputed.netPayable)}`}
+                : activeSchedule.provisionJournalId ? 'Provision posted' : `Post Provision ${formatCurrency(activeComputed.netPayable)}`}
             </button>
           </div>
         </section>

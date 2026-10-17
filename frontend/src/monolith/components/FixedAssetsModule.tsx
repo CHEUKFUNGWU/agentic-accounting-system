@@ -10,6 +10,7 @@ import { Plus, Play } from 'lucide-react';
 
 interface FixedAssetsModuleProps {
   assets: FixedAssetItem[];
+  period: string;
   onRunMonthlyDepreciation: () => void;
   onRegisterAsset: (params: {
     name: string;
@@ -17,11 +18,12 @@ interface FixedAssetsModuleProps {
     usefulLifeMonths: number;
     costBasis: number;
     salvageValue: number;
-  }) => void;
+  }) => Promise<unknown>;
 }
 
 export const FixedAssetsModule: React.FC<FixedAssetsModuleProps> = ({
   assets,
+  period,
   onRunMonthlyDepreciation,
   onRegisterAsset,
 }) => {
@@ -33,21 +35,22 @@ export const FixedAssetsModule: React.FC<FixedAssetsModuleProps> = ({
   const [salvageInput, setSalvageInput] = useState('0');
 
   const summary = useMemo(() => computeFixedAssetMetrics(assets), [assets]);
+  const due = useMemo(() => computeFixedAssetMetrics(assets.filter(asset => asset.lastDepreciatedPeriod < period)).totalMonthlyDepreciation, [assets, period]);
 
-  const handleSubmitAsset = (e: React.FormEvent) => {
+  const handleSubmitAsset = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cost = Math.round(Number(costInput));
+    const cost = Number(costInput);
     const life = Math.max(12, Math.round(Number(lifeInput) || 36));
-    const salvage = Math.max(0, Math.round(Number(salvageInput) || 0));
+    const salvage = Math.max(0, Number(salvageInput) || 0);
     if (!nameInput.trim() || !cost || cost <= 0) return;
 
-    onRegisterAsset({
+    try { await onRegisterAsset({
       name: nameInput.trim(),
       category: categoryInput,
       usefulLifeMonths: life,
       costBasis: cost,
       salvageValue: Math.min(salvage, cost),
-    });
+    }); } catch { return; }
     setNameInput('');
     setCostInput('');
     setSalvageInput('0');
@@ -101,11 +104,11 @@ export const FixedAssetsModule: React.FC<FixedAssetsModuleProps> = ({
             <button
               type="button"
               onClick={onRunMonthlyDepreciation}
-              disabled={summary.totalMonthlyDepreciation <= 0}
+              disabled={due <= 0}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono font-semibold bg-zinc-950 text-white hover:bg-zinc-800 disabled:bg-zinc-200 disabled:text-zinc-500 transition-colors cursor-pointer"
             >
               <Play className="w-3 h-3" />
-              <span>Post Monthly Depr. ({formatCurrency(summary.totalMonthlyDepreciation)})</span>
+              <span>Post Monthly Depr. ({formatCurrency(due)})</span>
             </button>
             <ExportActionsBar
               onGenerateExport={() => createFixedAssetsExportPayload(assets)}
@@ -152,11 +155,10 @@ export const FixedAssetsModule: React.FC<FixedAssetsModuleProps> = ({
             <option value="60">60 Mo</option>
           </select>
           <input
-            type="number"
+            type="number" step="0.01"
             aria-label="Cost Basis"
             placeholder="Cost ($)"
             min="0"
-            step="any"
             value={costInput}
             onChange={(e) => setCostInput(e.target.value)}
             className="sm:col-span-2 px-3 py-1.5 text-xs font-mono tabular-nums bg-white border border-zinc-200 text-zinc-950 focus:outline-none focus:border-zinc-950"

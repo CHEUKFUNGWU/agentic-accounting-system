@@ -70,6 +70,21 @@ class Base(DeclarativeBase):
     pass
 
 
+class MonolithWorkspaceModel(Base):
+    """Canonical Monolith workspace, committed atomically with a revision guard.
+
+    Legacy entities retain their existing normalized ledger. This separate
+    workspace uses the supplied UI's chart and subledger vocabulary.
+    """
+
+    __tablename__ = "monolith_workspaces"
+
+    workspace_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    revision: Mapped[int] = mapped_column(Integer, default=0)
+    payload_json: Mapped[str] = mapped_column(Text)
+    receipts_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
 class EntityModel(Base):
     __tablename__ = "entities"
 

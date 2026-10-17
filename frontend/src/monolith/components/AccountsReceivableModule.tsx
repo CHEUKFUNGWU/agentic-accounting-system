@@ -17,7 +17,7 @@ interface AccountsReceivableModuleProps {
     dueDate: string;
     revenueAccountCode: string;
     amount: number;
-  }) => void;
+  }) => Promise<unknown>;
 }
 
 export const AccountsReceivableModule: React.FC<AccountsReceivableModuleProps> = ({
@@ -38,17 +38,17 @@ export const AccountsReceivableModule: React.FC<AccountsReceivableModuleProps> =
     return invoices.filter((inv) => inv.status === statusFilter);
   }, [invoices, statusFilter]);
 
-  const handleSubmitNew = (e: React.FormEvent) => {
+  const handleSubmitNew = async (e: React.FormEvent) => {
     e.preventDefault();
-    const numericAmount = Math.round(Number(amountInput));
+    const numericAmount = Number(amountInput);
     if (!customerInput.trim() || !numericAmount || numericAmount <= 0) return;
 
-    onCreateInvoice({
+    try { await onCreateInvoice({
       customer: customerInput.trim(),
       dueDate: dueDateInput || '2026-11-15',
       revenueAccountCode: revenueAccountInput,
       amount: numericAmount,
-    });
+    }); } catch { return; }
     setCustomerInput('');
     setAmountInput('');
   };
@@ -149,11 +149,10 @@ export const AccountsReceivableModule: React.FC<AccountsReceivableModuleProps> =
             className="sm:col-span-2 px-2.5 py-1.5 text-xs font-mono bg-white border border-zinc-200 text-zinc-950 focus:outline-none focus:border-zinc-950"
           />
           <input
-            type="number"
+            type="number" step="0.01"
             aria-label="Invoice Amount"
             placeholder="Amount ($)"
             min="0"
-            step="any"
             value={amountInput}
             onChange={(e) => setAmountInput(e.target.value)}
             className="sm:col-span-2 px-3 py-1.5 text-xs font-mono tabular-nums bg-white border border-zinc-200 text-zinc-950 focus:outline-none focus:border-zinc-950"

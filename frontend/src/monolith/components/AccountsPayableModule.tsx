@@ -19,7 +19,7 @@ interface AccountsPayableModuleProps {
     dueDate: string;
     expenseAccountCode: string;
     amount: number;
-  }) => void;
+  }) => Promise<unknown>;
 }
 
 const EXPENSE_ACCOUNTS: { code: string; name: string }[] = [
@@ -49,18 +49,18 @@ export const AccountsPayableModule: React.FC<AccountsPayableModuleProps> = ({
     return bills.filter((b) => b.status === statusFilter);
   }, [bills, statusFilter]);
 
-  const handleSubmitNew = (e: React.FormEvent) => {
+  const handleSubmitNew = async (e: React.FormEvent) => {
     e.preventDefault();
-    const numericAmount = Math.round(Number(amountInput));
+    const numericAmount = Number(amountInput);
     if (!vendorInput.trim() || !numericAmount || numericAmount <= 0) return;
 
-    onCreateBill({
+    try { await onCreateBill({
       vendor: vendorInput.trim(),
       reference: refInput.trim() || `INV-${Math.floor(1000 + Math.random() * 9000)}`,
       dueDate: dueDateInput || '2026-11-15',
       expenseAccountCode: expenseCodeInput,
       amount: numericAmount,
-    });
+    }); } catch { return; }
     setVendorInput('');
     setRefInput('');
     setAmountInput('');
@@ -173,11 +173,10 @@ export const AccountsPayableModule: React.FC<AccountsPayableModuleProps> = ({
           />
           <div className="sm:col-span-2 flex gap-2">
             <input
-              type="number"
+              type="number" step="0.01"
               aria-label="Bill Amount"
               placeholder="Amount ($)"
               min="0"
-              step="any"
               value={amountInput}
               onChange={(e) => setAmountInput(e.target.value)}
               className="w-full px-2.5 py-1.5 text-xs font-mono tabular-nums bg-white border border-zinc-200 text-zinc-950 focus:outline-none focus:border-zinc-950"

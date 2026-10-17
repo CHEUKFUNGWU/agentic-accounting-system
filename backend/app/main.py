@@ -20,6 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from app.api_monolith import router as monolith_router
 from app.api_documents import router as document_router
 from app.api_vouchers import router as voucher_router
 from app.mcp_roles import mount_role_servers
@@ -103,6 +104,7 @@ MCP_ROLE_SURFACES: Dict[str, str] = mount_role_servers(app)
 # so the shipping reporting endpoints stay untouched.
 app.include_router(voucher_router)
 app.include_router(document_router)
+app.include_router(monolith_router)
 
 @app.get("/api/v1/audit/agent-activity")
 async def agent_activity(entity_code: str = "AU-OPC-01", limit: int = 50) -> Dict[str, Any]:

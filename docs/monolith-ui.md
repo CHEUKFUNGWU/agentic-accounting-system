@@ -14,7 +14,7 @@ Open `http://127.0.0.1:5173/` or `http://127.0.0.1:5173/app.html`.
 
 | URL | Interface and data |
 | --- | --- |
-| `/` and `/app.html` | Supplied Monolith UI with its original browser-side sample data |
+| `/` and `/app.html` | Supplied Monolith UI connected to a persistent Monolith backend workspace |
 | `/connected.html` | Existing backend-connected accounting workspace, requires the backend on port 8000 |
 | `/classic.html` | Previous reporting dashboard, requires the backend on port 8000 |
 | `/prototype.html` | Previous bilingual review and close prototype |
@@ -36,6 +36,8 @@ The supplied tests run using Node.js's native TypeScript support, requiring Node
 
 ## Data behavior
 
-This UI uses the sample data and state model included in the archive. Accounting actions modify that browser session and reset on reload. Appearance preferences use the supplied `monolith_preferences_v1` local-storage key. These actions do not change backend books, authorize real payments, file tax returns, or create production audit evidence.
+The UI now loads and saves through the [Monolith backend contract](monolith-backend.md). It initially uses the supplied example dataset in a separate workspace, then persists changes in the company database. Refreshing the browser or restarting the backend preserves journals, subledgers, plans, preferences, and audit events.
 
-The existing backend and its connected interfaces are retained. No environment files, AI Studio metadata, or private service credentials were imported from the archive.
+The visual design is retained. Loading, save failures, pending saves, source metadata, and explicit draft review now reflect real server responses. Financial mutations are validated on the server before success is shown. The backend receives commands rather than unrestricted client state replacements.
+
+Payments record disbursements in the books; they do not initiate bank transfers. Tax provision posting records an accrual and does not submit a tax return. Existing regional company records remain separate and accessible through their earlier interfaces.

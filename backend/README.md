@@ -25,6 +25,10 @@ The default company file uses SQLite. Set `AGENTIC_ACCOUNTING_DATA_DIR` to choos
 
 Reporting is available at `/api/v1/reporting/{entity_code}/{period}`. MCP endpoints use `/mcp/<position>/`, such as `/mcp/ap-clerk/`; the former shared `/mcp` surface has been removed. The development inventory is available at `/api/v1/mcp/surfaces`.
 
+## Monolith frontend integration
+
+The default Monolith UI uses `/api/v1/monolith/workspace` and `/api/v1/monolith/commands`. This persistent workspace supports its journal, subledger, reconciliation, tax-provision, asset, close, budget, forecast, preference, and audit workflows. It is initially seeded from the supplied demonstration dataset and remains separate from the existing regional company records. See [the contract and setup](../docs/monolith-backend.md).
+
 ## Verification
 
 ```bash

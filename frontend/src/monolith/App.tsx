@@ -3,20 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo, useEffect } from 'react';
-import {
-  INITIAL_JOURNAL_ENTRIES,
-  INITIAL_BANK_FEED,
-  INITIAL_LEDGER_CASH,
-  INITIAL_TAX_SCHEDULES,
-  JournalEntry,
-  BankFeedItem,
-  LedgerCashItem,
-  TaxJurisdictionSchedule,
-  calculateReconciliationSummary,
-  computeTaxScheduleLiability,
-} from './utils/accountingLogic';
-import { OverviewModule, AgentTask } from './components/OverviewModule';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { calculateReconciliationSummary, computeTaxScheduleLiability, CHART_OF_ACCOUNTS } from './utils/accountingLogic';
+import type { JournalEntry, FixedAssetItem } from './utils/accountingLogic';
+import { loadWorkspace, sendCommand, type Workspace } from './api';
+import { OverviewModule } from './components/OverviewModule';
 import { JournalEntryModule } from './components/JournalEntryModule';
 import { GeneralLedgerModule } from './components/GeneralLedgerModule';
 import { TrialBalanceModule } from './components/TrialBalanceModule';
@@ -32,51 +23,9 @@ import { AccountsReceivableModule } from './components/AccountsReceivableModule'
 import { AccountsPayableModule } from './components/AccountsPayableModule';
 import { FixedAssetsModule } from './components/FixedAssetsModule';
 import { PeriodCloseModule } from './components/PeriodCloseModule';
-import {
-  AppPreferences,
-  DEFAULT_PREFERENCES,
-  FONT_SIZE_ROOT_PX,
-  getTranslations,
-} from './utils/preferences';
-import {
-  AuditLogEntry,
-  INITIAL_AUDIT_LOGS,
-  generateAuditHash,
-  AuditCategory,
-  AuditActorType,
-  AuditAction,
-  ReceivableInvoice,
-  INITIAL_RECEIVABLES,
-  PayableBill,
-  INITIAL_PAYABLES,
-  FixedAssetItem,
-  INITIAL_FIXED_ASSETS,
-  computeFixedAssetMetrics,
-  CloseChecklistItem,
-  INITIAL_CLOSE_CHECKLIST,
-  AmortizationScheduleItem,
-  INITIAL_AMORTIZATION_SCHEDULES,
-  CHART_OF_ACCOUNTS,
-  formatCurrency,
-} from './utils/accountingLogic';
-import {
-  LayoutGrid,
-  BookOpen,
-  Layers,
-  Receipt,
-  CreditCard,
-  HardDrive,
-  Columns3,
-  FileSpreadsheet,
-  Target,
-  TrendingUp,
-  ArrowLeftRight,
-  Scale,
-  Lock,
-  ShieldCheck,
-  Settings,
-  Plus,
-} from 'lucide-react';
+import { FONT_SIZE_ROOT_PX, getTranslations } from './utils/preferences';
+import type { AppPreferences } from './utils/preferences';
+import { LayoutGrid, BookOpen, Layers, Receipt, CreditCard, HardDrive, Columns3, FileSpreadsheet, Target, TrendingUp, ArrowLeftRight, Scale, Lock, ShieldCheck, Settings, Plus } from 'lucide-react';
 
 export type ActiveModule =
   | 'overview'
@@ -95,958 +44,99 @@ export type ActiveModule =
   | 'audit-log'
   | 'settings';
 
-const INITIAL_AGENT_TASKS: AgentTask[] = [
-  {
-    id: 'AGT-101',
-    code: 'REV-01',
-    title: 'Citadel Quant — ASC 606 Split',
-    impactAmount: 240000,
-    confidence: 99.6,
-    category: 'Revenue Recognition',
-    description: '',
-    resolved: false,
-    targetTab: 'journal',
-  },
-  {
-    id: 'AGT-102',
-    code: 'REC-02',
-    title: 'Delaware Franchise Tax Autopay',
-    impactAmount: 4200,
-    confidence: 98.4,
-    category: 'Bank Reconciliation',
-    description: '',
-    resolved: false,
-    targetTab: 'reconciliation',
-  },
-  {
-    id: 'AGT-103',
-    code: 'TAX-03',
-    title: 'California Form 100-ES Provision',
-    impactAmount: 21381,
-    confidence: 97.9,
-    category: 'Tax Nexus',
-    description: '',
-    resolved: false,
-    targetTab: 'tax',
-  },
-];
-
 export default function App() {
+  const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  const workspaceRef = useRef<Workspace | null>(null);
+  const queue = useRef<Promise<unknown>>(Promise.resolve());
+  const queueEpoch = useRef(0);
+  const [error, setError] = useState('');
+  const [pending, setPending] = useState(0);
   const [activeTab, setActiveTab] = useState<ActiveModule>('overview');
-  const [journalEntries, setJournalEntries] = useState<JournalEntry[]>(
-    INITIAL_JOURNAL_ENTRIES
-  );
-  const [bankItems, setBankItems] = useState<BankFeedItem[]>(INITIAL_BANK_FEED);
-  const [ledgerCashItems, setLedgerCashItems] =
-    useState<LedgerCashItem[]>(INITIAL_LEDGER_CASH);
-  const [taxSchedules, setTaxSchedules] =
-    useState<TaxJurisdictionSchedule[]>(INITIAL_TAX_SCHEDULES);
-  const [agentTasks, setAgentTasks] = useState<AgentTask[]>(INITIAL_AGENT_TASKS);
-  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>(INITIAL_AUDIT_LOGS);
-  const [receivables, setReceivables] = useState<ReceivableInvoice[]>(INITIAL_RECEIVABLES);
-  const [payables, setPayables] = useState<PayableBill[]>(INITIAL_PAYABLES);
-  const [fixedAssets, setFixedAssets] = useState<FixedAssetItem[]>(INITIAL_FIXED_ASSETS);
-  const [closeChecklist, setCloseChecklist] = useState<CloseChecklistItem[]>(
-    INITIAL_CLOSE_CHECKLIST
-  );
-  const [amortizationSchedules, setAmortizationSchedules] = useState<AmortizationScheduleItem[]>(
-    INITIAL_AMORTIZATION_SCHEDULES
-  );
-  const [isPeriodLocked, setIsPeriodLocked] = useState<boolean>(false);
-  const [globalSearchQuery, setGlobalSearchQuery] = useState<string>('');
+  const [globalSearchQuery, setGlobalSearchQuery] = useState('');
   const [focusedAccountCode, setFocusedAccountCode] = useState<string | null>(null);
-  const [preferences, setPreferences] = useState<AppPreferences>(() => {
-    try {
-      const saved = localStorage.getItem('monolith_preferences_v1');
-      if (saved) {
-        return { ...DEFAULT_PREFERENCES, ...JSON.parse(saved) };
-      }
-    } catch {
-      // ignore storage errors
-    }
-    return DEFAULT_PREFERENCES;
-  });
 
+  const receive = (next: Workspace) => {
+    workspaceRef.current = next;
+    // Existing report and editor components read this shared account list.
+    CHART_OF_ACCOUNTS.splice(0, CHART_OF_ACCOUNTS.length, ...next.accounts);
+    setWorkspace(next);
+  };
   useEffect(() => {
+    let active = true;
+    loadWorkspace().then(next => { if (active) receive(next); })
+      .catch(reason => { if (active) setError(String(reason.message || reason)); });
+    return () => { active = false; };
+  }, []);
+
+  const command = (action: string, payload: object = {}) => {
+    setPending(n => n + 1);
+    const epoch = queueEpoch.current;
+    const job = queue.current.then(async () => {
+      if (epoch !== queueEpoch.current) throw new Error('Pending edits canceled after a save failed. Review the refreshed records.');
+      const current = workspaceRef.current;
+      if (!current) throw new Error('The accounting workspace has not loaded.');
+      try {
+        const next = await sendCommand(action, payload, current.revision);
+        receive(next);
+        setError('');
+        return next;
+      } catch (reason) {
+        const message = reason instanceof Error ? reason.message : 'Unable to save the change.';
+        queueEpoch.current += 1;
+        setError(message);
+        // Discard stale browser data after a conflict; never silently replay financial actions.
+        try { receive(await loadWorkspace()); } catch { /* Keep the error and last confirmed state. */ }
+        throw reason;
+      }
+    });
+    queue.current = job.catch(() => undefined);
+    void job.finally(() => setPending(n => n - 1)).catch(() => undefined);
+    return job;
+  };
+  const act = (action: string, payload: object = {}) => { void command(action, payload).catch(() => undefined); };
+  const preferences = workspace?.preferences;
+  useEffect(() => {
+    if (!preferences) return;
     const root = document.documentElement;
-    root.style.fontSize = FONT_SIZE_ROOT_PX[preferences.fontSize] || '16px';
+    root.style.fontSize = FONT_SIZE_ROOT_PX[preferences.fontSize];
     root.lang = preferences.language;
     root.dataset.font = preferences.fontFamily || 'inter';
     root.classList.toggle('dark', preferences.theme === 'dark');
-    try {
-      localStorage.setItem('monolith_preferences_v1', JSON.stringify(preferences));
-    } catch {
-      // ignore storage errors
-    }
   }, [preferences]);
+  useEffect(() => { window.scrollTo({ top: 0 }); }, [activeTab]);
+  const reconSummary = useMemo(() => calculateReconciliationSummary(workspace?.bankItems || [], workspace?.ledgerCashItems || [], 1420000), [workspace]);
+  const totalNetTaxLiability = useMemo(() => workspace?.taxSchedules.reduce((sum, schedule) => sum + computeTaxScheduleLiability(schedule).netPayable, 0) || 0, [workspace]);
 
-  useEffect(() => {
-    window.scrollTo({ top: 0 });
-  }, [activeTab]);
-
-  const handleUpdatePreferences = (updates: Partial<AppPreferences>) => {
-    setPreferences((prev) => ({ ...prev, ...updates }));
-  };
-
-  const t = getTranslations(preferences.language);
-
-  const logAuditEvent = (params: {
-    category: AuditCategory;
-    action: AuditAction;
-    actorType: AuditActorType;
-    actorId: string;
-    targetId: string;
-    summary: string;
-    details?: string;
-    impactAmount?: number;
-    targetReference?: string;
-  }) => {
-    const now = new Date();
-    const pad = (n: number) => String(n).padStart(2, '0');
-    const timestamp = `${now.getUTCFullYear()}-${pad(now.getUTCMonth() + 1)}-${pad(now.getUTCDate())} ${pad(now.getUTCHours())}:${pad(now.getUTCMinutes())}:${pad(now.getUTCSeconds())} UTC`;
-    setAuditLogs((prev) => {
-      const id = `AUD-2026-${1001 + prev.length}`;
-      const hash = generateAuditHash(
-        id,
-        timestamp,
-        params.actorId,
-        params.targetId,
-        params.summary
-      );
-      const newEntry: AuditLogEntry = {
-        id,
-        timestamp,
-        actorType: params.actorType,
-        actorId: params.actorId,
-        category: params.category,
-        action: params.action,
-        targetId: params.targetId,
-        targetReference: params.targetReference,
-        impactAmount: params.impactAmount,
-        summary: params.summary,
-        details: params.details,
-        hash,
-      };
-      return [newEntry, ...prev];
-    });
-  };
-
-  const reconSummary = useMemo(
-    () => calculateReconciliationSummary(bankItems, ledgerCashItems, 1420000),
-    [bankItems, ledgerCashItems]
+  if (!workspace || !preferences) return (
+    <main className="min-h-screen bg-zinc-50 p-8 text-zinc-950">
+      <h1 className="text-base font-extrabold">MONOLITH</h1>
+      <p role={error ? 'alert' : 'status'} className="mt-6 text-sm">{error || 'Loading accounting workspace…'}</p>
+      {error && <button className="mt-4 bg-zinc-950 px-4 py-2 text-sm text-white" onClick={() => window.location.reload()}>Retry connection</button>}
+    </main>
   );
-
-  const totalNetTaxLiability = useMemo(() => {
-    return taxSchedules.reduce(
-      (sum, sched) => sum + computeTaxScheduleLiability(sched).netPayable,
-      0
-    );
-  }, [taxSchedules]);
-
-  const handleAddJournalEntry = (newEntry: JournalEntry) => {
-    setJournalEntries((prev) => [newEntry, ...prev]);
-
-    const cashLine = newEntry.lines.find((l) => l.accountCode === '1010');
-    if (cashLine) {
-      const netCashAmount = cashLine.debit - cashLine.credit;
-      if (netCashAmount !== 0) {
-        const newCashItem: LedgerCashItem = {
-          id: `LC-0${ledgerCashItems.length + 1}`,
-          date: newEntry.date,
-          entryId: newEntry.id,
-          memo: newEntry.memo,
-          amount: netCashAmount,
-          reconciled: false,
-        };
-        setLedgerCashItems((prev) => [newCashItem, ...prev]);
-      }
-    }
-
-    const totalDebits = newEntry.lines.reduce((s, l) => s + l.debit, 0);
-    const totalCredits = newEntry.lines.reduce((s, l) => s + l.credit, 0);
-    const actorType: AuditActorType =
-      newEntry.source === 'Agentic Auto-Draft'
-        ? 'Agent'
-        : newEntry.source === 'System Accrual'
-        ? 'System'
-        : 'User';
-    const actorId =
-      newEntry.source === 'Agentic Auto-Draft'
-        ? 'Agent REV-01'
-        : newEntry.source === 'System Accrual'
-        ? 'System Accrual'
-        : 'auslifegriffin@gmail.com';
-    const action: AuditAction =
-      newEntry.source === 'Agentic Auto-Draft' ? 'Auto-Draft Post' : 'Create Entry';
-
-    logAuditEvent({
-      category: 'Journal Entry',
-      action,
-      actorType,
-      actorId,
-      targetId: newEntry.id,
-      targetReference: newEntry.reference,
-      impactAmount: totalDebits,
-      summary: `Posted journal entry ${newEntry.id}: ${newEntry.memo}`,
-      details: `Debits: ${formatCurrency(totalDebits)} | Credits: ${formatCurrency(totalCredits)}${
-        newEntry.attachments?.length
-          ? ` | ${newEntry.attachments.length} attachment(s) uploaded (${newEntry.attachments.map((a) => a.name).join(', ')})`
-          : ''
-      }`,
-    });
+  const { journalEntries, bankItems, ledgerCashItems, taxSchedules, agentTasks, auditLogs, receivables, payables, fixedAssets, closeChecklist, amortizationSchedules, isPeriodLocked } = workspace;
+  const t = getTranslations(preferences.language);
+  const handleUpdatePreferences = (updates: Partial<AppPreferences>) => act('preferences.update', updates);
+  const handleAddJournalEntry = async (entry: JournalEntry) => {
+    const next = await command('journal.create', entry);
+    return next.journalEntries[0];
   };
-
-  const handleReconcileItem = (bankId: string, ledgerId: string) => {
-    const targetBank = bankItems.find((item) => item.id === bankId);
-    const targetLedger = ledgerCashItems.find((l) => l.id === ledgerId);
-
-    setBankItems((prev) =>
-      prev.map((item) =>
-        item.id === bankId
-          ? { ...item, status: 'Matched', matchedLedgerId: ledgerId }
-          : item
-      )
-    );
-    setLedgerCashItems((prev) =>
-      prev.map((l) => (l.id === ledgerId ? { ...l, reconciled: true } : l))
-    );
-
-    logAuditEvent({
-      category: 'Bank Reconciliation',
-      action: 'Reconcile Match',
-      actorType: 'User',
-      actorId: 'auslifegriffin@gmail.com',
-      targetId: bankId,
-      targetReference: targetBank?.bankReference,
-      impactAmount: targetBank?.amount,
-      summary: `Matched bank transaction ${bankId} (${targetBank?.counterparty || 'Feed'}) to ledger cash ${ledgerId}`,
-      details: `Matched amount: ${formatCurrency(targetBank?.amount || 0, true)} against ${
-        targetLedger?.memo || ledgerId
-      }`,
-    });
-  };
-
-  const handleBatchReconcileSuggested = () => {
-    const suggestedPairs = bankItems
-      .filter((b) => b.status === 'Unmatched' && b.suggestedLedgerId)
-      .map((b) => ({ bankId: b.id, ledgerId: b.suggestedLedgerId! }));
-
-    if (suggestedPairs.length === 0) return;
-
-    const matchedBankIds = new Set(suggestedPairs.map((p) => p.bankId));
-    const matchedLedgerIds = new Set(suggestedPairs.map((p) => p.ledgerId));
-
-    const totalBatchAmount = suggestedPairs.reduce((sum, p) => {
-      const b = bankItems.find((item) => item.id === p.bankId);
-      return sum + Math.abs(b?.amount || 0);
-    }, 0);
-
-    setBankItems((prev) =>
-      prev.map((b) =>
-        matchedBankIds.has(b.id)
-          ? { ...b, status: 'Matched', matchedLedgerId: b.suggestedLedgerId }
-          : b
-      )
-    );
-
-    setLedgerCashItems((prev) =>
-      prev.map((l) =>
-        matchedLedgerIds.has(l.id) ? { ...l, reconciled: true } : l
-      )
-    );
-
-    logAuditEvent({
-      category: 'Bank Reconciliation',
-      action: 'Batch Reconcile',
-      actorType: 'System',
-      actorId: 'Agent REC-02',
-      targetId: 'BATCH-MATCH',
-      impactAmount: totalBatchAmount,
-      summary: `Batch reconciled ${suggestedPairs.length} suggested bank transaction(s) against general ledger`,
-      details: `Matched items: ${suggestedPairs.map((p) => p.bankId).join(', ')}`,
-    });
-  };
-
-  const handleBookExceptionToLedger = (bankId: string) => {
-    const targetBank = bankItems.find((b) => b.id === bankId);
-    if (!targetBank || targetBank.status === 'Matched') return;
-
-    const absAmount = Math.abs(targetBank.amount);
-    const newEntryId = `JE-2026-0${943 + journalEntries.length}`;
-    const newLedgerCashId = `LC-0${ledgerCashItems.length + 1}`;
-
-    const adjustmentEntry: JournalEntry = {
-      id: newEntryId,
-      date: targetBank.date,
-      reference: targetBank.bankReference,
-      memo: `${targetBank.counterparty}`,
-      source: 'Reconciliation Adjustment',
-      status: 'Posted',
-      confidence: 99.2,
-      lines: [
-        {
-          id: `L-exc-1-${Date.now()}`,
-          accountCode: '6800',
-          accountName: 'Corporate Tax Provision Expense',
-          description: targetBank.description,
-          debit: absAmount,
-          credit: 0,
-        },
-        {
-          id: `L-exc-2-${Date.now()}`,
-          accountCode: '1010',
-          accountName: 'Operating Cash — Mercury SVB',
-          description: targetBank.bankReference,
-          debit: 0,
-          credit: absAmount,
-        },
-      ],
-    };
-
-    const newLedgerItem: LedgerCashItem = {
-      id: newLedgerCashId,
-      date: targetBank.date,
-      entryId: newEntryId,
-      memo: targetBank.counterparty,
-      amount: targetBank.amount,
-      reconciled: true,
-    };
-
-    setJournalEntries((prev) => [adjustmentEntry, ...prev]);
-    setLedgerCashItems((prev) => [newLedgerItem, ...prev]);
-    setBankItems((prev) =>
-      prev.map((b) =>
-        b.id === bankId
-          ? {
-              ...b,
-              status: 'Matched',
-              matchedLedgerId: newLedgerCashId,
-              matchConfidence: 100,
-            }
-          : b
-      )
-    );
-    setAgentTasks((prev) =>
-      prev.map((t) => (t.id === 'AGT-102' ? { ...t, resolved: true } : t))
-    );
-
-    logAuditEvent({
-      category: 'Bank Reconciliation',
-      action: 'Book Exception',
-      actorType: 'Agent',
-      actorId: 'Agent REC-02',
-      targetId: bankId,
-      targetReference: targetBank.bankReference,
-      impactAmount: targetBank.amount,
-      summary: `Booked bank exception ${bankId} (${targetBank.counterparty}) to GL Expense & Cash via ${newEntryId}`,
-      details: `Created adjusting entry ${newEntryId} for ${formatCurrency(absAmount)} against Account 6800`,
-    });
-  };
-
-  const handleUpdateTaxSchedule = (
-    id: string,
-    updates: Partial<
-      Pick<TaxJurisdictionSchedule, 'taxableBase' | 'creditsAndDeductions' | 'status'>
-    >
-  ) => {
-    setTaxSchedules((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, ...updates } : s))
-    );
-  };
-
-  const handlePostTaxProvisionJournal = (
-    amount: number,
-    jurisdiction: string,
-    formCode: string
-  ) => {
-    const newEntry: JournalEntry = {
-      id: `JE-2026-0${943 + journalEntries.length}`,
-      date: '2026-10-16',
-      reference: formCode,
-      memo: `${jurisdiction} (${formCode})`,
-      source: 'System Accrual',
-      status: 'Posted',
-      confidence: 100,
-      lines: [
-        {
-          id: `L-tax-1-${Date.now()}`,
-          accountCode: '6800',
-          accountName: 'Corporate Tax Provision Expense',
-          description: formCode,
-          debit: amount,
-          credit: 0,
-        },
-        {
-          id: `L-tax-2-${Date.now()}`,
-          accountCode: '2150',
-          accountName: 'Accrued Tax Liability',
-          description: formCode,
-          debit: 0,
-          credit: amount,
-        },
-      ],
-    };
-    setJournalEntries((prev) => [newEntry, ...prev]);
-
-    logAuditEvent({
-      category: 'Journal Entry',
-      action: 'Post Tax Accrual',
-      actorType: 'User',
-      actorId: 'auslifegriffin@gmail.com',
-      targetId: newEntry.id,
-      targetReference: formCode,
-      impactAmount: amount,
-      summary: `Posted tax provision accrual for ${jurisdiction} (${formCode})`,
-      details: `Debits: ${formatCurrency(amount)} to Accrued Tax Liability (2150)`,
-    });
-  };
-
-  const handleResolveAgentTask = (taskId: string) => {
-    const task = agentTasks.find((t) => t.id === taskId);
-    if (!task || task.resolved) return;
-
-    if (taskId === 'AGT-101') {
-      handleAddJournalEntry({
-        id: `JE-2026-0${943 + journalEntries.length}`,
-        date: '2026-10-16',
-        reference: 'INV-9012',
-        memo: 'Citadel Quantitative Systems — Annual SaaS',
-        source: 'Agentic Auto-Draft',
-        status: 'Posted',
-        confidence: 99.6,
-        lines: [
-          {
-            id: `L-agt-1`,
-            accountCode: '1010',
-            accountName: 'Operating Cash — Mercury SVB',
-            description: 'Wire settlement',
-            debit: 240000,
-            credit: 0,
-          },
-          {
-            id: `L-agt-2`,
-            accountCode: '4010',
-            accountName: 'Enterprise SaaS Subscriptions',
-            description: 'Q4 recognized',
-            debit: 0,
-            credit: 60000,
-          },
-          {
-            id: `L-agt-3`,
-            accountCode: '2400',
-            accountName: 'Deferred Revenue — Annual SaaS',
-            description: 'Deferred ARR',
-            debit: 0,
-            credit: 180000,
-          },
-        ],
-      });
-    } else if (taskId === 'AGT-102') {
-      handleBookExceptionToLedger('BF-906');
-    } else if (taskId === 'AGT-103') {
-      handleUpdateTaxSchedule('TAX-CA-FRAN', { status: 'Ready to File' });
-    }
-
-    setAgentTasks((prev) =>
-      prev.map((t) => (t.id === taskId ? { ...t, resolved: true } : t))
-    );
-  };
-
-  // --- Accounts Receivable Handlers ---
-  const handleCreateInvoice = (params: {
-    customer: string;
-    dueDate: string;
-    revenueAccountCode: string;
-    amount: number;
-  }) => {
-    const newId = `INV-${9025 + receivables.length}`;
-    const revAccount =
-      CHART_OF_ACCOUNTS.find((a) => a.code === params.revenueAccountCode) ||
-      CHART_OF_ACCOUNTS.find((a) => a.code === '4010')!;
-
-    const newInvoice: ReceivableInvoice = {
-      id: newId,
-      customer: params.customer,
-      issueDate: '2026-10-16',
-      dueDate: params.dueDate,
-      agingBucket: 'Current',
-      revenueAccountCode: revAccount.code,
-      amount: params.amount,
-      paidAmount: 0,
-      status: 'Open',
-    };
-
-    setReceivables((prev) => [newInvoice, ...prev]);
-
-    const jeId = `JE-2026-0${943 + journalEntries.length}`;
-    const newEntry: JournalEntry = {
-      id: jeId,
-      date: '2026-10-16',
-      reference: newId,
-      memo: `${params.customer} — Invoice ${newId}`,
-      source: 'Manual Entry',
-      status: 'Posted',
-      confidence: 100,
-      lines: [
-        {
-          id: `L-ar-1-${Date.now()}`,
-          accountCode: '1100',
-          accountName: 'Accounts Receivable — Enterprise',
-          description: newId,
-          debit: params.amount,
-          credit: 0,
-        },
-        {
-          id: `L-ar-2-${Date.now()}`,
-          accountCode: revAccount.code,
-          accountName: revAccount.name,
-          description: newId,
-          debit: 0,
-          credit: params.amount,
-        },
-      ],
-    };
-    setJournalEntries((prev) => [newEntry, ...prev]);
-
-    logAuditEvent({
-      category: 'Accounts Receivable',
-      action: 'Issue Invoice',
-      actorType: 'User',
-      actorId: 'auslifegriffin@gmail.com',
-      targetId: newId,
-      targetReference: jeId,
-      impactAmount: params.amount,
-      summary: `Issued invoice ${newId} to ${params.customer}`,
-      details: `DR 1100 / CR ${revAccount.code} (${formatCurrency(params.amount)}) via ${jeId}`,
-    });
-  };
-
-  const handleCollectInvoice = (invoiceId: string) => {
-    const target = receivables.find((inv) => inv.id === invoiceId);
-    if (!target || target.status === 'Paid') return;
-
-    const collectAmount = Math.max(0, target.amount - target.paidAmount);
-    setReceivables((prev) =>
-      prev.map((inv) =>
-        inv.id === invoiceId
-          ? { ...inv, paidAmount: inv.amount, status: 'Paid', agingBucket: 'Current' }
-          : inv
-      )
-    );
-
-    const jeId = `JE-2026-0${943 + journalEntries.length}`;
-    const newEntry: JournalEntry = {
-      id: jeId,
-      date: '2026-10-16',
-      reference: invoiceId,
-      memo: `Cash Collection — ${target.customer} (${invoiceId})`,
-      source: 'Manual Entry',
-      status: 'Posted',
-      confidence: 100,
-      lines: [
-        {
-          id: `L-col-1-${Date.now()}`,
-          accountCode: '1010',
-          accountName: 'Operating Cash — Mercury SVB',
-          description: invoiceId,
-          debit: collectAmount,
-          credit: 0,
-        },
-        {
-          id: `L-col-2-${Date.now()}`,
-          accountCode: '1100',
-          accountName: 'Accounts Receivable — Enterprise',
-          description: invoiceId,
-          debit: 0,
-          credit: collectAmount,
-        },
-      ],
-    };
-    setJournalEntries((prev) => [newEntry, ...prev]);
-    setLedgerCashItems((prev) => [
-      {
-        id: `LC-0${prev.length + 1}`,
-        date: '2026-10-16',
-        entryId: jeId,
-        memo: `${target.customer} (${invoiceId})`,
-        amount: collectAmount,
-        reconciled: false,
-      },
-      ...prev,
-    ]);
-
-    logAuditEvent({
-      category: 'Accounts Receivable',
-      action: 'Collect Payment',
-      actorType: 'User',
-      actorId: 'auslifegriffin@gmail.com',
-      targetId: invoiceId,
-      targetReference: jeId,
-      impactAmount: collectAmount,
-      summary: `Collected payment on ${invoiceId} (${target.customer})`,
-      details: `DR 1010 / CR 1100 (${formatCurrency(collectAmount)}) via ${jeId}`,
-    });
-  };
-
-  // --- Accounts Payable Handlers ---
-  const handleCreateBill = (params: {
-    vendor: string;
-    reference: string;
-    dueDate: string;
-    expenseAccountCode: string;
-    amount: number;
-  }) => {
-    const newId = `BILL-${405 + payables.length}`;
-    const expAccount =
-      CHART_OF_ACCOUNTS.find((a) => a.code === params.expenseAccountCode) ||
-      CHART_OF_ACCOUNTS.find((a) => a.code === '5010')!;
-
-    const newBill: PayableBill = {
-      id: newId,
-      vendor: params.vendor,
-      billDate: '2026-10-16',
-      dueDate: params.dueDate,
-      expenseAccountCode: expAccount.code,
-      expenseAccountName: expAccount.name,
-      amount: params.amount,
-      status: 'Pending',
-      reference: params.reference,
-    };
-
-    setPayables((prev) => [newBill, ...prev]);
-
-    const jeId = `JE-2026-0${943 + journalEntries.length}`;
-    const newEntry: JournalEntry = {
-      id: jeId,
-      date: '2026-10-16',
-      reference: params.reference,
-      memo: `${params.vendor} — Bill ${newId}`,
-      source: 'Manual Entry',
-      status: 'Posted',
-      confidence: 100,
-      lines: [
-        {
-          id: `L-ap-1-${Date.now()}`,
-          accountCode: expAccount.code,
-          accountName: expAccount.name,
-          description: params.reference,
-          debit: params.amount,
-          credit: 0,
-        },
-        {
-          id: `L-ap-2-${Date.now()}`,
-          accountCode: '2010',
-          accountName: 'Accounts Payable — Trade',
-          description: params.reference,
-          debit: 0,
-          credit: params.amount,
-        },
-      ],
-    };
-    setJournalEntries((prev) => [newEntry, ...prev]);
-
-    logAuditEvent({
-      category: 'Accounts Payable',
-      action: 'Record Bill',
-      actorType: 'User',
-      actorId: 'auslifegriffin@gmail.com',
-      targetId: newId,
-      targetReference: params.reference,
-      impactAmount: params.amount,
-      summary: `Recorded vendor bill ${newId} from ${params.vendor}`,
-      details: `DR ${expAccount.code} / CR 2010 (${formatCurrency(params.amount)}) via ${jeId}`,
-    });
-  };
-
-  const handleApproveBill = (billId: string) => {
-    const target = payables.find((b) => b.id === billId);
-    if (!target || target.status !== 'Pending') return;
-
-    setPayables((prev) =>
-      prev.map((b) => (b.id === billId ? { ...b, status: 'Approved' } : b))
-    );
-
-    logAuditEvent({
-      category: 'Accounts Payable',
-      action: 'Approve Bill',
-      actorType: 'User',
-      actorId: 'auslifegriffin@gmail.com',
-      targetId: billId,
-      targetReference: target.reference,
-      impactAmount: target.amount,
-      summary: `Approved vendor bill ${billId} (${target.vendor})`,
-      details: `Authorized ${formatCurrency(target.amount)} for payment`,
-    });
-  };
-
-  const handlePayBill = (billId: string) => {
-    const target = payables.find((b) => b.id === billId);
-    if (!target || target.status === 'Paid') return;
-
-    setPayables((prev) =>
-      prev.map((b) => (b.id === billId ? { ...b, status: 'Paid' } : b))
-    );
-
-    const jeId = `JE-2026-0${943 + journalEntries.length}`;
-    const newEntry: JournalEntry = {
-      id: jeId,
-      date: '2026-10-16',
-      reference: target.reference,
-      memo: `AP Disbursement — ${target.vendor} (${billId})`,
-      source: 'Manual Entry',
-      status: 'Posted',
-      confidence: 100,
-      lines: [
-        {
-          id: `L-pay-1-${Date.now()}`,
-          accountCode: '2010',
-          accountName: 'Accounts Payable — Trade',
-          description: billId,
-          debit: target.amount,
-          credit: 0,
-        },
-        {
-          id: `L-pay-2-${Date.now()}`,
-          accountCode: '1010',
-          accountName: 'Operating Cash — Mercury SVB',
-          description: billId,
-          debit: 0,
-          credit: target.amount,
-        },
-      ],
-    };
-    setJournalEntries((prev) => [newEntry, ...prev]);
-    setLedgerCashItems((prev) => [
-      {
-        id: `LC-0${prev.length + 1}`,
-        date: '2026-10-16',
-        entryId: jeId,
-        memo: `${target.vendor} (${billId})`,
-        amount: -target.amount,
-        reconciled: false,
-      },
-      ...prev,
-    ]);
-
-    logAuditEvent({
-      category: 'Accounts Payable',
-      action: 'Pay Bill',
-      actorType: 'User',
-      actorId: 'auslifegriffin@gmail.com',
-      targetId: billId,
-      targetReference: jeId,
-      impactAmount: -target.amount,
-      summary: `Disbursed payment for ${billId} (${target.vendor})`,
-      details: `DR 2010 / CR 1010 (${formatCurrency(target.amount)}) via ${jeId}`,
-    });
-  };
-
-  // --- Fixed Assets Handlers ---
-  const handleRegisterAsset = (params: {
-    name: string;
-    category: FixedAssetItem['category'];
-    usefulLifeMonths: number;
-    costBasis: number;
-    salvageValue: number;
-  }) => {
-    const newId = `FA-${105 + fixedAssets.length}`;
-    const newAsset: FixedAssetItem = {
-      id: newId,
-      name: params.name,
-      category: params.category,
-      inServiceDate: '2026-10-16',
-      usefulLifeMonths: params.usefulLifeMonths,
-      costBasis: params.costBasis,
-      salvageValue: params.salvageValue,
-      accumulatedDepreciation: 0,
-      lastDepreciatedPeriod: '2026-09',
-      status: 'Active',
-    };
-    setFixedAssets((prev) => [newAsset, ...prev]);
-
-    logAuditEvent({
-      category: 'Fixed Assets',
-      action: 'Register Asset',
-      actorType: 'User',
-      actorId: 'auslifegriffin@gmail.com',
-      targetId: newId,
-      impactAmount: params.costBasis,
-      summary: `Registered capital asset ${newId}: ${params.name}`,
-      details: `Cost: ${formatCurrency(params.costBasis)} · Life: ${params.usefulLifeMonths}m`,
-    });
-  };
-
-  const handleRunMonthlyDepreciation = () => {
-    const summary = computeFixedAssetMetrics(fixedAssets);
-    if (summary.totalMonthlyDepreciation <= 0) return;
-
-    const deprAmount = summary.totalMonthlyDepreciation;
-    setFixedAssets((prev) =>
-      prev.map((asset) => {
-        const depreciableBase = Math.max(0, asset.costBasis - asset.salvageValue);
-        const rawMonthly =
-          asset.usefulLifeMonths > 0
-            ? Math.round(depreciableBase / asset.usefulLifeMonths)
-            : 0;
-        const remaining = Math.max(0, depreciableBase - asset.accumulatedDepreciation);
-        const addDepr = Math.min(rawMonthly, remaining);
-        const nextAccum = asset.accumulatedDepreciation + addDepr;
-        return {
-          ...asset,
-          accumulatedDepreciation: nextAccum,
-          lastDepreciatedPeriod: '2026-10',
-          status: nextAccum >= depreciableBase ? 'Fully Depreciated' : 'Active',
-        };
-      })
-    );
-
-    const jeId = `JE-2026-0${943 + journalEntries.length}`;
-    const newEntry: JournalEntry = {
-      id: jeId,
-      date: '2026-10-16',
-      reference: 'DEPR-2026-10',
-      memo: 'Monthly Fixed Asset Straight-Line Depreciation',
-      source: 'System Accrual',
-      status: 'Posted',
-      confidence: 100,
-      lines: [
-        {
-          id: `L-dep-1-${Date.now()}`,
-          accountCode: '5010',
-          accountName: 'Cloud & GPU Inference Hosting',
-          description: 'DEPR-2026-10',
-          debit: deprAmount,
-          credit: 0,
-        },
-        {
-          id: `L-dep-2-${Date.now()}`,
-          accountCode: '1400',
-          accountName: 'Prepaid Cloud Infrastructure',
-          description: 'DEPR-2026-10',
-          debit: 0,
-          credit: deprAmount,
-        },
-      ],
-    };
-    setJournalEntries((prev) => [newEntry, ...prev]);
-    setCloseChecklist((prev) =>
-      prev.map((c) => (c.id === 'CLS-05' ? { ...c, completed: true } : c))
-    );
-
-    logAuditEvent({
-      category: 'Fixed Assets',
-      action: 'Run Depreciation',
-      actorType: 'System',
-      actorId: 'System Accrual',
-      targetId: 'DEPR-2026-10',
-      targetReference: jeId,
-      impactAmount: deprAmount,
-      summary: `Posted monthly straight-line depreciation run (${formatCurrency(deprAmount)})`,
-      details: `Updated ${fixedAssets.length} assets via ${jeId}`,
-    });
-  };
-
-  // --- Period Close Handlers ---
-  const handleToggleChecklistTask = (id: string) => {
-    setCloseChecklist((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, completed: !item.completed } : item
-      )
-    );
-  };
-
-  const handlePostAmortizationSchedule = (scheduleId: string) => {
-    if (isPeriodLocked) return;
-    const target = amortizationSchedules.find((s) => s.id === scheduleId);
-    if (!target || target.status === 'Posted Q4') return;
-
-    setAmortizationSchedules((prev) =>
-      prev.map((s) =>
-        s.id === scheduleId
-          ? {
-              ...s,
-              recognizedToDate: Math.min(
-                s.totalContractAmount,
-                s.recognizedToDate + s.monthlyRecognition
-              ),
-              remainingMonths: Math.max(0, s.remainingMonths - 1),
-              status: 'Posted Q4',
-            }
-          : s
-      )
-    );
-
-    const jeId = `JE-2026-0${943 + journalEntries.length}`;
-    const isDefRev = target.type === 'Deferred Revenue';
-    const debitCode = isDefRev ? target.balanceSheetAccount : target.pnlAccount;
-    const creditCode = isDefRev ? target.pnlAccount : target.balanceSheetAccount;
-    const debitAcc = CHART_OF_ACCOUNTS.find((a) => a.code === debitCode)!;
-    const creditAcc = CHART_OF_ACCOUNTS.find((a) => a.code === creditCode)!;
-
-    const newEntry: JournalEntry = {
-      id: jeId,
-      date: '2026-10-16',
-      reference: target.contractRef,
-      memo: `${target.type} Amortization — ${target.counterparty}`,
-      source: 'System Accrual',
-      status: 'Posted',
-      confidence: 100,
-      lines: [
-        {
-          id: `L-sch-1-${Date.now()}`,
-          accountCode: debitAcc.code,
-          accountName: debitAcc.name,
-          description: target.id,
-          debit: target.monthlyRecognition,
-          credit: 0,
-        },
-        {
-          id: `L-sch-2-${Date.now()}`,
-          accountCode: creditAcc.code,
-          accountName: creditAcc.name,
-          description: target.id,
-          debit: 0,
-          credit: target.monthlyRecognition,
-        },
-      ],
-    };
-    setJournalEntries((prev) => [newEntry, ...prev]);
-
-    if (isDefRev) {
-      setCloseChecklist((prev) =>
-        prev.map((c) => (c.id === 'CLS-04' ? { ...c, completed: true } : c))
-      );
-    }
-
-    logAuditEvent({
-      category: 'Period Close',
-      action: 'Post Amortization',
-      actorType: 'System',
-      actorId: 'Agent REV-01',
-      targetId: scheduleId,
-      targetReference: jeId,
-      impactAmount: target.monthlyRecognition,
-      summary: `Recognized ${target.type.toLowerCase()} schedule ${scheduleId} (${target.counterparty})`,
-      details: `DR ${debitAcc.code} / CR ${creditAcc.code} (${formatCurrency(target.monthlyRecognition)}) via ${jeId}`,
-    });
-  };
-
-  const handleTogglePeriodLock = () => {
-    const nextLocked = !isPeriodLocked;
-    setIsPeriodLocked(nextLocked);
-    setCloseChecklist((prev) =>
-      prev.map((c) => (c.id === 'CLS-06' ? { ...c, completed: nextLocked } : c))
-    );
-
-    logAuditEvent({
-      category: 'Period Close',
-      action: nextLocked ? 'Lock Period' : 'Unlock Period',
-      actorType: 'User',
-      actorId: 'auslifegriffin@gmail.com',
-      targetId: 'PERIOD-2026-10',
-      summary: `${nextLocked ? 'Locked' : 'Unlocked'} fiscal period 2026-10`,
-    });
-  };
+  const handleReconcileItem = (bankId: string, ledgerId: string) => act('bank.reconcile', { bankId, ledgerId });
+  const handleBatchReconcileSuggested = () => act('bank.batch');
+  const handleBookExceptionToLedger = (id: string) => act('bank.exception', { id });
+  const handleUpdateTaxSchedule = (id: string, updates: object) => act('tax.update', { id, updates });
+  const handlePostTaxProvisionJournal = (amount: number, jurisdiction: string, formCode: string) => act('tax.provision', { amount, jurisdiction, formCode });
+  const handleResolveAgentTask = (id: string) => act('agent.resolve', { id });
+  const handleCreateInvoice = (params: object) => command('invoice.create', params);
+  const handleCollectInvoice = (id: string) => act('invoice.collect', { id });
+  const handleCreateBill = (params: object) => command('bill.create', params);
+  const handleApproveBill = (id: string) => act('bill.approve', { id });
+  const handlePayBill = (id: string) => act('bill.pay', { id });
+  const handleRegisterAsset = (params: { name: string; category: FixedAssetItem['category']; usefulLifeMonths: number; costBasis: number; salvageValue: number }) => command('asset.register', params);
+  const handleRunMonthlyDepreciation = () => act('asset.depreciate');
+  const handleToggleChecklistTask = (id: string) => act('close.checklist', { id });
+  const handlePostAmortizationSchedule = (id: string) => act('close.amortize', { id });
+  const handleTogglePeriodLock = () => act(isPeriodLocked ? 'period.unlock' : 'period.lock');
 
   const navItems: {
     id: ActiveModule;
@@ -1173,6 +263,9 @@ export default function App() {
       {/* Main Content Viewport */}
       <main className="flex-1 md:pl-56 min-w-0">
         <div className="max-w-[1320px] w-full mx-auto px-4 sm:px-8 py-8">
+          {error && <div role="alert" className="mb-4 flex items-center justify-between gap-4 border border-zinc-300 bg-white p-4 text-sm"><span>{error}</span><button onClick={() => setError('')} aria-label="Dismiss error">Dismiss</button></div>}
+          {pending > 0 && <p role="status" className="mb-2 text-xs text-zinc-500">Saving to company file…</p>}
+          <p className="mb-3 text-[11px] text-zinc-500">{workspace.entityName} · {workspace.currency} · {workspace.period} · {workspace.dataOrigin}</p>
           <GlobalSearchBar
             query={globalSearchQuery}
             onQueryChange={(q) => {
@@ -1213,6 +306,7 @@ export default function App() {
             <JournalEntryModule
               entries={journalEntries}
               onAddEntry={handleAddJournalEntry}
+              onReviewEntry={(id) => act('journal.review', { id })}
               globalSearchQuery={globalSearchQuery}
             />
           )}
@@ -1245,6 +339,7 @@ export default function App() {
           {activeTab === 'fixed-assets' && (
             <FixedAssetsModule
               assets={fixedAssets}
+              period={workspace.period}
               onRunMonthlyDepreciation={handleRunMonthlyDepreciation}
               onRegisterAsset={handleRegisterAsset}
             />
@@ -1259,11 +354,11 @@ export default function App() {
           )}
 
           {activeTab === 'budgeting' && (
-            <BudgetingModule entries={journalEntries} />
+            <BudgetingModule entries={journalEntries} saving={pending > 0} savedAllocations={workspace.budgetAllocations} onSave={(allocations) => act('budget.save', { allocations })} />
           )}
 
           {activeTab === 'forecasting' && (
-            <ForecastingModule entries={journalEntries} />
+            <ForecastingModule entries={journalEntries} saving={pending > 0} savedDrivers={workspace.forecastDrivers} savedOverrides={workspace.forecastOverrides} onSave={(drivers, overrides) => act('forecast.save', { drivers, overrides })} />
           )}
 
           {activeTab === 'reconciliation' && (

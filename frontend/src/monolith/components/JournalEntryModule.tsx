@@ -27,7 +27,8 @@ import {
 
 interface JournalEntryModuleProps {
   entries: JournalEntry[];
-  onAddEntry: (entry: JournalEntry) => void;
+  onAddEntry: (entry: JournalEntry) => Promise<JournalEntry>;
+  onReviewEntry: (id: string) => void;
   globalSearchQuery?: string;
 }
 
@@ -92,6 +93,7 @@ const AGENTIC_PRESETS = [
 export const JournalEntryModule: React.FC<JournalEntryModuleProps> = ({
   entries,
   onAddEntry,
+  onReviewEntry,
   globalSearchQuery = '',
 }) => {
   const [date, setDate] = useState<string>('2026-10-16');
@@ -262,7 +264,7 @@ export const JournalEntryModule: React.FC<JournalEntryModuleProps> = ({
     ]);
   };
 
-  const handlePostEntry = (e: React.FormEvent) => {
+  const handlePostEntry = async (e: React.FormEvent) => {
     e.preventDefault();
     setAttemptedSubmit(true);
 
@@ -295,11 +297,12 @@ export const JournalEntryModule: React.FC<JournalEntryModuleProps> = ({
       lines: finalLines,
     };
 
-    onAddEntry(newEntry);
+    let saved: JournalEntry;
+    try { saved = await onAddEntry(newEntry); } catch { return; }
     setSubmitSuccessMsg(
       attachments.length > 0
-        ? `Posted ${newEntry.id} (${attachments.length} file${attachments.length > 1 ? 's' : ''} attached)`
-        : `Posted ${newEntry.id}`
+        ? `Recorded ${saved.status.toLowerCase()} ${saved.id} (${attachments.length} file${attachments.length > 1 ? 's' : ''} attached)`
+        : `Recorded ${saved.status.toLowerCase()} ${saved.id}`
     );
     setMemo('');
     setReference(`JE-${105 + entries.length}`);
@@ -655,6 +658,7 @@ export const JournalEntryModule: React.FC<JournalEntryModuleProps> = ({
                     <span className="text-xs font-mono text-zinc-400 shrink-0">
                       {entry.date}
                     </span>
+                    {entry.status !== 'Posted' && <button type="button" className="border border-zinc-300 px-2 py-1 text-xs text-zinc-950" onClick={() => onReviewEntry(entry.id)}>Review &amp; post</button>}
                     <span className="text-xs font-medium text-zinc-900 truncate">
                       {entry.memo}
                     </span>

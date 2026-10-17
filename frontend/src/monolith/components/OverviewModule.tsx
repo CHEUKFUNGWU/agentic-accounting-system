@@ -6,6 +6,7 @@ import {
   PNL_SANKEY_DATASETS,
   computeFinancialStatements,
   buildLivePnlSankeyDataset,
+  buildLiveCashSankeyDataset,
   formatCurrency,
 } from '../utils/accountingLogic';
 import { createOverviewExportPayload } from '../utils/exportUtils';
@@ -51,19 +52,20 @@ export const OverviewModule: React.FC<OverviewModuleProps> = ({
     [journalEntries]
   );
 
+  const liveCashDataset = useMemo(() => buildLiveCashSankeyDataset(journalEntries), [journalEntries]);
   const dataset = useMemo(() => {
     if (chartMode === 'cashflow') {
-      return SANKEY_DATASETS[selectedPeriod] || SANKEY_DATASETS['Q4-2026'];
+      return selectedPeriod === 'Q4-2026' ? liveCashDataset : SANKEY_DATASETS[selectedPeriod] || liveCashDataset;
     }
     if (selectedPeriod === 'Q4-2026') {
       return livePnlDataset;
     }
     return PNL_SANKEY_DATASETS[selectedPeriod] || livePnlDataset;
-  }, [chartMode, selectedPeriod, livePnlDataset]);
+  }, [chartMode, selectedPeriod, livePnlDataset, liveCashDataset]);
 
-  const grossInflow = dataset.nodes.find((n) => n.id === 'gross_inflow')?.value ?? 1315000;
-  const opexPool = dataset.nodes.find((n) => n.id === 'opex_pool')?.value ?? 665000;
-  const netTreasury = dataset.nodes.find((n) => n.id === 'net_treasury')?.value ?? 487200;
+  const grossInflow = dataset.nodes.find((n) => n.id === 'gross_inflow')?.value ?? 0;
+  const opexPool = dataset.nodes.find((n) => n.id === 'opex_pool')?.value ?? 0;
+  const netTreasury = chartMode === 'cashflow' && selectedPeriod === 'Q4-2026' ? grossInflow - opexPool : dataset.nodes.find((n) => n.id === 'net_treasury')?.value ?? 0;
   const operatingMarginPct = ((grossInflow - opexPool) / Math.max(grossInflow, 1)) * 100;
 
   const filteredEntries = journalEntries.filter((entry) => {
@@ -92,13 +94,13 @@ export const OverviewModule: React.FC<OverviewModuleProps> = ({
             {formatCurrency(grossInflow)}
           </div>
           <div className="mt-2 text-xs font-mono text-zinc-500 tabular-nums">
-            +18.5% QoQ
+            {selectedPeriod === 'Q4-2026' ? 'From posted journals' : 'Historical sample'}
           </div>
         </div>
 
         <div className="p-6">
           <div className="text-xs font-mono text-zinc-400">
-            {chartMode === 'cashflow' ? 'Net Free Cash' : 'Net Income'}
+            {chartMode === 'cashflow' ? 'Net Cash Movement' : 'Net Income'}
           </div>
           <div className="mt-2 text-3xl font-bold font-mono tabular-nums tracking-tight text-zinc-950">
             {formatCurrency(netTreasury)}
