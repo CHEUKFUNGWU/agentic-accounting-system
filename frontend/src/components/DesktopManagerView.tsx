@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { isMyGo } from "mygo-runtime";
 import { DesktopBridge } from "../mygo";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from "./ui/shadcn";
-import { useI18n } from "../i18n";
+import { useI18n, pick } from "../i18n";
 
 interface DesktopManagerViewProps {
   storageType: string;
@@ -55,7 +55,7 @@ export const DesktopManagerView: React.FC<DesktopManagerViewProps> = ({
       const openedPath = await DesktopBridge.openDataFolder();
       setFolderStatus(`${lang === "en" ? "Opened in file manager: " : lang === "zh-CN" ? "已在文件管理器中打开：" : "已在檔案總管中開啟："}${openedPath}`);
     } catch (err: any) {
-      setFolderStatus(`${lang === "en" ? "Failed to open folder: " : "無法開啟資料夾: "}${err?.message || err}`);
+      setFolderStatus(`${pick(lang, { en: "Failed to open folder: ", "zh-CN": "无法打开文件夹: ", "zh-TW": "無法開啟資料夾: " })}${err?.message || err}`);
     }
   };
 
@@ -97,7 +97,7 @@ export const DesktopManagerView: React.FC<DesktopManagerViewProps> = ({
                 {fileSizeFormatted}
               </div>
               <span style={{ fontSize: "0.75rem", color: "var(--muted-foreground)" }}>
-                {storageType.includes("PostgreSQL") ? (lang === "en" ? "Managed Cloud RDS / Cluster" : "雲端託管資料庫") : (lang === "en" ? "Low Latency Local I/O" : "低延遲本地讀寫")}
+                {storageType.includes("PostgreSQL") ? (lang === "en" ? "Managed Cloud RDS / Cluster" : lang === "zh-CN" ? "云端托管数据库" : "雲端託管資料庫") : (lang === "en" ? "Low Latency Local I/O" : lang === "zh-CN" ? "低延迟本地读写" : "低延遲本地讀寫")}
               </span>
             </div>
 
@@ -106,7 +106,7 @@ export const DesktopManagerView: React.FC<DesktopManagerViewProps> = ({
                 {lang === "en" ? "Runtime Environment" : lang === "zh-CN" ? "运行环境" : "執行環境"}
               </div>
               <div style={{ fontWeight: 600, fontSize: "1.05rem", marginTop: "0.25rem" }}>
-                {isNativeDesktop ? (lang === "en" ? "Desktop Native (MyGo)" : "原生桌面應用程式") : (lang === "en" ? "Web Client" : "瀏覽器客戶端 (Web)")}
+                {isNativeDesktop ? (lang === "en" ? "Desktop Native (MyGo)" : lang === "zh-CN" ? "原生桌面应用" : "原生桌面應用程式") : (lang === "en" ? "Web Client" : lang === "zh-CN" ? "浏览器客户端 (Web)" : "瀏覽器客戶端 (Web)")}
               </div>
               <span style={{ fontSize: "0.75rem", color: "var(--muted-foreground)" }}>
                 {storageType.includes("PostgreSQL") ? "PostgreSQL 16+" : "SQLite WAL"}

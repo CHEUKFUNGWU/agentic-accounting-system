@@ -1,17 +1,17 @@
 import {
-  ETBWorksheetRow,
+  TrialBalanceSheetRow,
   JurisdictionCode,
-  ThreeStatementWorkingPaperPack,
+  ReportingPack,
 } from "../types/accounting";
 
 const API_BASE_URL = "http://localhost:8000/api/v1";
 
 /* ==========================================================================
-   Deterministic In-Browser Fallback Working Paper Engine
+   Deterministic In-Browser Fallback Statement Engine
    (Ensures `npm run dev` works instantaneously even before FastAPI is started)
    ========================================================================== */
 
-interface RawETBRow {
+interface RawTrialBalanceSheetRow {
   code: string;
   name: string;
   type: "ASSET" | "LIABILITY" | "EQUITY" | "REVENUE" | "EXPENSE";
@@ -51,7 +51,7 @@ const ENTITY_META: Record<
     jurisdiction: "CN",
     standard: "PRC_SMALL",
     currency: "CNY",
-    formName: "金稅四期增值稅及小微企業所得稅申報底稿",
+    formName: "金稅四期增值稅及小微企業所得稅申報",
     relief: "小型微利企業所得稅優惠（應納稅所得額 ≤ 300萬，實際稅負 5%）",
   },
   "HK-SME-01": {
@@ -60,7 +60,7 @@ const ENTITY_META: Record<
     jurisdiction: "HK",
     standard: "SME_FRS_HK",
     currency: "HKD",
-    formName: "IRD Profits Tax Computation (兩級制利得稅計算底稿 BIR51/52)",
+    formName: "IRD Profits Tax Computation (兩級制利得稅計算 BIR51/52)",
     relief: "Two-Tiered Profits Tax (8.25% on first HKD 2,000,000; Offshore claims tracked)",
   },
   "SG-OPC-01": {
@@ -94,7 +94,7 @@ const ENTITY_META: Record<
 
 const LOCAL_STATE: Record<
   string,
-  { rows: RawETBRow[]; splits: number; locked: boolean }
+  { rows: RawTrialBalanceSheetRow[]; splits: number; locked: boolean }
 > = {};
 
 function getOrInitLocalState(entityCode: string) {
@@ -103,20 +103,20 @@ function getOrInitLocalState(entityCode: string) {
       splits: 0,
       locked: false,
       rows: [
-        { code: "1110", name: "Cash at Bank - Operating Account (銀行存款)", type: "ASSET", cat: "CASH", wp: "W/P A", open: 85000, opDr: 142000, opCr: 64500, ajeDr: 0, ajeCr: 0 },
-        { code: "1210", name: "Accounts Receivable Control (應收賬款)", type: "ASSET", cat: "AR", wp: "W/P B", open: 18000, opDr: 165000, opCr: 142000, ajeDr: 0, ajeCr: 0 },
-        { code: "1420", name: "Prepayments & Input VAT/GST (預付費用及進項稅額)", type: "ASSET", cat: "PREPAY_TAX", wp: "W/P C", open: 4000, opDr: 6500, opCr: 0, ajeDr: 0, ajeCr: 1500 },
-        { code: "1610", name: "Computer & AI Server Equipment - Cost (固定資產原值)", type: "ASSET", cat: "FA", wp: "W/P F", open: 36000, opDr: 12000, opCr: 0, ajeDr: 0, ajeCr: 0 },
-        { code: "1650", name: "Accumulated Depreciation (累計折舊)", type: "ASSET", cat: "CONTRA", wp: "W/P F", open: -6000, opDr: 0, opCr: 0, ajeDr: 0, ajeCr: 2000 },
-        { code: "2110", name: "Accounts Payable & Accrued Expenses (應付賬款及應計費用)", type: "LIABILITY", cat: "AP", wp: "W/P AA", open: -12000, opDr: 52500, opCr: 58000, ajeDr: 0, ajeCr: 3500 },
-        { code: "2190", name: "Director's Loan / Owner's Current Account (股東/業主往來)", type: "LIABILITY", cat: "DIR", wp: "W/P DD", open: -15000, opDr: 0, opCr: 0, ajeDr: 0, ajeCr: 0 },
-        { code: "2210", name: "Statutory Taxes Payable - GST/VAT/CIT (應交稅費)", type: "LIABILITY", cat: "TAX", wp: "W/P CC", open: -10000, opDr: 0, opCr: 15000, ajeDr: 0, ajeCr: 11200 },
-        { code: "3100", name: "Share Capital / Owner's Capital & Opening Surplus (實收資本及留存)", type: "EQUITY", cat: "EQ", wp: "W/P EQ", open: -100000, opDr: 0, opCr: 0, ajeDr: 0, ajeCr: 0 },
-        { code: "4100", name: "AI Consulting & SaaS Subscription Revenue (主營業務收入)", type: "REVENUE", cat: "REV", wp: "W/P PL-10", open: 0, opDr: 0, opCr: 150000, ajeDr: 0, ajeCr: 0 },
-        { code: "5100", name: "Direct Cloud GPU & LLM API Token Cost (主營業務成本)", type: "EXPENSE", cat: "COGS", wp: "W/P PL-20", open: 0, opDr: 24000, opCr: 0, ajeDr: 0, ajeCr: 0 },
-        { code: "6100", name: "Operating, Software, Rent & Professional Expenses (管理費用)", type: "EXPENSE", cat: "OPEX", wp: "W/P PL-40", open: 0, opDr: 27500, opCr: 0, ajeDr: 5000, ajeCr: 0 },
-        { code: "6410", name: "Depreciation Expense (折舊費用)", type: "EXPENSE", cat: "DEP", wp: "W/P F", open: 0, opDr: 0, opCr: 0, ajeDr: 2000, ajeCr: 0 },
-        { code: "7500", name: "Income Tax Expense (所得稅費用)", type: "EXPENSE", cat: "TAX_EXP", wp: "W/P CC", open: 0, opDr: 0, opCr: 0, ajeDr: 11200, ajeCr: 0 },
+        { code: "1110", name: "Cash at Bank - Operating Account (銀行存款)", type: "ASSET", cat: "CASH", wp: "A", open: 85000, opDr: 142000, opCr: 64500, ajeDr: 0, ajeCr: 0 },
+        { code: "1210", name: "Accounts Receivable Control (應收賬款)", type: "ASSET", cat: "AR", wp: "B", open: 18000, opDr: 165000, opCr: 142000, ajeDr: 0, ajeCr: 0 },
+        { code: "1420", name: "Prepayments & Input VAT/GST (預付費用及進項稅額)", type: "ASSET", cat: "PREPAY_TAX", wp: "C", open: 4000, opDr: 6500, opCr: 0, ajeDr: 0, ajeCr: 1500 },
+        { code: "1610", name: "Computer & AI Server Equipment - Cost (固定資產原值)", type: "ASSET", cat: "FA", wp: "F", open: 36000, opDr: 12000, opCr: 0, ajeDr: 0, ajeCr: 0 },
+        { code: "1650", name: "Accumulated Depreciation (累計折舊)", type: "ASSET", cat: "CONTRA", wp: "F", open: -6000, opDr: 0, opCr: 0, ajeDr: 0, ajeCr: 2000 },
+        { code: "2110", name: "Accounts Payable & Accrued Expenses (應付賬款及應計費用)", type: "LIABILITY", cat: "AP", wp: "AA", open: -12000, opDr: 52500, opCr: 58000, ajeDr: 0, ajeCr: 3500 },
+        { code: "2190", name: "Director's Loan / Owner's Current Account (股東/業主往來)", type: "LIABILITY", cat: "DIR", wp: "DD", open: -15000, opDr: 0, opCr: 0, ajeDr: 0, ajeCr: 0 },
+        { code: "2210", name: "Statutory Taxes Payable - GST/VAT/CIT (應交稅費)", type: "LIABILITY", cat: "TAX", wp: "CC", open: -10000, opDr: 0, opCr: 15000, ajeDr: 0, ajeCr: 11200 },
+        { code: "3100", name: "Share Capital / Owner's Capital & Opening Surplus (實收資本及留存)", type: "EQUITY", cat: "EQ", wp: "EQ", open: -100000, opDr: 0, opCr: 0, ajeDr: 0, ajeCr: 0 },
+        { code: "4100", name: "AI Consulting & SaaS Subscription Revenue (主營業務收入)", type: "REVENUE", cat: "REV", wp: "PL-10", open: 0, opDr: 0, opCr: 150000, ajeDr: 0, ajeCr: 0 },
+        { code: "5100", name: "Direct Cloud GPU & LLM API Token Cost (主營業務成本)", type: "EXPENSE", cat: "COGS", wp: "PL-20", open: 0, opDr: 24000, opCr: 0, ajeDr: 0, ajeCr: 0 },
+        { code: "6100", name: "Operating, Software, Rent & Professional Expenses (管理費用)", type: "EXPENSE", cat: "OPEX", wp: "PL-40", open: 0, opDr: 27500, opCr: 0, ajeDr: 5000, ajeCr: 0 },
+        { code: "6410", name: "Depreciation Expense (折舊費用)", type: "EXPENSE", cat: "DEP", wp: "F", open: 0, opDr: 0, opCr: 0, ajeDr: 2000, ajeCr: 0 },
+        { code: "7500", name: "Income Tax Expense (所得稅費用)", type: "EXPENSE", cat: "TAX_EXP", wp: "CC", open: 0, opDr: 0, opCr: 0, ajeDr: 11200, ajeCr: 0 },
       ],
     };
   }
@@ -125,13 +125,13 @@ function getOrInitLocalState(entityCode: string) {
 
 const f4 = (n: number) => n.toFixed(4);
 
-function buildFallbackPack(entityCode: string, period = "2026-10"): ThreeStatementWorkingPaperPack {
+function buildFallbackPack(entityCode: string, period = "2026-10"): ReportingPack {
   const meta = ENTITY_META[entityCode] ?? ENTITY_META["AU-OPC-01"];
   const state = getOrInitLocalState(entityCode);
 
   let opDrSum = 0, opCrSum = 0, unadjDrSum = 0, unadjCrSum = 0, ajeDrSum = 0, ajeCrSum = 0, atbDrSum = 0, atbCrSum = 0;
 
-  const etbRows: ETBWorksheetRow[] = state.rows.map((r) => {
+  const tbRows: TrialBalanceSheetRow[] = state.rows.map((r) => {
     const unadj = r.open + r.opDr - r.opCr;
     const adj = unadj + r.ajeDr - r.ajeCr;
     const uDr = unadj > 0 ? unadj : 0;
@@ -150,16 +150,16 @@ function buildFallbackPack(entityCode: string, period = "2026-10"): ThreeStateme
       account_code: r.code,
       account_name: r.name,
       account_type: r.type,
-      wp_ref: r.wp,
+      statement_ref: r.wp,
       opening_balance: f4(r.open),
       period_op_debit: f4(r.opDr),
       period_op_credit: f4(r.opCr),
-      unadjusted_dr: f4(uDr),
-      unadjusted_cr: f4(uCr),
-      aje_debit: f4(r.ajeDr),
-      aje_credit: f4(r.ajeCr),
-      adjusted_dr: f4(aDr),
-      adjusted_cr: f4(aCr),
+      unadjusted_debit: f4(uDr),
+      unadjusted_credit: f4(uCr),
+      adjustment_debit: f4(r.ajeDr),
+      adjustment_credit: f4(r.ajeCr),
+      adjusted_debit: f4(aDr),
+      adjusted_credit: f4(aCr),
       statement_destination:
         r.type === "REVENUE" || r.type === "EXPENSE"
           ? "INCOME_STATEMENT (P&L)"
@@ -219,170 +219,170 @@ function buildFallbackPack(entityCode: string, period = "2026-10"): ThreeStateme
     accounting_standard: meta.standard,
     currency: meta.currency,
     period,
-    pack_status: state.locked ? "CPA_SIGNED_LOCKED" : "READY_FOR_CPA",
-    etb_rows: etbRows,
-    etb_totals: {
-      total_open_dr: f4(143000),
-      total_open_cr: f4(143000),
-      total_op_dr: f4(opDrSum),
-      total_op_cr: f4(opCrSum),
-      total_unadj_dr: f4(unadjDrSum),
-      total_unadj_cr: f4(unadjCrSum),
-      total_aje_dr: f4(ajeDrSum),
-      total_aje_cr: f4(ajeCrSum),
-      total_adjusted_dr: f4(atbDrSum),
-      total_adjusted_cr: f4(atbCrSum),
+    reporting_status: state.locked ? "REVIEWED_AND_LOCKED" : "READY",
+    trial_balance_rows: tbRows,
+    trial_balance_totals: {
+      total_opening_debit: f4(143000),
+      total_opening_credit: f4(143000),
+      total_period_debit: f4(opDrSum),
+      total_period_credit: f4(opCrSum),
+      total_unadjusted_debit: f4(unadjDrSum),
+      total_unadjusted_credit: f4(unadjCrSum),
+      total_adjustment_debit: f4(ajeDrSum),
+      total_adjustment_credit: f4(ajeCrSum),
+      total_adjusted_debit: f4(atbDrSum),
+      total_adjusted_credit: f4(atbCrSum),
     },
-    income_statement_wp: {
-      wp_schedule_code: "W/P PL",
+    income_statement: {
+      statement_code: "PL",
       period,
       currency: meta.currency,
       line_items: [
-        { wp_ref: "W/P PL-10", label: "Revenue / Turnover (主營業務收入)", amount: f4(rev) },
-        { wp_ref: "W/P PL-20", label: "Less: Direct Cloud & API Cost of Sales (營業成本)", amount: f4(-cogs) },
-        { wp_ref: "W/P PL", label: "Gross Profit (毛利)", amount: f4(gp), margin_pct: `${((gp / rev) * 100).toFixed(1)}%`, is_subtotal: true },
-        { wp_ref: "W/P PL-40", label: "Less: Operating & Admin Expenses (管理及營運費用)", amount: f4(-opex) },
-        { wp_ref: "W/P PL", label: "EBITDA (稅息折舊攤銷前利潤)", amount: f4(ebitda), is_subtotal: true },
-        { wp_ref: "W/P F", label: "Less: Depreciation & Amortization (折舊及攤銷)", amount: f4(-dep) },
-        { wp_ref: "W/P PL", label: "Profit Before Tax / EBT (稅前淨利)", amount: f4(ebt), is_subtotal: true },
-        { wp_ref: "W/P CC", label: "Less: Income Tax Provision (所得稅費用提列)", amount: f4(-taxExp) },
-        { wp_ref: "W/P EQ", label: "Net Profit for the Period (本期淨利)", amount: f4(netProfit), margin_pct: `${((netProfit / rev) * 100).toFixed(1)}%`, is_subtotal: true },
+        { statement_ref: "PL-10", label: "Revenue / Turnover (主營業務收入)", amount: f4(rev) },
+        { statement_ref: "PL-20", label: "Less: Direct Cloud & API Cost of Sales (營業成本)", amount: f4(-cogs) },
+        { statement_ref: "PL", label: "Gross Profit (毛利)", amount: f4(gp), margin_pct: `${((gp / rev) * 100).toFixed(1)}%`, is_subtotal: true },
+        { statement_ref: "PL-40", label: "Less: Operating & Admin Expenses (管理及營運費用)", amount: f4(-opex) },
+        { statement_ref: "PL", label: "EBITDA (稅息折舊攤銷前利潤)", amount: f4(ebitda), is_subtotal: true },
+        { statement_ref: "F", label: "Less: Depreciation & Amortization (折舊及攤銷)", amount: f4(-dep) },
+        { statement_ref: "PL", label: "Profit Before Tax / EBT (稅前淨利)", amount: f4(ebt), is_subtotal: true },
+        { statement_ref: "CC", label: "Less: Income Tax Provision (所得稅費用提列)", amount: f4(-taxExp) },
+        { statement_ref: "EQ", label: "Net Profit for the Period (本期淨利)", amount: f4(netProfit), margin_pct: `${((netProfit / rev) * 100).toFixed(1)}%`, is_subtotal: true },
       ],
     },
-    balance_sheet_wp: {
-      wp_schedule_code: "W/P BS",
+    balance_sheet: {
+      statement_code: "BS",
       as_of_period: period,
       currency: meta.currency,
       current_assets: [
-        { wp_ref: "W/P A", label: "Cash & Bank Balances (貨幣資金 / 銀行存款)", amount: f4(cash) },
-        { wp_ref: "W/P B", label: "Accounts Receivable, Net (應收賬款淨額)", amount: f4(ar) },
-        { wp_ref: "W/P C", label: "Prepayments & Input VAT/GST (預付賬款及留抵稅額)", amount: f4(prepay) },
+        { statement_ref: "A", label: "Cash & Bank Balances (貨幣資金 / 銀行存款)", amount: f4(cash) },
+        { statement_ref: "B", label: "Accounts Receivable, Net (應收賬款淨額)", amount: f4(ar) },
+        { statement_ref: "C", label: "Prepayments & Input VAT/GST (預付賬款及留抵稅額)", amount: f4(prepay) },
         ...(dirAsset > 0
-          ? [{ wp_ref: "W/P DD", label: "Due from Director / Owner (應收股東/業主往來)", amount: f4(dirAsset) }]
+          ? [{ statement_ref: "DD", label: "Due from Director / Owner (應收股東/業主往來)", amount: f4(dirAsset) }]
           : []),
       ],
       total_current_assets: f4(totalCA),
       non_current_assets: [
-        { wp_ref: "W/P F", label: "Property, Plant & Equipment - Cost (固定資產原值)", amount: f4(faCost) },
-        { wp_ref: "W/P F", label: "Less: Accumulated Depreciation (累計折舊)", amount: f4(faAccum) },
-        { wp_ref: "W/P F", label: "Fixed Assets, Net Book Value (固定資產淨值)", amount: f4(faNbv), is_subtotal: true },
+        { statement_ref: "F", label: "Property, Plant & Equipment - Cost (固定資產原值)", amount: f4(faCost) },
+        { statement_ref: "F", label: "Less: Accumulated Depreciation (累計折舊)", amount: f4(faAccum) },
+        { statement_ref: "F", label: "Fixed Assets, Net Book Value (固定資產淨值)", amount: f4(faNbv), is_subtotal: true },
       ],
       total_assets: f4(totalAssets),
       current_liabilities: [
-        { wp_ref: "W/P AA", label: "Accounts Payable & Accrued Expenses (應付賬款及應計費用)", amount: f4(ap) },
-        { wp_ref: "W/P CC", label: "Statutory Taxes Payable - GST/VAT/CIT (應交稅費)", amount: f4(taxPay) },
+        { statement_ref: "AA", label: "Accounts Payable & Accrued Expenses (應付賬款及應計費用)", amount: f4(ap) },
+        { statement_ref: "CC", label: "Statutory Taxes Payable - GST/VAT/CIT (應交稅費)", amount: f4(taxPay) },
         ...(dirLiab > 0
-          ? [{ wp_ref: "W/P DD", label: "Director's Loan / Due to Owner (應付股東/董事往來款)", amount: f4(dirLiab) }]
+          ? [{ statement_ref: "DD", label: "Director's Loan / Due to Owner (應付股東/董事往來款)", amount: f4(dirLiab) }]
           : []),
       ],
       total_liabilities: f4(totalLiab),
       equity: [
-        { wp_ref: "W/P EQ", label: "Share / Owner Capital & Opening Surplus (實收資本及期初留存)", amount: f4(openEq) },
-        { wp_ref: "W/P PL", label: "Current Period Net Profit (本期淨利結轉)", amount: f4(netProfit) },
+        { statement_ref: "EQ", label: "Share / Owner Capital & Opening Surplus (實收資本及期初留存)", amount: f4(openEq) },
+        { statement_ref: "PL", label: "Current Period Net Profit (本期淨利結轉)", amount: f4(netProfit) },
       ],
       total_equity: f4(totalEq),
       total_liabilities_and_equity: f4(totalLE),
     },
-    cash_flow_statement_wp: {
-      wp_schedule_code: "W/P CFS",
+    cash_flow_statement: {
+      statement_code: "CFS",
       period,
       currency: meta.currency,
       indirect_method_operating: [
-        { wp_ref: "W/P PL", label: "Net Profit for the Period (本期淨利)", amount: f4(netProfit) },
-        { wp_ref: "W/P F", label: "Add back: Depreciation & Amortization (加：折舊及攤銷)", amount: f4(dep) },
-        { wp_ref: "W/P B", label: "Change in Accounts Receivable (應收賬款變動)", amount: f4(-dAr) },
-        { wp_ref: "W/P C", label: "Change in Prepayments & Input Tax (預付及留抵稅額變動)", amount: f4(-dPrepay) },
-        { wp_ref: "W/P AA", label: "Change in Payables & Accruals (應付及應計費用變動)", amount: f4(dAp) },
-        { wp_ref: "W/P CC", label: "Change in Statutory Taxes Payable (應交稅費變動)", amount: f4(dTax) },
+        { statement_ref: "PL", label: "Net Profit for the Period (本期淨利)", amount: f4(netProfit) },
+        { statement_ref: "F", label: "Add back: Depreciation & Amortization (加：折舊及攤銷)", amount: f4(dep) },
+        { statement_ref: "B", label: "Change in Accounts Receivable (應收賬款變動)", amount: f4(-dAr) },
+        { statement_ref: "C", label: "Change in Prepayments & Input Tax (預付及留抵稅額變動)", amount: f4(-dPrepay) },
+        { statement_ref: "AA", label: "Change in Payables & Accruals (應付及應計費用變動)", amount: f4(dAp) },
+        { statement_ref: "CC", label: "Change in Statutory Taxes Payable (應交稅費變動)", amount: f4(dTax) },
       ],
       direct_method_operating_memo: [
-        { wp_ref: "W/P B", label: "Cash Received from Customers (銷售商品、提供勞務收到的現金)", amount: f4(rev - dAr) },
-        { wp_ref: "W/P AA", label: "Cash Paid to Suppliers & Opex (購買商品及營運支付的現金)", amount: f4(-(cogs + opex + dPrepay - dAp)) },
-        { wp_ref: "W/P CC", label: "Cash Paid for Taxes (支付的各項稅費)", amount: f4(-(taxExp - dTax)) },
+        { statement_ref: "B", label: "Cash Received from Customers (銷售商品、提供勞務收到的現金)", amount: f4(rev - dAr) },
+        { statement_ref: "AA", label: "Cash Paid to Suppliers & Opex (購買商品及營運支付的現金)", amount: f4(-(cogs + opex + dPrepay - dAp)) },
+        { statement_ref: "CC", label: "Cash Paid for Taxes (支付的各項稅費)", amount: f4(-(taxExp - dTax)) },
       ],
       net_cash_from_operating_activities: f4(cfOp),
       investing_activities: [
-        { wp_ref: "W/P F", label: "Payments for Property, Plant & Equipment (購建固定資產支付的現金)", amount: f4(cfInv) },
+        { statement_ref: "F", label: "Payments for Property, Plant & Equipment (購建固定資產支付的現金)", amount: f4(cfInv) },
       ],
       net_cash_from_investing_activities: f4(cfInv),
       financing_activities: [
-        { wp_ref: "W/P DD", label: "Net Director's Loan / Owner Drawings Movement (股東/業主往來變動)", amount: f4(cfFin) },
+        { statement_ref: "DD", label: "Net Director's Loan / Owner Drawings Movement (股東/業主往來變動)", amount: f4(cfFin) },
       ],
       net_cash_from_financing_activities: f4(cfFin),
       net_increase_in_cash: f4(netCf),
       opening_cash_balance: f4(85000),
       ending_cash_balance: f4(85000 + netCf),
     },
-    lead_schedules: {
-      "W/P A": {
-        wp_ref: "W/P A",
-        title: "Cash & Bank Reconciliation Schedule (貨幣資金與銀行調節底稿)",
+    detail_schedules: {
+      "A": {
+        statement_ref: "A",
+        title: "Cash & Bank Reconciliation Schedule (貨幣資金與銀行調節)",
         gl_balance: f4(cash),
         subledger_balance: f4(cash),
         variance: "0.0000",
         prepared_by: "bookkeeper-and-split-agent",
         reviewed_by: "controller-reviewer-agent",
-        tickmark: "✓ Agreed to External Bank Statement & Cash Flow Statement Ending Cash",
+        note: "✓ Agreed to External Bank Statement & Cash Flow Statement Ending Cash",
         evidence_sha256: "8f93b42a11c09d8723e9b55c14f8a2c3d9018472615243a9b8c7d6e5f4a3b2c1",
         agent_reasoning: "Matched 100% of bank feed lines against AR customer settlements and AP supplier payments.",
         items: [
-          { item: "Opening Bank Balance (1110)", amount: f4(85000), note: "Agreed to prior period W/P A" },
+          { item: "Opening Bank Balance (1110)", amount: f4(85000), note: "Agreed to prior period cash schedule" },
           { item: "Net Period Cash Movement", amount: f4(netCf), note: "Reconciled via Open Banking feed" },
           { item: "Ending Reconciled Bank Balance", amount: f4(cash), note: "✓ Matches Bank Statement PDF" },
         ],
       },
-      "W/P B": {
-        wp_ref: "W/P B",
-        title: "Accounts Receivable & Aging Schedule (應收賬款及賬齡分析底稿)",
+      "B": {
+        statement_ref: "B",
+        title: "Accounts Receivable & Aging Schedule (應收賬款及賬齡分析)",
         gl_balance: f4(ar),
         subledger_balance: f4(ar),
         variance: "0.0000",
         prepared_by: "bookkeeper-and-split-agent",
         reviewed_by: "controller-reviewer-agent",
-        tickmark: "✓ Sub-ledger Aging agrees to GL Control Account 1210",
+        note: "✓ Sub-ledger Aging agrees to GL Control Account 1210",
         evidence_sha256: "3b19c42e88a12f0091c7d64e55a1b2c3d4e5f60718293a4b5c6d7e8f9a0b1c2d",
         agent_reasoning: "All open customer invoices are within 0-30 days current terms; 0% Expected Credit Loss required.",
         items: [{ item: "0 - 30 Days Current Invoices", amount: f4(ar), note: "Enterprise AI Advisory & SaaS" }],
       },
-      "W/P C": {
-        wp_ref: "W/P C",
-        title: "Prepayments & Input VAT/GST Schedule (預付費用攤銷與進項稅額底稿)",
+      "C": {
+        statement_ref: "C",
+        title: "Prepayments & Input VAT/GST Schedule (預付費用攤銷與進項稅額)",
         gl_balance: f4(prepay),
         subledger_balance: f4(prepay),
         variance: "0.0000",
-        prepared_by: "close-and-workpaper-agent",
+        prepared_by: "close-and-schedule-agent",
         reviewed_by: "controller-reviewer-agent",
-        tickmark: "✓ Prepaid amortization AJE posted & Input Tax verified",
+        note: "✓ Prepaid amortization AJE posted & Input Tax verified",
         evidence_sha256: "7d42e11a99c34b8812f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2",
         agent_reasoning: "Amortized annual cloud prepayments (1,500.00 AJE) and verified recoverable GST/VAT on business portion.",
         items: [{ item: "Net Prepayments & Verified Input Tax", amount: f4(prepay), note: "Agreed to GL 1420" }],
       },
-      "W/P DD": {
-        wp_ref: "W/P DD",
-        title: "Director's Loan & Owner Drawings Schedule (股東/董事往來與公私混用拆分底稿)",
+      "DD": {
+        statement_ref: "DD",
+        title: "Director's Loan & Owner Drawings Schedule (股東/董事往來與公私混用拆分)",
         gl_balance: f4(dirLoanNet),
         subledger_balance: f4(dirLoanNet),
         variance: "0.0000",
         prepared_by: "bookkeeper-and-split-agent",
         reviewed_by: "controller-reviewer-agent",
-        tickmark: dirLoanNet > 0 ? "⚠ Overdrawn - Review Div 7A / PRC Art. 23" : "✓ Net Credit Balance (Compliant)",
+        note: dirLoanNet > 0 ? "⚠ Overdrawn - Review Div 7A / PRC Art. 23" : "✓ Net Credit Balance (Compliant)",
         evidence_sha256: "5e91f00c44b23a1987d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d8e7f6a5b4",
-        agent_reasoning: "Isolated non-business portions of mixed expenses into Account 2190 (W/P DD) to keep P&L and GST claims clean.",
+        agent_reasoning: "Isolated non-business portions of mixed expenses into Account 2190 () to keep P&L and GST claims clean.",
         items: [
           { item: "Opening Founder Advance to Company (Credit)", amount: "-15000.0000", note: "Initial working capital advance" },
           { item: "Personal Portion of Mixed Expenses Charged", amount: f4(dirLoanNet - -15000), note: "Excluded from P&L & Input Tax" },
-          { item: "Ending Net Balance", amount: f4(dirLoanNet), note: "Flows to Balance Sheet W/P DD" },
+          { item: "Ending net balance", amount: f4(dirLoanNet), note: "Flows to Balance Sheet " },
         ],
       },
-      "W/P F": {
-        wp_ref: "W/P F",
-        title: "Fixed Assets & Depreciation Roll-Forward Schedule (固定資產及折舊明細底稿)",
+      "F": {
+        statement_ref: "F",
+        title: "Fixed Assets & Depreciation Roll-Forward Schedule (固定資產及折舊明細)",
         gl_balance: f4(faNbv),
         subledger_balance: f4(faNbv),
         variance: "0.0000",
-        prepared_by: "close-and-workpaper-agent",
+        prepared_by: "close-and-schedule-agent",
         reviewed_by: "controller-reviewer-agent",
-        tickmark: "✓ Fixed Asset Register agrees to GL 1610/1650 & Cash Flow CapEx",
+        note: "✓ Fixed Asset Register agrees to GL 1610/1650 & Cash Flow CapEx",
         evidence_sha256: "9a12b34c56d78e90f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4",
         agent_reasoning: "Calculated monthly straight-line depreciation across AI servers and workstations.",
         items: [
@@ -391,104 +391,104 @@ function buildFallbackPack(entityCode: string, period = "2026-10"): ThreeStateme
           { item: "Ending Net Book Value (NBV)", amount: f4(faNbv), note: "Agreed to Balance Sheet" },
         ],
       },
-      "W/P AA": {
-        wp_ref: "W/P AA",
-        title: "Accounts Payable & Accrued Expenses Schedule (應付賬款及月底應計費用底稿)",
+      "AA": {
+        statement_ref: "AA",
+        title: "Accounts Payable & Accrued Expenses Schedule (應付賬款及月底應計費用)",
         gl_balance: f4(-ap),
         subledger_balance: f4(-ap),
         variance: "0.0000",
-        prepared_by: "close-and-workpaper-agent",
+        prepared_by: "close-and-schedule-agent",
         reviewed_by: "controller-reviewer-agent",
-        tickmark: "✓ 3-Way Matched Vendor Bills & Month-End Accruals Verified",
+        note: "✓ 3-Way Matched Vendor Bills & Month-End Accruals Verified",
         evidence_sha256: "2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d",
         agent_reasoning: "Reconciled open vendor bills and month-end accrued expenses.",
         items: [{ item: "Ending Payables & Accruals", amount: f4(ap), note: "Agreed to GL 2110" }],
       },
-      "W/P CC": {
-        wp_ref: "W/P CC",
-        title: `Statutory Tax Working Paper (${meta.formName})`,
+      "CC": {
+        statement_ref: "CC",
+        title: `Statutory Tax Statement (${meta.formName})`,
         gl_balance: f4(-taxPay),
         subledger_balance: f4(-taxPay),
         variance: "0.0000",
-        prepared_by: "close-and-workpaper-agent",
+        prepared_by: "close-and-schedule-agent",
         reviewed_by: "controller-reviewer-agent",
-        tickmark: `✓ ${meta.relief}`,
+        note: `✓ ${meta.relief}`,
         evidence_sha256: "4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a",
         agent_reasoning: "Computed indirect tax and income tax provision under regional SME rules.",
         items: [{ item: "Total Statutory Taxes Payable", amount: f4(taxPay), note: "Reserved in Tax Vault" }],
       },
-      "W/P EQ": {
-        wp_ref: "W/P EQ",
-        title: "Share / Owner Capital & Retained Earnings Roll-Forward (權益變動底稿)",
+      "EQ": {
+        statement_ref: "EQ",
+        title: "Share / Owner Capital & Retained Earnings Roll-Forward (權益變動)",
         gl_balance: f4(-totalEq),
         subledger_balance: f4(-totalEq),
         variance: "0.0000",
-        prepared_by: "close-and-workpaper-agent",
+        prepared_by: "close-and-schedule-agent",
         reviewed_by: "controller-reviewer-agent",
-        tickmark: "✓ Net Profit from W/P PL reconciled to Ending Equity",
+        note: "✓ Net Profit from PL reconciled to Ending Equity",
         evidence_sha256: "6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c",
         agent_reasoning: "Verified opening share/owner capital plus current period net profit tie out to Balance Sheet Equity.",
         items: [
           { item: "Opening Capital & Surplus", amount: f4(openEq), note: "Statutory register" },
-          { item: "Current Period Net Profit", amount: f4(netProfit), note: "From W/P PL" },
+          { item: "Current Period Net Profit", amount: f4(netProfit), note: "From PL" },
           { item: "Ending Total Equity", amount: f4(totalEq), note: "Agreed to Balance Sheet" },
         ],
       },
-      "W/P PL": {
-        wp_ref: "W/P PL",
-        title: "Income Statement Lead Schedule (損益表彙總底稿)",
+      "PL": {
+        statement_ref: "PL",
+        title: "Income Statement schedule (損益表彙總)",
         gl_balance: f4(netProfit),
         subledger_balance: f4(netProfit),
         variance: "0.0000",
-        prepared_by: "close-and-workpaper-agent",
+        prepared_by: "close-and-schedule-agent",
         reviewed_by: "controller-reviewer-agent",
-        tickmark: "✓ Cut-off tested; personal expenses excluded",
+        note: "✓ Cut-off tested; personal expenses excluded",
         evidence_sha256: "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b",
         agent_reasoning: "Verified revenue cut-off and month-end depreciation, prepaid amortization, and accrual AJEs.",
-        items: [{ item: "Net Profit for the Period", amount: f4(netProfit), note: "Flows to W/P EQ" }],
+        items: [{ item: "Net Profit for the Period", amount: f4(netProfit), note: "Flows to EQ" }],
       },
-      "W/P PL-10": {
-        wp_ref: "W/P PL",
-        title: "Income Statement Lead Schedule (損益表彙總底稿)",
+      "PL-10": {
+        statement_ref: "PL",
+        title: "Income Statement schedule (損益表彙總)",
         gl_balance: f4(netProfit),
         subledger_balance: f4(netProfit),
         variance: "0.0000",
-        prepared_by: "close-and-workpaper-agent",
+        prepared_by: "close-and-schedule-agent",
         reviewed_by: "controller-reviewer-agent",
-        tickmark: "✓ Cut-off tested; personal expenses excluded",
+        note: "✓ Cut-off tested; personal expenses excluded",
         evidence_sha256: "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b",
         agent_reasoning: "Verified revenue cut-off and month-end AJEs.",
-        items: [{ item: "Total Revenue", amount: f4(rev), note: "W/P PL-10" }],
+        items: [{ item: "Total Revenue", amount: f4(rev), note: "PL-10" }],
       },
-      "W/P PL-20": {
-        wp_ref: "W/P PL",
-        title: "Income Statement Lead Schedule (損益表彙總底稿)",
+      "PL-20": {
+        statement_ref: "PL",
+        title: "Income Statement schedule (損益表彙總)",
         gl_balance: f4(netProfit),
         subledger_balance: f4(netProfit),
         variance: "0.0000",
-        prepared_by: "close-and-workpaper-agent",
+        prepared_by: "close-and-schedule-agent",
         reviewed_by: "controller-reviewer-agent",
-        tickmark: "✓ Cut-off tested; personal expenses excluded",
+        note: "✓ Cut-off tested; personal expenses excluded",
         evidence_sha256: "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b",
         agent_reasoning: "Verified direct cloud GPU & API token cost.",
-        items: [{ item: "Direct COGS", amount: f4(-cogs), note: "W/P PL-20" }],
+        items: [{ item: "Direct COGS", amount: f4(-cogs), note: "PL-20" }],
       },
-      "W/P PL-40": {
-        wp_ref: "W/P PL",
-        title: "Income Statement Lead Schedule (損益表彙總底稿)",
+      "PL-40": {
+        statement_ref: "PL",
+        title: "Income Statement schedule (損益表彙總)",
         gl_balance: f4(netProfit),
         subledger_balance: f4(netProfit),
         variance: "0.0000",
-        prepared_by: "close-and-workpaper-agent",
+        prepared_by: "close-and-schedule-agent",
         reviewed_by: "controller-reviewer-agent",
-        tickmark: "✓ Cut-off tested; personal expenses excluded",
+        note: "✓ Cut-off tested; personal expenses excluded",
         evidence_sha256: "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b",
         agent_reasoning: "Verified operating expenses & month-end accruals.",
-        items: [{ item: "Operating & Admin Expenses", amount: f4(-opex), note: "W/P PL-40" }],
+        items: [{ item: "Operating & Admin Expenses", amount: f4(-opex), note: "PL-40" }],
       },
     },
-    statutory_tax_workpaper: {
-      wp_ref: "W/P CC",
+    statutory_tax_schedule: {
+      statement_ref: "CC",
       jurisdiction: meta.jurisdiction,
       return_form_name: meta.formName,
       relief_applied: meta.relief,
@@ -504,36 +504,36 @@ function buildFallbackPack(entityCode: string, period = "2026-10"): ThreeStateme
       safe_to_spend_operating_cash: f4(cash - taxPay),
     },
     close_checklist: [
-      { step: 1, code: "BANK_REC_WP_A", title: "Bank Feeds 100% Reconciled to Statement (銀行流水對賬完畢)", wp_ref: "W/P A", agent: "bookkeeper-and-split-agent", status: "COMPLETED" },
-      { step: 2, code: "OWNER_SPLIT_WP_DD", title: "Mixed Personal/Business Expenses Apportioned (公私混用費用拆分與股東往來檢核)", wp_ref: "W/P DD", agent: "bookkeeper-and-split-agent", status: dirAsset > 0 ? "WARNING" : "COMPLETED" },
-      { step: 3, code: "PREPAY_FA_AJE_WP_CF", title: "Prepayments & Fixed Asset Depreciation AJEs Posted (預付攤銷與折舊提列)", wp_ref: "W/P F", agent: "close-and-workpaper-agent", status: "COMPLETED" },
-      { step: 4, code: "STATUTORY_TAX_WP_CC", title: "Statutory Tax Return Boxes Verified (稅務申報底稿與預留稅款計算)", wp_ref: "W/P CC", agent: "close-and-workpaper-agent", status: "COMPLETED" },
-      { step: 5, code: "THREE_STMT_PROOF", title: "ETB Cross-Foot, B/S Equation & Cash Flow Proof (三大報表平衡與現金流量勾稽)", wp_ref: "W/P PL", agent: "controller-reviewer-agent", status: "COMPLETED" },
-      { step: 6, code: "CPA_FINAL_LOCK", title: "Human CPA / Founder Final Sign-Off & Period Lock (會計師/創辦人簽核封存)", wp_ref: "W/P EQ", agent: "Griffin (CPA)", status: state.locked ? "COMPLETED" : "PENDING" },
+      { step: 1, code: "BANK_REC_WP_A", title: "Bank Feeds 100% Reconciled to Statement (銀行流水對賬完畢)", statement_ref: "A", agent: "bookkeeper-and-split-agent", status: "COMPLETED" },
+      { step: 2, code: "OWNER_SPLIT_WP_DD", title: "Mixed Personal/Business Expenses Apportioned (公私混用費用拆分與股東往來檢核)", statement_ref: "DD", agent: "bookkeeper-and-split-agent", status: dirAsset > 0 ? "WARNING" : "COMPLETED" },
+      { step: 3, code: "PREPAY_FA_AJE_WP_CF", title: "Prepayments & Fixed Asset Depreciation AJEs Posted (預付攤銷與折舊提列)", statement_ref: "F", agent: "close-and-schedule-agent", status: "COMPLETED" },
+      { step: 4, code: "STATUTORY_TAX_WP_CC", title: "Statutory Tax Return Boxes Verified (稅務申報與預留稅款計算)", statement_ref: "CC", agent: "close-and-schedule-agent", status: "COMPLETED" },
+      { step: 5, code: "THREE_STMT_PROOF", title: "trial balance Cross-Foot, B/S Equation & Cash Flow Proof (三大報表平衡與現金流量勾稽)", statement_ref: "PL", agent: "controller-reviewer-agent", status: "COMPLETED" },
+      { step: 6, code: "CPA_FINAL_LOCK", title: "Human CPA / Founder Final Sign-Off & Period Lock (會計師/創辦人簽核封存)", statement_ref: "EQ", agent: "Griffin (CPA)", status: state.locked ? "COMPLETED" : "PENDING" },
     ],
     opc_and_sme_compliance_checks: [
       {
-        rule: `${meta.jurisdiction} ${meta.structure} Director Loan & Fund Separation Check (W/P DD)`,
+        rule: `${meta.jurisdiction} ${meta.structure} Director Loan & Fund Separation Check ()`,
         status: dirAsset > 0 ? "WARNING" : "PASS",
         detail:
           dirAsset > 0
             ? `股東/董事往來出現借方佔款 (${meta.currency} ${f4(dirAsset)})，請注意澳洲 Division 7A 或中國新公司法第23條財產混同風險。`
-            : `公私賬務完全分離（W/P DD 貸方餘額 ${meta.currency} ${f4(dirLiab)} 為創辦人墊款），無資金混同風險。`,
+            : `公私賬務完全分離（DIRECTOR 貸方餘額 ${meta.currency} ${f4(dirLiab)} 為創辦人墊款），無資金混同風險。`,
       },
       ...(state.splits > 0
         ? [
             {
               rule: "Mixed Personal/Business Expense Apportionment (公私混用費用自動拆賬)" as const,
               status: "APPLIED" as const,
-              detail: `已自動拆分 ${state.splits} 筆公私混用支出，私人比例已隔離至 W/P DD（股東/業主往來）。`,
+              detail: `已自動拆分 ${state.splits} 筆公私混用支出，私人比例已隔離至股東往來（股東/業主往來）。`,
             },
           ]
         : []),
     ],
-    reconciliation_proofs: {
-      etb_unadjusted_balanced: true,
-      etb_adjustments_balanced: true,
-      etb_adjusted_balanced: true,
+    consistency_checks: {
+      trial_balance_balanced: true,
+      adjustments_balanced: true,
+      reported_balance_balanced: true,
       balance_sheet_equation_balanced: Math.abs(totalAssets - totalLE) < 0.01,
       balance_sheet_variance: f4(totalAssets - totalLE),
       cash_flow_reconciles_to_bs_cash: Math.abs(85000 + netCf - cash) < 0.01,
@@ -563,9 +563,9 @@ export function isOfflineDemoMode(): boolean {
 export async function fetchWorkingPaperPack(
   entityCode: string,
   period = "2026-10"
-): Promise<ThreeStatementWorkingPaperPack> {
+): Promise<ReportingPack> {
   try {
-    const res = await fetch(`${API_BASE_URL}/workpapers/${entityCode}/${period}`);
+    const res = await fetch(`${API_BASE_URL}/reporting/${entityCode}/${period}`);
     if (res.ok) {
       _isBackendOffline = false;
       return await res.json();
@@ -583,7 +583,7 @@ export async function triggerMixedExpenseSplit(params: {
   tax_rate: string;
   business_use_pct: string;
 }): Promise<{
-  updated_working_paper_pack: ThreeStatementWorkingPaperPack;
+  reporting_pack: ReportingPack;
 }> {
   let res: Response;
   try {
@@ -603,19 +603,19 @@ export async function triggerMixedExpenseSplit(params: {
   return await res.json();
 }
 
-export async function postAdjustingWorkpaperEntry(params: {
+export async function postAdjustingScheduleEntry(params: {
   entity_code: string;
   debit_account_code: string;
   credit_account_code: string;
   amount: string;
   memo: string;
-  wp_ref: string;
+  statement_ref: string;
 }): Promise<{
-  updated_working_paper_pack: ThreeStatementWorkingPaperPack;
+  reporting_pack: ReportingPack;
 }> {
   let res: Response;
   try {
-    res = await fetch(`${API_BASE_URL}/workpapers/aje`, {
+    res = await fetch(`${API_BASE_URL}/reporting/aje`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(params),
@@ -635,11 +635,11 @@ export async function lockWorkingPaperPack(
   entityCode: string,
   period = "2026-10"
 ): Promise<{
-  updated_working_paper_pack: ThreeStatementWorkingPaperPack;
+  reporting_pack: ReportingPack;
 }> {
   let res: Response;
   try {
-    res = await fetch(`${API_BASE_URL}/workpapers/${entityCode}/${period}/lock`, {
+    res = await fetch(`${API_BASE_URL}/reporting/${entityCode}/${period}/lock`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ cpa_principal_key: "cpa-griffin", period }),

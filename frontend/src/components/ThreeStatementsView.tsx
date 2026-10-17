@@ -6,19 +6,24 @@ import {
   ReconciliationProofs,
 } from "../types/accounting";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from "./ui/shadcn";
-import { useI18n, cleanLabel } from "../i18n";
+import { useI18n } from "../i18n";
+import { fmtAmount } from "../lib/format";
+import { localizeLabel } from "../lib/labels";
 
 interface ThreeStatementsViewProps {
+  /** Legal entity name, printed on the working-paper header. */
+  entityName?: string;
   currency: string;
   incomeStatement: IncomeStatementWorkingPaper;
   balanceSheet: BalanceSheetWorkingPaper;
   cashFlow: CashFlowStatementWorkingPaper;
   kpi?: any;
   proofs: ReconciliationProofs;
-  onOpenWpDrawer: (wpRef?: string) => void;
+  onOpenWpDrawer: (statementRef?: string) => void;
 }
 
 export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
+  entityName,
   currency,
   incomeStatement,
   balanceSheet,
@@ -28,17 +33,8 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
   onOpenWpDrawer,
 }) => {
   const { t, lang } = useI18n();
-  const [activeStatement, setActiveStatement] = useState<"PL" | "BS" | "CFS">("PL");
+  const [activeStatement, setActiveStatement] = useState<"PL" | "BS" | "CF">("PL");
   const [cashFlowMethod, setCashFlowMethod] = useState<"INDIRECT" | "DIRECT">("INDIRECT");
-
-  const fmt = (val: string | number) => {
-    const n = typeof val === "string" ? parseFloat(val) : val;
-    if (isNaN(n)) return val;
-    if (n < 0) {
-      return `(${Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`;
-    }
-    return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
 
   const handlePrint = () => {
     window.print();
@@ -46,8 +42,18 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+      {/* Print-only working-paper header: the printed pack must identify itself. */}
+      <div className="print-only print-header">
+        <div className="print-header-title">{entityName}</div>
+        <div className="print-header-meta">{t.pnl_title} · {t.bs_title} · {t.cfs_title}</div>
+        <div className="print-header-meta">
+          {t.accounting_period}：{incomeStatement.period}　|　{t.currency_label}：{currency}　|　{t.statement_ref_col}：PL · BS · CFS
+        </div>
+      </div>
+
       {/* Statement Sub-navigation & Header Bar */}
       <div
+        className="no-print"
         style={{
           display: "flex",
           justifyContent: "space-between",
@@ -83,8 +89,8 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
             <button
               type="button"
               className="sh-tabs-trigger"
-              data-state={activeStatement === "CFS" ? "active" : "inactive"}
-              onClick={() => setActiveStatement("CFS")}
+              data-state={activeStatement === "CF" ? "active" : "inactive"}
+              onClick={() => setActiveStatement("CF")}
               style={{ fontSize: "0.85rem", padding: "0.35rem 0.85rem" }}
             >
               {t.tab_cfs}
@@ -111,8 +117,9 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
       </div>
 
       {/* Statement Content */}
-      {activeStatement === "PL" && (
-        <Card className="sh-card">
+      {/* Rendered for every tab so the printed pack is complete; only the active statement is visible on screen. */}
+      <div className={`stmt-panel${activeStatement === "PL" ? "" : " stmt-panel-hidden"}`}>
+          <Card className="sh-card stmt-card">
           <CardHeader style={{ paddingBottom: "0.5rem", borderBottom: "1px solid var(--border)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
               <div>
@@ -126,10 +133,10 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
               <Badge
                 variant="outline"
                 interactive
-                onClick={() => onOpenWpDrawer("W/P PL")}
+                onClick={() => onOpenWpDrawer("PL")}
                 style={{ fontSize: "0.75rem", cursor: "pointer" }}
               >
-                W/P PL ↗
+                PL ↗
               </Badge>
             </div>
           </CardHeader>
@@ -138,7 +145,7 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
               <table className="sh-table" style={{ fontSize: "0.875rem" }}>
                 <thead>
                   <tr style={{ background: "#fafafa" }}>
-                    <th style={{ width: "110px" }}>{t.wp_ref_col}</th>
+                    <th style={{ width: "110px" }}>{t.statement_ref_col}</th>
                     <th>{t.account_name_col}</th>
                     <th style={{ textAlign: "right", width: "160px" }}>{t.amount_col} ({currency})</th>
                     <th style={{ textAlign: "right", width: "100px" }}>{t.ratio_col}</th>
@@ -147,7 +154,9 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
                 <tbody>
                   {incomeStatement.line_items.map((item, idx) => {
                     const isSub = item.is_subtotal;
-                    const isNet = item.label.includes("Net Profit") || item.label.includes("本期淨利");
+                    // Identify the bottom line by dictionary identity, not by
+                    // substring-matching a label whose wording comes from the API.
+                    const isNet = localizeLabel(item.label, lang) === t.row_net_profit;
                     return (
                       <tr
                         key={idx}
@@ -158,20 +167,20 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
                         }}
                       >
                         <td>
-                          {item.wp_ref ? (
+                          {item.statement_ref ? (
                             <Badge
                               variant="secondary"
                               interactive
-                              onClick={() => onOpenWpDrawer(item.wp_ref)}
+                              onClick={() => onOpenWpDrawer(item.statement_ref)}
                               style={{ fontSize: "0.7rem", cursor: "pointer" }}
                             >
-                              {item.wp_ref} ↗
+                              {item.statement_ref} ↗
                             </Badge>
                           ) : (
                             <span style={{ color: "var(--muted-foreground)" }}>-</span>
                           )}
                         </td>
-                        <td style={{ paddingLeft: isSub ? "0.75rem" : "1.5rem" }}>{cleanLabel(item.label, lang)}</td>
+                        <td style={{ paddingLeft: isSub ? "0.75rem" : "1.5rem" }}>{localizeLabel(item.label, lang)}</td>
                         <td
                           className={`tabular-nums ${isNet ? "acc-double-underline" : ""}`}
                           style={{
@@ -179,7 +188,7 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
                             color: parseFloat(item.amount) < 0 ? "#dc2626" : "inherit",
                           }}
                         >
-                          {fmt(item.amount)}
+                          {fmtAmount(item.amount)}
                         </td>
                         <td style={{ textAlign: "right", color: "var(--muted-foreground)", fontSize: "0.8rem" }}>
                           {item.margin_pct || ""}
@@ -192,10 +201,11 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
             </div>
           </CardContent>
         </Card>
-      )}
+      </div>
 
-      {activeStatement === "BS" && (
-        <Card className="sh-card">
+      {/* Rendered for every tab so the printed pack is complete; only the active statement is visible on screen. */}
+      <div className={`stmt-panel${activeStatement === "BS" ? "" : " stmt-panel-hidden"}`}>
+          <Card className="sh-card stmt-card">
           <CardHeader style={{ paddingBottom: "0.5rem", borderBottom: "1px solid var(--border)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
               <div>
@@ -209,10 +219,10 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
               <Badge
                 variant="outline"
                 interactive
-                onClick={() => onOpenWpDrawer("W/P BS")}
+                onClick={() => onOpenWpDrawer("BS")}
                 style={{ fontSize: "0.75rem", cursor: "pointer" }}
               >
-                W/P BS ↗
+                BS ↗
               </Badge>
             </div>
           </CardHeader>
@@ -241,20 +251,20 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
                     {balanceSheet.current_assets.map((item, idx) => (
                       <tr key={idx}>
                         <td style={{ width: "90px" }}>
-                          {item.wp_ref && (
+                          {item.statement_ref && (
                             <Badge
                               variant="secondary"
                               interactive
-                              onClick={() => onOpenWpDrawer(item.wp_ref)}
+                              onClick={() => onOpenWpDrawer(item.statement_ref)}
                               style={{ fontSize: "0.7rem", cursor: "pointer" }}
                             >
-                              {item.wp_ref} ↗
+                              {item.statement_ref} ↗
                             </Badge>
                           )}
                         </td>
-                        <td>{cleanLabel(item.label, lang)}</td>
+                        <td>{localizeLabel(item.label, lang)}</td>
                         <td className="tabular-nums" style={{ textAlign: "right" }}>
-                          {fmt(item.amount)}
+                          {fmtAmount(item.amount)}
                         </td>
                       </tr>
                     ))}
@@ -262,7 +272,7 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
                       <td>-</td>
                       <td>{t.row_total_current_assets}</td>
                       <td className="tabular-nums" style={{ textAlign: "right" }}>
-                        {fmt(balanceSheet.total_current_assets)}
+                        {fmtAmount(balanceSheet.total_current_assets)}
                       </td>
                     </tr>
 
@@ -274,20 +284,20 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
                     {balanceSheet.non_current_assets.map((item, idx) => (
                       <tr key={idx} className={item.is_subtotal ? "sh-row-subtotal" : ""}>
                         <td style={{ width: "90px" }}>
-                          {item.wp_ref && (
+                          {item.statement_ref && (
                             <Badge
                               variant="secondary"
                               interactive
-                              onClick={() => onOpenWpDrawer(item.wp_ref)}
+                              onClick={() => onOpenWpDrawer(item.statement_ref)}
                               style={{ fontSize: "0.7rem", cursor: "pointer" }}
                             >
-                              {item.wp_ref} ↗
+                              {item.statement_ref} ↗
                             </Badge>
                           )}
                         </td>
-                        <td>{cleanLabel(item.label, lang)}</td>
+                        <td>{localizeLabel(item.label, lang)}</td>
                         <td className="tabular-nums" style={{ textAlign: "right" }}>
-                          {fmt(item.amount)}
+                          {fmtAmount(item.amount)}
                         </td>
                       </tr>
                     ))}
@@ -295,7 +305,7 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
                       <td>-</td>
                       <td style={{ fontWeight: 700 }}>{t.row_total_assets}</td>
                       <td className="tabular-nums acc-double-underline" style={{ textAlign: "right", fontWeight: 700 }}>
-                        {fmt(balanceSheet.total_assets)}
+                        {fmtAmount(balanceSheet.total_assets)}
                       </td>
                     </tr>
                   </tbody>
@@ -325,20 +335,20 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
                     {balanceSheet.current_liabilities.map((item, idx) => (
                       <tr key={idx}>
                         <td style={{ width: "90px" }}>
-                          {item.wp_ref && (
+                          {item.statement_ref && (
                             <Badge
                               variant="secondary"
                               interactive
-                              onClick={() => onOpenWpDrawer(item.wp_ref)}
+                              onClick={() => onOpenWpDrawer(item.statement_ref)}
                               style={{ fontSize: "0.7rem", cursor: "pointer" }}
                             >
-                              {item.wp_ref} ↗
+                              {item.statement_ref} ↗
                             </Badge>
                           )}
                         </td>
-                        <td>{cleanLabel(item.label, lang)}</td>
+                        <td>{localizeLabel(item.label, lang)}</td>
                         <td className="tabular-nums" style={{ textAlign: "right" }}>
-                          {fmt(item.amount)}
+                          {fmtAmount(item.amount)}
                         </td>
                       </tr>
                     ))}
@@ -346,7 +356,7 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
                       <td>-</td>
                       <td>{t.row_total_liabilities}</td>
                       <td className="tabular-nums" style={{ textAlign: "right" }}>
-                        {fmt(balanceSheet.total_liabilities)}
+                        {fmtAmount(balanceSheet.total_liabilities)}
                       </td>
                     </tr>
 
@@ -358,20 +368,20 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
                     {balanceSheet.equity.map((item, idx) => (
                       <tr key={idx}>
                         <td style={{ width: "90px" }}>
-                          {item.wp_ref && (
+                          {item.statement_ref && (
                             <Badge
                               variant="secondary"
                               interactive
-                              onClick={() => onOpenWpDrawer(item.wp_ref)}
+                              onClick={() => onOpenWpDrawer(item.statement_ref)}
                               style={{ fontSize: "0.7rem", cursor: "pointer" }}
                             >
-                              {item.wp_ref} ↗
+                              {item.statement_ref} ↗
                             </Badge>
                           )}
                         </td>
-                        <td>{cleanLabel(item.label, lang)}</td>
+                        <td>{localizeLabel(item.label, lang)}</td>
                         <td className="tabular-nums" style={{ textAlign: "right" }}>
-                          {fmt(item.amount)}
+                          {fmtAmount(item.amount)}
                         </td>
                       </tr>
                     ))}
@@ -379,14 +389,14 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
                       <td>-</td>
                       <td>{t.row_total_equity}</td>
                       <td className="tabular-nums" style={{ textAlign: "right" }}>
-                        {fmt(balanceSheet.total_equity)}
+                        {fmtAmount(balanceSheet.total_equity)}
                       </td>
                     </tr>
                     <tr className="sh-row-subtotal" style={{ borderTop: "2px solid var(--border)" }}>
                       <td>-</td>
                       <td style={{ fontWeight: 700 }}>{t.row_total_liabilities_equity}</td>
                       <td className="tabular-nums acc-double-underline" style={{ textAlign: "right", fontWeight: 700 }}>
-                        {fmt(balanceSheet.total_liabilities_and_equity)}
+                        {fmtAmount(balanceSheet.total_liabilities_and_equity)}
                       </td>
                     </tr>
                   </tbody>
@@ -395,10 +405,11 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
             </div>
           </CardContent>
         </Card>
-      )}
+      </div>
 
-      {activeStatement === "CFS" && (
-        <Card className="sh-card">
+      {/* Rendered for every tab so the printed pack is complete; only the active statement is visible on screen. */}
+      <div className={`stmt-panel${activeStatement === "CF" ? "" : " stmt-panel-hidden"}`}>
+          <Card className="sh-card stmt-card">
           <CardHeader style={{ paddingBottom: "0.5rem", borderBottom: "1px solid var(--border)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
               <div>
@@ -433,10 +444,10 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
                 <Badge
                   variant="outline"
                   interactive
-                  onClick={() => onOpenWpDrawer("W/P CFS")}
+                  onClick={() => onOpenWpDrawer("CFS")}
                   style={{ fontSize: "0.75rem", cursor: "pointer" }}
                 >
-                  W/P CFS ↗
+                  CFS ↗
                 </Badge>
               </div>
             </div>
@@ -446,7 +457,7 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
               <table className="sh-table" style={{ fontSize: "0.875rem" }}>
                 <thead>
                   <tr style={{ background: "#fafafa" }}>
-                    <th style={{ width: "110px" }}>{t.wp_ref_col}</th>
+                    <th style={{ width: "110px" }}>{t.statement_ref_col}</th>
                     <th>{t.account_name_col}</th>
                     <th style={{ textAlign: "right", width: "160px" }}>{t.amount_col} ({currency})</th>
                   </tr>
@@ -463,20 +474,20 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
                   ).map((item, idx) => (
                     <tr key={idx}>
                       <td>
-                        {item.wp_ref && (
+                        {item.statement_ref && (
                           <Badge
                             variant="secondary"
                             interactive
-                            onClick={() => onOpenWpDrawer(item.wp_ref)}
+                            onClick={() => onOpenWpDrawer(item.statement_ref)}
                             style={{ fontSize: "0.7rem", cursor: "pointer" }}
                           >
-                            {item.wp_ref} ↗
+                            {item.statement_ref} ↗
                           </Badge>
                         )}
                       </td>
-                      <td style={{ paddingLeft: "1.5rem" }}>{cleanLabel(item.label, lang)}</td>
+                      <td style={{ paddingLeft: "1.5rem" }}>{localizeLabel(item.label, lang)}</td>
                       <td className="tabular-nums" style={{ textAlign: "right" }}>
-                        {fmt(item.amount)}
+                        {fmtAmount(item.amount)}
                       </td>
                     </tr>
                   ))}
@@ -484,7 +495,7 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
                     <td>-</td>
                     <td>{t.row_cfs_op}</td>
                     <td className="tabular-nums" style={{ textAlign: "right" }}>
-                      {fmt(cashFlow.net_cash_from_operating_activities)}
+                      {fmtAmount(cashFlow.net_cash_from_operating_activities)}
                     </td>
                   </tr>
 
@@ -496,20 +507,20 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
                   {cashFlow.investing_activities.map((item, idx) => (
                     <tr key={idx}>
                       <td>
-                        {item.wp_ref && (
+                        {item.statement_ref && (
                           <Badge
                             variant="secondary"
                             interactive
-                            onClick={() => onOpenWpDrawer(item.wp_ref)}
+                            onClick={() => onOpenWpDrawer(item.statement_ref)}
                             style={{ fontSize: "0.7rem", cursor: "pointer" }}
                           >
-                            {item.wp_ref} ↗
+                            {item.statement_ref} ↗
                           </Badge>
                         )}
                       </td>
-                      <td style={{ paddingLeft: "1.5rem" }}>{cleanLabel(item.label, lang)}</td>
+                      <td style={{ paddingLeft: "1.5rem" }}>{localizeLabel(item.label, lang)}</td>
                       <td className="tabular-nums" style={{ textAlign: "right" }}>
-                        {fmt(item.amount)}
+                        {fmtAmount(item.amount)}
                       </td>
                     </tr>
                   ))}
@@ -517,7 +528,7 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
                     <td>-</td>
                     <td>{t.row_cfs_inv}</td>
                     <td className="tabular-nums" style={{ textAlign: "right" }}>
-                      {fmt(cashFlow.net_cash_from_investing_activities)}
+                      {fmtAmount(cashFlow.net_cash_from_investing_activities)}
                     </td>
                   </tr>
 
@@ -529,20 +540,20 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
                   {cashFlow.financing_activities.map((item, idx) => (
                     <tr key={idx}>
                       <td>
-                        {item.wp_ref && (
+                        {item.statement_ref && (
                           <Badge
                             variant="secondary"
                             interactive
-                            onClick={() => onOpenWpDrawer(item.wp_ref)}
+                            onClick={() => onOpenWpDrawer(item.statement_ref)}
                             style={{ fontSize: "0.7rem", cursor: "pointer" }}
                           >
-                            {item.wp_ref} ↗
+                            {item.statement_ref} ↗
                           </Badge>
                         )}
                       </td>
-                      <td style={{ paddingLeft: "1.5rem" }}>{cleanLabel(item.label, lang)}</td>
+                      <td style={{ paddingLeft: "1.5rem" }}>{localizeLabel(item.label, lang)}</td>
                       <td className="tabular-nums" style={{ textAlign: "right" }}>
-                        {fmt(item.amount)}
+                        {fmtAmount(item.amount)}
                       </td>
                     </tr>
                   ))}
@@ -550,7 +561,7 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
                     <td>-</td>
                     <td>{t.row_cfs_fin}</td>
                     <td className="tabular-nums" style={{ textAlign: "right" }}>
-                      {fmt(cashFlow.net_cash_from_financing_activities)}
+                      {fmtAmount(cashFlow.net_cash_from_financing_activities)}
                     </td>
                   </tr>
 
@@ -558,21 +569,21 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
                     <td>-</td>
                     <td style={{ fontWeight: 600 }}>{t.row_cfs_net_change}</td>
                     <td className="tabular-nums" style={{ textAlign: "right", fontWeight: 600 }}>
-                      {fmt(cashFlow.net_increase_in_cash)}
+                      {fmtAmount(cashFlow.net_increase_in_cash)}
                     </td>
                   </tr>
                   <tr>
                     <td>-</td>
                     <td>{t.row_cfs_open_cash}</td>
                     <td className="tabular-nums" style={{ textAlign: "right" }}>
-                      {fmt(cashFlow.opening_cash_balance)}
+                      {fmtAmount(cashFlow.opening_cash_balance)}
                     </td>
                   </tr>
                   <tr className="sh-row-subtotal" style={{ borderTop: "1px solid var(--border)" }}>
-                    <td>W/P A</td>
+                    <td>CASH</td>
                     <td style={{ fontWeight: 700 }}>{t.row_cfs_close_cash}</td>
                     <td className="tabular-nums acc-double-underline" style={{ textAlign: "right", fontWeight: 700 }}>
-                      {fmt(cashFlow.ending_cash_balance)}
+                      {fmtAmount(cashFlow.ending_cash_balance)}
                     </td>
                   </tr>
                 </tbody>
@@ -580,7 +591,7 @@ export const ThreeStatementsView: React.FC<ThreeStatementsViewProps> = ({
             </div>
           </CardContent>
         </Card>
-      )}
+      </div>
     </div>
   );
 };

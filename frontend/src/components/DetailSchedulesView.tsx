@@ -1,36 +1,32 @@
 import React from "react";
 import { LeadScheduleDetail } from "../types/accounting";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from "./ui/shadcn";
-import { useI18n, cleanLabel } from "../i18n";
+import { useI18n } from "../i18n";
+import { fmtAmount, hasAmount } from "../lib/format";
+import { scheduleTitle } from "../lib/labels";
 
-interface LeadSchedulesViewProps {
+interface DetailSchedulesViewProps {
   currency: string;
   schedules: Record<string, LeadScheduleDetail>;
-  onOpenWpDrawer: (wpRef: string) => void;
+  onOpenWpDrawer: (statementRef: string) => void;
 }
 
-export const LeadSchedulesView: React.FC<LeadSchedulesViewProps> = ({
+export const DetailSchedulesView: React.FC<DetailSchedulesViewProps> = ({
   currency,
   schedules,
   onOpenWpDrawer,
 }) => {
   const { t, lang } = useI18n();
 
-  const fmt = (val: string | number) => {
-    const n = typeof val === "string" ? parseFloat(val) : val;
-    if (isNaN(n)) return val;
-    return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
-
   const scheduleKeys = [
-    "W/P A",
-    "W/P B",
-    "W/P C",
-    "W/P DD",
-    "W/P F",
-    "W/P AA",
-    "W/P CC",
-    "W/P EQ",
+    "A",
+    "B",
+    "C",
+    "DD",
+    "F",
+    "AA",
+    "CC",
+    "EQ",
   ];
 
   return (
@@ -49,17 +45,18 @@ export const LeadSchedulesView: React.FC<LeadSchedulesViewProps> = ({
           const sched = schedules[key];
           if (!sched) return null;
           const isBalanced = parseFloat(sched.variance) === 0;
+          const prepared = hasAmount(sched.subledger_balance);
 
           return (
             <Card key={key} className="sh-card" style={{ display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
               <CardHeader style={{ paddingBottom: "0.5rem" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "0.5rem" }}>
                   <Badge variant="default" style={{ fontSize: "0.75rem", fontWeight: 600 }}>
-                    {sched.wp_ref}
+                    {sched.statement_ref}
                   </Badge>
                   {isBalanced ? (
-                    <Badge variant="success" style={{ fontSize: "0.7rem" }}>
-                      {t.wp_balanced_status}
+                    <Badge variant={prepared ? "success" : "warning"} style={{ fontSize: "0.7rem" }}>
+                      {prepared ? t.wp_balanced_status : t.wp_status_not_performed}
                     </Badge>
                   ) : (
                     <Badge variant="warning" style={{ fontSize: "0.7rem" }}>
@@ -68,7 +65,7 @@ export const LeadSchedulesView: React.FC<LeadSchedulesViewProps> = ({
                   )}
                 </div>
                 <CardTitle style={{ fontSize: "0.95rem", marginTop: "0.35rem", fontWeight: 600 }}>
-                  {cleanLabel(sched.title, lang)}
+                  {scheduleTitle(sched.statement_ref, sched.title, lang)}
                 </CardTitle>
               </CardHeader>
 
@@ -76,14 +73,14 @@ export const LeadSchedulesView: React.FC<LeadSchedulesViewProps> = ({
                 <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px dashed var(--border)", paddingBottom: "0.35rem" }}>
                   <span style={{ color: "var(--muted-foreground)" }}>{t.wp_gl_balance}:</span>
                   <span className="tabular-nums" style={{ fontWeight: 600 }}>
-                    {currency} {fmt(sched.gl_balance)}
+                    {hasAmount(sched.gl_balance) ? `${currency} ${fmtAmount(sched.gl_balance)}` : t.wp_not_performed}
                   </span>
                 </div>
 
                 <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px dashed var(--border)", paddingBottom: "0.35rem" }}>
                   <span style={{ color: "var(--muted-foreground)" }}>{t.wp_subledger_balance}:</span>
                   <span className="tabular-nums">
-                    {currency} {fmt(sched.subledger_balance)}
+                    {hasAmount(sched.subledger_balance) ? `${currency} ${fmtAmount(sched.subledger_balance)}` : "—"}
                   </span>
                 </div>
 
@@ -94,7 +91,7 @@ export const LeadSchedulesView: React.FC<LeadSchedulesViewProps> = ({
 
                 <Button
                   variant="outline"
-                  onClick={() => onOpenWpDrawer(sched.wp_ref)}
+                  onClick={() => onOpenWpDrawer(sched.statement_ref)}
                   style={{ width: "100%", fontSize: "0.8rem", marginTop: "0.5rem" }}
                 >
                   {t.wp_view_detail} ↗

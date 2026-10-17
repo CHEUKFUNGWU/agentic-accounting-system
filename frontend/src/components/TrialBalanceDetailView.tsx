@@ -1,30 +1,31 @@
 import React, { useState } from "react";
-import { ETBTotals, ETBWorksheetRow } from "../types/accounting";
+import { TrialBalanceSheetTotals, TrialBalanceSheetRow } from "../types/accounting";
 import { Badge, Card, CardContent, CardHeader, CardTitle } from "./ui/shadcn";
-import { useI18n, cleanLabel } from "../i18n";
+import { useI18n, pick } from "../i18n";
+import { fmtAmount } from "../lib/format";
+import { localizeLabel, localizeDestination } from "../lib/labels";
 
-interface ExtendedTrialBalanceViewProps {
+interface TrialBalanceDetailViewProps {
+  /** Legal entity name, printed on the working-paper header. */
+  entityName?: string;
   currency: string;
-  rows: ETBWorksheetRow[];
-  totals: ETBTotals;
-  onOpenWpDrawer: (wpRef?: string) => void;
+  rows: TrialBalanceSheetRow[];
+  totals: TrialBalanceSheetTotals;
+  onOpenWpDrawer: (statementRef?: string) => void;
 }
 
-export const ExtendedTrialBalanceView: React.FC<ExtendedTrialBalanceViewProps> = ({
+export const TrialBalanceDetailView: React.FC<TrialBalanceDetailViewProps> = ({
+  entityName,
   currency,
   rows,
   totals,
   onOpenWpDrawer,
 }) => {
   const { t, lang } = useI18n();
+  /** Trial-balance columns: a zero balance is blank, not "0.00". */
+  const cell = (value: unknown) => fmtAmount(value, { blankZero: true });
   const [filterType, setFilterType] = useState<string>("ALL");
   const [searchKeyword, setSearchKeyword] = useState<string>("");
-
-  const fmt = (val: string | number) => {
-    const n = typeof val === "string" ? parseFloat(val) : val;
-    if (isNaN(n) || n === 0) return "-";
-    return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
 
   const filteredRows = rows.filter((r) => {
     if (filterType !== "ALL" && r.account_type !== filterType) return false;
@@ -36,15 +37,21 @@ export const ExtendedTrialBalanceView: React.FC<ExtendedTrialBalanceViewProps> =
   });
 
   return (
-    <Card className="sh-card">
-      <CardHeader style={{ paddingBottom: "0.75rem", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+    <Card className="sh-card print-landscape">
+      {/* Print-only working-paper header. */}
+      <div className="print-only print-header">
+        <div className="print-header-title">{entityName ?? t.tb_detail_title}</div>
+        <div className="print-header-meta">
+          {t.tb_detail_title}　|　{t.currency_label}：{currency}　|　{t.statement_ref_col}： · B · C · DD · F · AA · CC · EQ
+        </div>
+      </div>
+      <CardHeader className="no-print" style={{ paddingBottom: "0.75rem", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
           <div>
             <CardTitle style={{ fontSize: "1.15rem", fontWeight: 700 }}>
-              {t.etb_title}
-            </CardTitle>
-            <span style={{ fontSize: "0.8rem", color: "var(--muted-foreground)" }}>
-              {t.currency_label}：{currency} • {t.etb_subtitle}
+              {t.tb_detail_title}
+            </CardTitle>            <span style={{ fontSize: "0.8rem", color: "var(--muted-foreground)" }}>
+              {t.currency_label}：{currency} • {t.tb_detail_subtitle}
             </span>
           </div>
           <div style={{ display: "flex", gap: "0.5rem" }}>
@@ -101,13 +108,12 @@ export const ExtendedTrialBalanceView: React.FC<ExtendedTrialBalanceViewProps> =
       </CardHeader>
 
       <CardContent style={{ padding: "0 0.5rem 0.5rem" }}>
-        <div className="sh-table-wrapper" style={{ maxHeight: "680px", overflowY: "auto" }}>
-          <table className="sh-table" style={{ fontSize: "0.8rem" }}>
+        <div className="sh-table-wrapper" style={{ maxHeight: "680px", overflowY: "auto" }}>          <table className="sh-table" style={{ fontSize: "0.8rem" }}>
             <thead style={{ position: "sticky", top: 0, zIndex: 10, background: "#fafafa" }}>
               <tr>
-                <th rowSpan={2} style={{ width: "65px" }}>{t.col_acc_code}</th>
-                <th rowSpan={2} style={{ minWidth: "220px" }}>{t.col_acc_name}</th>
-                <th rowSpan={2} style={{ width: "70px" }}>{t.wp_ref_col}</th>
+                <th rowSpan={2} className="etb-col-sticky etb-col-code" style={{ width: "65px", zIndex: 20 }}>{t.col_acc_code}</th>
+                <th rowSpan={2} className="etb-col-sticky etb-col-name" style={{ minWidth: "200px", zIndex: 20 }}>{t.col_acc_name}</th>
+                <th rowSpan={2} style={{ width: "70px" }}>{t.statement_ref_col}</th>
                 <th colSpan={2} style={{ textAlign: "center", borderLeft: "1px solid var(--border)" }}>
                   {t.col_period_activity}
                 </th>
@@ -121,7 +127,7 @@ export const ExtendedTrialBalanceView: React.FC<ExtendedTrialBalanceViewProps> =
                   {t.col_ending_tb}
                 </th>
                 <th rowSpan={2} style={{ width: "120px", borderLeft: "1px solid var(--border)" }}>
-                  {lang === "en" ? "Statement" : "报表归属"}
+                  {pick(lang, { en: "Statement", "zh-CN": "报表归属", "zh-TW": "報表歸屬" })}
                 </th>
               </tr>
               <tr>
@@ -138,48 +144,48 @@ export const ExtendedTrialBalanceView: React.FC<ExtendedTrialBalanceViewProps> =
             <tbody>
               {filteredRows.map((r) => (
                 <tr key={r.account_code}>
-                  <td style={{ fontWeight: 600 }}>{r.account_code}</td>
-                  <td>{cleanLabel(r.account_name, lang)}</td>
+                  <td className="etb-col-sticky etb-col-code" style={{ fontWeight: 600 }}>{r.account_code}</td>
+                  <td className="etb-col-sticky etb-col-name">{localizeLabel(r.account_name, lang)}</td>
                   <td>
-                    {r.wp_ref ? (
+                    {r.statement_ref ? (
                       <Badge
                         variant="secondary"
                         interactive
-                        onClick={() => onOpenWpDrawer(r.wp_ref)}
+                        onClick={() => onOpenWpDrawer(r.statement_ref)}
                         style={{ fontSize: "0.7rem", cursor: "pointer" }}
                       >
-                        {r.wp_ref}
+                        {r.statement_ref}
                       </Badge>
                     ) : (
                       "-"
                     )}
                   </td>
                   <td className="tabular-nums" style={{ textAlign: "right", borderLeft: "1px solid var(--border)" }}>
-                    {fmt(r.period_op_debit)}
+                    {cell(r.period_op_debit)}
                   </td>
                   <td className="tabular-nums" style={{ textAlign: "right" }}>
-                    {fmt(r.period_op_credit)}
+                    {cell(r.period_op_credit)}
                   </td>
                   <td className="tabular-nums" style={{ textAlign: "right", borderLeft: "1px solid var(--border)" }}>
-                    {fmt(r.unadjusted_dr)}
+                    {cell(r.unadjusted_debit)}
                   </td>
                   <td className="tabular-nums" style={{ textAlign: "right" }}>
-                    {fmt(r.unadjusted_cr)}
+                    {cell(r.unadjusted_credit)}
                   </td>
                   <td className="tabular-nums" style={{ textAlign: "right", borderLeft: "1px solid var(--border)" }}>
-                    {fmt(r.aje_debit)}
+                    {cell(r.adjustment_debit)}
                   </td>
                   <td className="tabular-nums" style={{ textAlign: "right" }}>
-                    {fmt(r.aje_credit)}
+                    {cell(r.adjustment_credit)}
                   </td>
                   <td className="tabular-nums" style={{ textAlign: "right", borderLeft: "1px solid var(--border)", fontWeight: 500 }}>
-                    {fmt(r.adjusted_dr)}
+                    {cell(r.adjusted_debit)}
                   </td>
                   <td className="tabular-nums" style={{ textAlign: "right", fontWeight: 500 }}>
-                    {fmt(r.adjusted_cr)}
+                    {cell(r.adjusted_credit)}
                   </td>
                   <td style={{ borderLeft: "1px solid var(--border)", fontSize: "0.75rem", color: "var(--muted-foreground)" }}>
-                    {r.statement_destination}
+                    {localizeDestination(r.statement_destination, lang)}
                   </td>
                 </tr>
               ))}
@@ -190,28 +196,28 @@ export const ExtendedTrialBalanceView: React.FC<ExtendedTrialBalanceViewProps> =
                   {t.total_label}
                 </td>
                 <td className="tabular-nums" style={{ textAlign: "right", borderLeft: "1px solid var(--border)" }}>
-                  {fmt(totals.total_op_dr)}
+                  {fmtAmount(totals.total_period_debit)}
                 </td>
                 <td className="tabular-nums" style={{ textAlign: "right" }}>
-                  {fmt(totals.total_op_cr)}
+                  {fmtAmount(totals.total_period_credit)}
                 </td>
                 <td className="tabular-nums" style={{ textAlign: "right", borderLeft: "1px solid var(--border)" }}>
-                  {fmt(totals.total_unadj_dr)}
+                  {fmtAmount(totals.total_unadjusted_debit)}
                 </td>
                 <td className="tabular-nums" style={{ textAlign: "right" }}>
-                  {fmt(totals.total_unadj_cr)}
+                  {fmtAmount(totals.total_unadjusted_credit)}
                 </td>
                 <td className="tabular-nums" style={{ textAlign: "right", borderLeft: "1px solid var(--border)" }}>
-                  {fmt(totals.total_aje_dr)}
+                  {fmtAmount(totals.total_adjustment_debit)}
                 </td>
                 <td className="tabular-nums" style={{ textAlign: "right" }}>
-                  {fmt(totals.total_aje_cr)}
+                  {fmtAmount(totals.total_adjustment_credit)}
                 </td>
                 <td className="tabular-nums" style={{ textAlign: "right", borderLeft: "1px solid var(--border)", color: "#16a34a" }}>
-                  {fmt(totals.total_adjusted_dr)}
+                  {fmtAmount(totals.total_adjusted_debit)}
                 </td>
                 <td className="tabular-nums" style={{ textAlign: "right", color: "#16a34a" }}>
-                  {fmt(totals.total_adjusted_cr)}
+                  {fmtAmount(totals.total_adjusted_credit)}
                 </td>
                 <td style={{ borderLeft: "1px solid var(--border)", color: "#16a34a" }}>
                   ✓ {t.balanced}

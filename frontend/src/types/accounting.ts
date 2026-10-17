@@ -1,44 +1,44 @@
 /**
  * Strict TypeScript Interfaces for SME, OPC & Sole Proprietor Agentic Accounting System
- * and Standalone Three Financial Statement Working Papers (單體三大報表底稿).
+ * and Standalone Three Financial Statement Statements (單體三大報表).
  */
 
 export type EntityLegalStructure = "SOLE_PROPRIETOR" | "OPC_LIMITED" | "SME_CORP";
 
 export type JurisdictionCode = "CN" | "HK" | "SG" | "AU" | "US" | "CA" | "EU" | "UK";
 
-export interface ETBWorksheetRow {
+export interface TrialBalanceSheetRow {
   account_code: string;
   account_name: string;
   account_type: string;
-  wp_ref: string;
+  statement_ref: string;
   opening_balance: string;
   period_op_debit: string;
   period_op_credit: string;
-  unadjusted_dr: string;
-  unadjusted_cr: string;
-  aje_debit: string;
-  aje_credit: string;
-  adjusted_dr: string;
-  adjusted_cr: string;
+  unadjusted_debit: string;
+  unadjusted_credit: string;
+  adjustment_debit: string;
+  adjustment_credit: string;
+  adjusted_debit: string;
+  adjusted_credit: string;
   statement_destination: "INCOME_STATEMENT (P&L)" | "BALANCE_SHEET (B/S)";
 }
 
-export interface ETBTotals {
-  total_open_dr: string;
-  total_open_cr: string;
-  total_op_dr: string;
-  total_op_cr: string;
-  total_unadj_dr: string;
-  total_unadj_cr: string;
-  total_aje_dr: string;
-  total_aje_cr: string;
-  total_adjusted_dr: string;
-  total_adjusted_cr: string;
+export interface TrialBalanceSheetTotals {
+  total_opening_debit: string;
+  total_opening_credit: string;
+  total_period_debit: string;
+  total_period_credit: string;
+  total_unadjusted_debit: string;
+  total_unadjusted_credit: string;
+  total_adjustment_debit: string;
+  total_adjustment_credit: string;
+  total_adjusted_debit: string;
+  total_adjusted_credit: string;
 }
 
 export interface StatementLine {
-  wp_ref?: string;
+  statement_ref?: string;
   label: string;
   amount: string;
   margin_pct?: string;
@@ -46,14 +46,14 @@ export interface StatementLine {
 }
 
 export interface IncomeStatementWorkingPaper {
-  wp_schedule_code: string;
+  statement_code: string;
   period: string;
   currency: string;
   line_items: StatementLine[];
 }
 
 export interface BalanceSheetWorkingPaper {
-  wp_schedule_code: string;
+  statement_code: string;
   as_of_period: string;
   currency: string;
   current_assets: StatementLine[];
@@ -68,7 +68,7 @@ export interface BalanceSheetWorkingPaper {
 }
 
 export interface CashFlowStatementWorkingPaper {
-  wp_schedule_code: string;
+  statement_code: string;
   period: string;
   currency: string;
   indirect_method_operating: StatementLine[];
@@ -90,21 +90,21 @@ export interface LeadScheduleItem {
 }
 
 export interface LeadScheduleDetail {
-  wp_ref: string;
+  statement_ref: string;
   title: string;
   gl_balance: string;
   subledger_balance: string;
   variance: string;
   prepared_by: string;
   reviewed_by: string;
-  tickmark: string;
+  note: string;
   evidence_sha256: string;
   agent_reasoning: string;
   items: LeadScheduleItem[];
 }
 
-export interface StatutoryTaxWorkpaper {
-  wp_ref: string;
+export interface StatutoryTaxSchedule {
+  statement_ref: string;
   jurisdiction: JurisdictionCode;
   return_form_name: string;
   relief_applied: string;
@@ -119,7 +119,7 @@ export interface CloseChecklistItem {
   step: number;
   code: string;
   title: string;
-  wp_ref: string;
+  statement_ref: string;
   agent: string;
   status: "COMPLETED" | "WARNING" | "PENDING" | "BLOCKED";
 }
@@ -131,9 +131,9 @@ export interface OpcComplianceCheck {
 }
 
 export interface ReconciliationProofs {
-  etb_unadjusted_balanced: boolean;
-  etb_adjustments_balanced: boolean;
-  etb_adjusted_balanced: boolean;
+  trial_balance_balanced: boolean;
+  adjustments_balanced: boolean;
+  reported_balance_balanced: boolean;
   balance_sheet_equation_balanced: boolean;
   balance_sheet_variance: string;
   cash_flow_reconciles_to_bs_cash: boolean;
@@ -153,7 +153,7 @@ export interface KpiSummary {
   director_loan_status: "OVERDRAWN_ASSET" | "CREDIT_OWED_TO_FOUNDER";
 }
 
-export interface ThreeStatementWorkingPaperPack {
+export interface ReportingPack {
   entity_code: string;
   legal_name: string;
   entity_structure: EntityLegalStructure;
@@ -161,16 +161,16 @@ export interface ThreeStatementWorkingPaperPack {
   accounting_standard: string;
   currency: string;
   period: string;
-  pack_status: "READY_FOR_CPA" | "CPA_SIGNED_LOCKED";
-  etb_rows: ETBWorksheetRow[];
-  etb_totals: ETBTotals;
-  income_statement_wp: IncomeStatementWorkingPaper;
-  balance_sheet_wp: BalanceSheetWorkingPaper;
-  cash_flow_statement_wp: CashFlowStatementWorkingPaper;
-  lead_schedules: Record<string, LeadScheduleDetail>;
-  statutory_tax_workpaper: StatutoryTaxWorkpaper;
+  reporting_status: "READY" | "REVIEWED_AND_LOCKED";
+  trial_balance_rows: TrialBalanceSheetRow[];
+  trial_balance_totals: TrialBalanceSheetTotals;
+  income_statement: IncomeStatementWorkingPaper;
+  balance_sheet: BalanceSheetWorkingPaper;
+  cash_flow_statement: CashFlowStatementWorkingPaper;
+  detail_schedules: Record<string, LeadScheduleDetail>;
+  statutory_tax_schedule: StatutoryTaxSchedule;
   close_checklist: CloseChecklistItem[];
   opc_and_sme_compliance_checks: OpcComplianceCheck[];
-  reconciliation_proofs: ReconciliationProofs;
+  consistency_checks: ReconciliationProofs;
   kpi_summary: KpiSummary;
 }

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Button, Dialog } from "./ui/shadcn";
 import { useI18n } from "../i18n";
+import { fmtAmount, parseAmount, sanitizeAmountInput, toAmountInput } from "../lib/format";
 
 interface PersonalSplitModalProps {
   open: boolean;
@@ -27,13 +28,13 @@ export const PersonalSplitModal: React.FC<PersonalSplitModalProps> = ({
       ? "创办人居家光纤、手机话费与工作站开支"
       : "創辦人家用光纖、手機話費與工作站開支"
   );
-  const [grossAmount, setGrossAmount] = useState("2200.0000");
+  const [grossAmount, setGrossAmount] = useState(() => toAmountInput("2200.00"));
   const [businessPct, setBusinessPct] = useState(70);
   const [submitting, setSubmitting] = useState(false);
 
-  const gross = parseFloat(grossAmount) || 0;
-  const bizAmt = (gross * (businessPct / 100)).toFixed(2);
-  const persAmt = (gross - parseFloat(bizAmt)).toFixed(2);
+  const gross = parseAmount(grossAmount) ?? 0;
+  const bizAmt = gross * (businessPct / 100);
+  const persAmt = gross - bizAmt;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,7 +42,7 @@ export const PersonalSplitModal: React.FC<PersonalSplitModalProps> = ({
     try {
       await onSubmit({
         description,
-        grossAmount,
+        grossAmount: toAmountInput(grossAmount),
         businessPct,
       });
       onClose();
@@ -98,9 +99,13 @@ export const PersonalSplitModal: React.FC<PersonalSplitModalProps> = ({
             </label>
             <input
               type="text"
-              className="sh-input"
+              inputMode="decimal"
+              autoComplete="off"
+              className="sh-input tabular-nums"
               value={grossAmount}
-              onChange={(e) => setGrossAmount(e.target.value)}
+              onChange={(e) => setGrossAmount(sanitizeAmountInput(e.target.value))}
+              onBlur={() => setGrossAmount((current) => toAmountInput(current))}
+              placeholder="0.00"
               required
             />
           </div>
@@ -111,11 +116,13 @@ export const PersonalSplitModal: React.FC<PersonalSplitModalProps> = ({
             </label>
             <input
               type="range"
+              className="sh-range"
               min="0"
               max="100"
               step="5"
               value={businessPct}
               onChange={(e) => setBusinessPct(parseInt(e.target.value, 10))}
+              aria-label={ratioLabel}
               style={{ width: "100%", marginTop: "0.4rem" }}
             />
           </div>
@@ -129,19 +136,19 @@ export const PersonalSplitModal: React.FC<PersonalSplitModalProps> = ({
               <span>
                 {lang === "en" ? `Dr: Operating & Admin Expenses (${businessPct}%):` : lang === "zh-CN" ? `借：管理与营运费用 (业务抵扣 ${businessPct}%):` : `借：管理與營運費用 (業務扣抵 ${businessPct}%):`}
               </span>
-              <span className="tabular-nums" style={{ fontWeight: 600 }}>{currency} {bizAmt}</span>
+              <span className="tabular-nums" style={{ fontWeight: 600 }}>{currency} {fmtAmount(bizAmt)}</span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", color: "#b45309" }}>
               <span>
                 {lang === "en" ? `Dr: Shareholder Loan / Current Account (${100 - businessPct}%):` : lang === "zh-CN" ? `借：股东往来款项 (私人比例 ${100 - businessPct}%):` : `借：股東往來款項 (私人比例 ${100 - businessPct}%):`}
               </span>
-              <span className="tabular-nums" style={{ fontWeight: 600 }}>{currency} {persAmt}</span>
+              <span className="tabular-nums" style={{ fontWeight: 600 }}>{currency} {fmtAmount(persAmt)}</span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px dashed #d4d4d8", paddingTop: "0.25rem" }}>
               <span>
                 {lang === "en" ? "Cr: Cash & Bank (Total):" : lang === "zh-CN" ? "贷：银行存款 (支出总额):" : "貸：銀行存款 (支出總額):"}
               </span>
-              <span className="tabular-nums" style={{ fontWeight: 600 }}>{currency} {gross.toFixed(2)}</span>
+              <span className="tabular-nums" style={{ fontWeight: 600 }}>{currency} {fmtAmount(gross)}</span>
             </div>
           </div>
         </div>

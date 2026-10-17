@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { Badge, Button, Dialog } from "./ui/shadcn";
-import { useI18n, cleanLabel } from "../i18n";
+import { useI18n, pick } from "../i18n";
+import { fmtAmount } from "../lib/format";
+import { localizeLabel } from "../lib/labels";
 
 interface JournalReviewModalProps {
   open: boolean;
@@ -22,12 +24,6 @@ export const JournalReviewModal: React.FC<JournalReviewModalProps> = ({
   const [rejectionReason, setRejectionReason] = useState<string>("");
   const [loading, setLoading] = useState(false);
 
-  const fmt = (val: string | number) => {
-    const n = typeof val === "string" ? parseFloat(val) : val;
-    if (isNaN(n)) return val;
-    return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
-
   const handleApprove = async (journalId: string) => {
     setLoading(true);
     try {
@@ -39,7 +35,7 @@ export const JournalReviewModal: React.FC<JournalReviewModalProps> = ({
 
   const handleReject = async (journalId: string) => {
     if (!rejectionReason.trim()) {
-      alert(lang === "en" ? "Please enter a rejection reason." : "请填写驳回原因。");
+      alert(pick(lang, { en: "Please enter a rejection reason.", "zh-CN": "请填写驳回原因。", "zh-TW": "請填寫駁回原因。" }));
       return;
     }
     setLoading(true);
@@ -106,7 +102,7 @@ export const JournalReviewModal: React.FC<JournalReviewModalProps> = ({
                 </div>
 
                 <div style={{ fontSize: "0.85rem", color: "var(--foreground)" }}>
-                  {cleanLabel(j.ai_reasoning_summary || (lang === "en" ? "Routine operating entry proposal" : "日常营运分录提案"), lang)}
+                  {localizeLabel(j.ai_reasoning_summary || pick(lang, { en: "Routine operating entry proposal", "zh-CN": "日常营运分录提案", "zh-TW": "日常營運分錄提案" }), lang)}
                 </div>
 
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", color: "var(--muted-foreground)" }}>
@@ -114,7 +110,7 @@ export const JournalReviewModal: React.FC<JournalReviewModalProps> = ({
                     {preparerLabel}: <strong style={{ color: "var(--foreground)" }}>{j.created_by_principal_key}</strong>
                   </span>
                   <span className="tabular-nums" style={{ fontWeight: 700, color: "var(--foreground)" }}>
-                    {currency} {fmt(j.total_debit)}
+                    {currency} {fmtAmount(j.total_debit)}
                   </span>
                 </div>
 

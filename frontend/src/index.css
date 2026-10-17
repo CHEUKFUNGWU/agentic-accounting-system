@@ -464,6 +464,88 @@ body {
   border-bottom: 3px double var(--foreground);
 }
 
+/* Range slider — the native control is the only element that shipped with
+   browser-default chrome (blue thumb) instead of this design system. */
+.sh-range {
+  appearance: none;
+  -webkit-appearance: none;
+  height: 1.25rem;
+  background: transparent;
+  cursor: pointer;
+}
+
+.sh-range::-webkit-slider-runnable-track {
+  height: 4px;
+  background-color: var(--secondary);
+  border-radius: 9999px;
+}
+
+.sh-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  margin-top: -6px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background-color: var(--primary);
+  border: 2px solid #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+.sh-range:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.sh-range::-moz-range-track {
+  height: 4px;
+  background-color: var(--secondary);
+  border-radius: 9999px;
+}
+
+.sh-range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background-color: var(--primary);
+  border: 2px solid #ffffff;
+}
+
+/* ETB horizontal scroll: keep account code + name in view */
+.etb-col-sticky {
+  position: sticky;
+  background-color: var(--background);
+}
+
+.sh-table tbody tr:hover .etb-col-sticky {
+  background-color: #f6f6f7;
+}
+
+.sh-table tfoot tr .etb-col-sticky {
+  background-color: #f4f4f5;
+}
+
+.etb-col-code {
+  left: 0;
+  z-index: 5;
+}
+
+.etb-col-name {
+  left: 65px;
+  z-index: 5;
+  box-shadow: 1px 0 0 var(--border);
+}
+
+/* Only rendered by @media print. */
+.print-only {
+  display: none;
+}
+
+/* One statement at a time on screen; the print block below re-shows them all
+   so the printed pack contains the full set of statements. */
+.stmt-panel-hidden {
+  display: none;
+}
+
 @media (max-width: 768px) {
   .acc-shell {
     flex-direction: column;
@@ -496,6 +578,172 @@ body {
   }
   .acc-content {
     padding: 1rem 0.5rem;
+  }
+  /* Statement tables must scroll sideways, not wrap one character per line. */
+  .sh-table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .sh-table {
+    min-width: 560px;
+  }
+  .acc-topbar h1 {
+    font-size: 1rem !important;
+  }
+}
+
+/* ==========================================================================
+   Print — a working paper is the product's deliverable.
+
+   Without this the browser printed the sidebar, the language switcher and the
+   period selector on every page, and cut the 14-column ETB off the right edge.
+   ========================================================================== */
+
+@page {
+  size: A4 portrait;
+  margin: 14mm 12mm;
+}
+
+/* Wide grids get their own landscape page. */
+@page etb-landscape {
+  size: A4 landscape;
+  margin: 10mm;
+}
+
+@media print {
+  html,
+  body {
+    background: #ffffff !important;
+    font-size: 9.5pt;
+  }
+
+  /* Screen chrome never belongs on paper. */
+  .acc-sidebar,
+  .acc-topbar,
+  .no-print,
+  .sh-overlay,
+  .sh-dialog-overlay,
+  [role="dialog"] {
+    display: none !important;
+  }
+
+  /* Cross-references (W/P refs) are part of the evidence trail — print them
+     as plain text rather than hiding the interactive badge. */
+  .sh-badge-interactive {
+    display: inline-flex !important;
+    cursor: default !important;
+  }
+
+  .acc-shell,
+  .acc-main,
+  .acc-content {
+    display: block !important;
+    max-width: none !important;
+    width: auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #ffffff !important;
+  }
+
+  .sh-card {
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    break-inside: auto;
+  }
+
+  .print-landscape {
+    page: etb-landscape;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  .print-header {
+    border-bottom: 1.5pt solid #000;
+    padding-bottom: 6pt;
+    margin-bottom: 10pt;
+  }
+
+  .print-header-title {
+    font-size: 13pt;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  .print-header-meta {
+    font-size: 8.5pt;
+    color: #333;
+    margin-top: 2pt;
+  }
+
+  /* Every statement on its own page, and none of them clipped. */
+  .stmt-panel {
+    display: block !important;
+  }
+
+  .stmt-panel + .stmt-panel {
+    break-before: page;
+    page-break-before: always;
+  }
+
+  /* Repeat headers on continuation pages; never split a figure from its label. */
+  .sh-table thead {
+    display: table-header-group;
+  }
+
+  .sh-table tfoot {
+    display: table-footer-group;
+  }
+
+  .sh-table tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .sh-table-wrapper {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .sh-table {
+    font-size: 8.5pt !important;
+    min-width: 0 !important;
+  }
+
+  .sh-table th,
+  .sh-table td {
+    padding: 2.5pt 4pt !important;
+  }
+
+  .sh-table tr:hover td {
+    background-color: transparent !important;
+  }
+
+  /* Frozen columns are a screen affordance only. */
+  .etb-col-sticky {
+    position: static !important;
+    box-shadow: none !important;
+  }
+
+  .sh-badge {
+    border: 0.5pt solid #999 !important;
+    border-radius: 2pt !important;
+    background: transparent !important;
+    color: #000 !important;
+    padding: 0 !important;
+    font-size: 7.5pt !important;
+  }
+
+  .sh-btn {
+    border: 0.5pt solid #666 !important;
+    background: transparent !important;
+    color: #000 !important;
+  }
+
+  .acc-double-underline {
+    border-bottom: 2.5pt double #000 !important;
   }
 }
 

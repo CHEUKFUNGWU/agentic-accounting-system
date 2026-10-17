@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Dialog } from "./ui/shadcn";
-import { useI18n } from "../i18n";
+import { useI18n, pick } from "../i18n";
+import { fmtAmount } from "../lib/format";
 
 interface JournalEntryItem {
   journal_id: string;
@@ -45,12 +46,6 @@ export const JournalLedgerView: React.FC<JournalLedgerViewProps> = ({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [rejectModalJournalId, setRejectModalJournalId] = useState<string | null>(null);
   const [rejectionReasonInput, setRejectionReasonInput] = useState<string>("");
-
-  const fmt = (val: string | number) => {
-    const n = typeof val === "string" ? parseFloat(val) : val;
-    if (isNaN(n)) return val;
-    return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
 
   const filtered = journals.filter((j) => {
     if (filterStatus === "ALL") return true;
@@ -194,12 +189,12 @@ export const JournalLedgerView: React.FC<JournalLedgerViewProps> = ({
                             <div style={{ fontWeight: 500 }}>{j.ai_reasoning_summary || (lang === "en" ? "General Operating Journal Entry" : lang === "zh-CN" ? "日常运营会计分录" : "日常營運會計分錄")}</div>
                             {j.entry_hash && (
                               <div style={{ fontSize: "0.7rem", color: "var(--muted-foreground)", fontFamily: "monospace" }}>
-                                {lang === "en" ? "Hash: " : "指纹: "}{j.entry_hash.slice(0, 16)}...
+                                {pick(lang, { en: "Hash: ", "zh-CN": "指纹: ", "zh-TW": "指紋: " })}{j.entry_hash.slice(0, 16)}...
                               </div>
                             )}
                           </td>
                           <td className="tabular-nums" style={{ textAlign: "right", fontWeight: 600 }}>
-                            {fmt(j.total_debit)}
+                            {fmtAmount(j.total_debit)}
                           </td>
                           <td style={{ fontSize: "0.75rem", color: "var(--muted-foreground)" }}>
                             <div>{lang === "en" ? "Maker: " : lang === "zh-CN" ? "制单: " : "製單: "}<span style={{ color: "var(--foreground)" }}>{j.created_by_principal_key}</span></div>
@@ -246,7 +241,7 @@ export const JournalLedgerView: React.FC<JournalLedgerViewProps> = ({
                                   onClick={() => setExpandedId(isExpanded ? null : j.journal_id)}
                                   style={{ fontSize: "0.75rem", padding: "0.2rem 0.4rem" }}
                                 >
-                                  {isExpanded ? (lang === "en" ? "Collapse" : "收起") : (lang === "en" ? "Lines" : "明细")}
+                                  {isExpanded ? pick(lang, { en: "Collapse", "zh-CN": "收起", "zh-TW": "收起" }) : pick(lang, { en: "Lines", "zh-CN": "明细", "zh-TW": "明細" })}
                                 </Button>
                               )}
                             </div>
@@ -277,10 +272,10 @@ export const JournalLedgerView: React.FC<JournalLedgerViewProps> = ({
                                       <td style={{ fontWeight: 600 }}>{ln.account_code}</td>
                                       <td>{ln.memo || "-"}</td>
                                       <td className="tabular-nums" style={{ textAlign: "right" }}>
-                                        {parseFloat(ln.debit) > 0 ? fmt(ln.debit) : "-"}
+                                        {parseFloat(ln.debit) > 0 ? fmtAmount(ln.debit) : "-"}
                                       </td>
                                       <td className="tabular-nums" style={{ textAlign: "right" }}>
-                                        {parseFloat(ln.credit) > 0 ? fmt(ln.credit) : "-"}
+                                        {parseFloat(ln.credit) > 0 ? fmtAmount(ln.credit) : "-"}
                                       </td>
                                     </tr>
                                   ))}

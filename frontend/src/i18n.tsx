@@ -7,7 +7,7 @@ export interface Translations {
   nav_statements: string;
   nav_etb: string;
   nav_journals: string;
-  nav_workpapers: string;
+  nav_schedules: string;
   nav_close_tax: string;
   nav_database: string;
 
@@ -29,7 +29,7 @@ export interface Translations {
   pnl_title: string;
   bs_title: string;
   cfs_title: string;
-  wp_ref_col: string;
+  statement_ref_col: string;
   account_name_col: string;
   amount_col: string;
   ratio_col: string;
@@ -72,10 +72,21 @@ export interface Translations {
   row_cfs_net_change: string;
   row_cfs_open_cash: string;
   row_cfs_close_cash: string;
+  row_cfs_addback_dep: string;
+  row_cfs_chg_ar: string;
+  row_cfs_chg_prepay: string;
+  row_cfs_chg_ap: string;
+  row_cfs_chg_tax: string;
+  row_cfs_direct_in: string;
+  row_cfs_direct_out: string;
+  row_cfs_direct_tax: string;
+  row_cfs_capex: string;
+  row_cfs_fin_equity: string;
+  row_cfs_fin_loan: string;
 
-  // Trial Balance (ETB)
-  etb_title: string;
-  etb_subtitle: string;
+  // Trial balance
+  tb_detail_title: string;
+  tb_detail_subtitle: string;
   col_acc_code: string;
   col_acc_name: string;
   col_open_bal: string;
@@ -89,6 +100,8 @@ export interface Translations {
   total_label: string;
   balanced: string;
   imbalanced: string;
+  dest_balance_sheet: string;
+  dest_income_statement: string;
 
   // Journals & Ledger
   journal_title: string;
@@ -116,14 +129,14 @@ export interface Translations {
   cancel: string;
   no_journals: string;
 
-  // Audit Workpapers
+  // Schedules
   wp_title: string;
   wp_subtitle: string;
   wp_drawer_title: string;
   wp_variance: string;
   wp_status_tied: string;
   wp_status_not_performed: string;
-  wp_tickmark: string;
+  wp_note: string;
   wp_evidence_hash: string;
   wp_gl_balance: string;
   wp_subledger_balance: string;
@@ -137,6 +150,7 @@ export interface Translations {
   wp_col_notes: string;
   wp_notes_title: string;
   wp_variance_tied: string;
+  wp_not_performed: string;
 
   // Month-end close & Tax
   close_title: string;
@@ -164,7 +178,7 @@ const zhCN: Translations = {
   nav_statements: "财务报表",
   nav_etb: "扩展试算表",
   nav_journals: "日记账与凭证",
-  nav_workpapers: "审计底稿",
+  nav_schedules: "审计",
   nav_close_tax: "月末结账与税务",
   nav_database: "账套与数据库设置",
 
@@ -184,7 +198,7 @@ const zhCN: Translations = {
   pnl_title: "单体利润表",
   bs_title: "单体资产负债表",
   cfs_title: "单体现金流量表",
-  wp_ref_col: "底稿索引",
+  statement_ref_col: "索引",
   account_name_col: "报表项目",
   amount_col: "金额",
   ratio_col: "比率",
@@ -226,9 +240,20 @@ const zhCN: Translations = {
   row_cfs_net_change: "现金及现金等价物净增加额",
   row_cfs_open_cash: "加：期初现金余额",
   row_cfs_close_cash: "期末现金及现金等价物余额",
+  row_cfs_addback_dep: "加：折旧及摊销",
+  row_cfs_chg_ar: "应收账款变动",
+  row_cfs_chg_prepay: "预付款项及留抵税额变动",
+  row_cfs_chg_ap: "应付账款及应计费用变动",
+  row_cfs_chg_tax: "应交税费变动",
+  row_cfs_direct_in: "销售商品、提供劳务收到的现金",
+  row_cfs_direct_out: "购买商品、接受劳务及运营支付的现金",
+  row_cfs_direct_tax: "支付的各项税费",
+  row_cfs_capex: "购建固定资产支付的现金",
+  row_cfs_fin_equity: "吸收投资或分配股利",
+  row_cfs_fin_loan: "股东/业主往来资金变动",
 
-  etb_title: "扩展试算表",
-  etb_subtitle: "全科目发生额、月末调整分录与报表结转自动勾稽表",
+  tb_detail_title: "扩展试算表",
+  tb_detail_subtitle: "全科目发生额、月末调整分录与报表结转自动勾稽表",
   col_acc_code: "科目代码",
   col_acc_name: "科目名称",
   col_open_bal: "期初余额",
@@ -242,13 +267,15 @@ const zhCN: Translations = {
   total_label: "借贷合计",
   balanced: "借贷试算平衡",
   imbalanced: "借贷不平",
+  dest_balance_sheet: "资产负债表 (B/S)",
+  dest_income_statement: "利润表 (P&L)",
 
   journal_title: "日记账与凭证审核",
-  journal_subtitle: "会计凭证流水、公私费用分摊与制单覆核权责分离",
+  journal_subtitle: "会计凭证流水、公私费用分摊与制单复核权责分离",
   btn_split_expense: "记一笔公私费用分摊",
   btn_add_aje: "提列调整分录 (AJE)",
   filter_all: "全部凭证",
-  filter_pending: "待覆核",
+  filter_pending: "待复核",
   filter_posted: "已过账",
   filter_rejected: "已驳回",
   col_voucher_no: "凭证编号",
@@ -268,26 +295,27 @@ const zhCN: Translations = {
   cancel: "取消",
   no_journals: "暂无符合条件的日记账记录",
 
-  wp_title: "审计工作底稿索引",
-  wp_subtitle: "总账与明细账勾稽核对表（W/P A 至 W/P EQ）",
-  wp_drawer_title: "底稿核验详情",
+  wp_title: "审计工作索引",
+  wp_subtitle: "总账与明细账勾稽核对表",
+  wp_drawer_title: "核验详情",
   wp_variance: "勾稽差额",
   wp_status_tied: "账实相符",
   wp_status_not_performed: "待核对外部对账单",
-  wp_tickmark: "核算标记说明",
-  wp_evidence_hash: "原始底稿指纹",
+  wp_note: "核算标记说明",
+  wp_evidence_hash: "原始指纹",
   wp_gl_balance: "总账余额",
   wp_subledger_balance: "明细账余额",
   wp_prepared_by: "编制人",
-  wp_reviewed_by: "覆核人",
+  wp_reviewed_by: "复核人",
   wp_view_detail: "查看审计明细",
   wp_balanced_status: "勾稽相符 (0.00)",
   wp_items_title: "明细抽核清单",
   wp_col_desc: "项目说明",
   wp_col_amount: "金额",
   wp_col_notes: "备注 / 证明索引",
-  wp_notes_title: "审计底稿附注与核验说明",
+  wp_notes_title: "审计附注与核验说明",
   wp_variance_tied: "勾稽差额：0.00（账实相符）",
+  wp_not_performed: "未执行（未取得外部核对来源）",
 
   close_title: "月末结账与税务申报",
   close_subtitle: "期末检查清单、公私账分离审核与注册会计师签核封存",
@@ -313,7 +341,7 @@ const zhTW: Translations = {
   nav_statements: "財務報表",
   nav_etb: "擴展試算表",
   nav_journals: "日記賬與憑證",
-  nav_workpapers: "審計底稿",
+  nav_schedules: "審計",
   nav_close_tax: "月末結賬與稅務",
   nav_database: "賬套與資料庫設置",
 
@@ -333,7 +361,7 @@ const zhTW: Translations = {
   pnl_title: "單體損益表",
   bs_title: "單體資產負債表",
   cfs_title: "單體現金流量表",
-  wp_ref_col: "底稿索引",
+  statement_ref_col: "索引",
   account_name_col: "報表項目",
   amount_col: "金額",
   ratio_col: "比率",
@@ -375,9 +403,20 @@ const zhTW: Translations = {
   row_cfs_net_change: "現金及約當現金淨增加額",
   row_cfs_open_cash: "加：期初現金餘額",
   row_cfs_close_cash: "期末現金及約當現金餘額",
+  row_cfs_addback_dep: "加：折舊及攤銷",
+  row_cfs_chg_ar: "應收賬款變動",
+  row_cfs_chg_prepay: "預付款項及留抵稅額變動",
+  row_cfs_chg_ap: "應付賬款及應計費用變動",
+  row_cfs_chg_tax: "應交稅費變動",
+  row_cfs_direct_in: "銷售商品、提供勞務收到的現金",
+  row_cfs_direct_out: "購買商品、接受勞務及營運支付的現金",
+  row_cfs_direct_tax: "支付的各項稅費",
+  row_cfs_capex: "購建固定資產支付的現金",
+  row_cfs_fin_equity: "吸收投資或分配股利",
+  row_cfs_fin_loan: "股東/業主往來資金變動",
 
-  etb_title: "擴展試算表",
-  etb_subtitle: "全科目發生額、期末調整分錄與報表結轉自動勾稽表",
+  tb_detail_title: "擴展試算表",
+  tb_detail_subtitle: "全科目發生額、期末調整分錄與報表結轉自動勾稽表",
   col_acc_code: "科目代碼",
   col_acc_name: "科目名稱",
   col_open_bal: "期初餘額",
@@ -391,6 +430,8 @@ const zhTW: Translations = {
   total_label: "借貸合計",
   balanced: "借貸試算平衡",
   imbalanced: "借貸不平",
+  dest_balance_sheet: "資產負債表 (B/S)",
+  dest_income_statement: "損益表 (P&L)",
 
   journal_title: "日記賬與憑證審核",
   journal_subtitle: "會計憑證流水、公私費用分攤與製單覆核權責分離",
@@ -417,14 +458,14 @@ const zhTW: Translations = {
   cancel: "取消",
   no_journals: "無符合條件之日記賬記錄",
 
-  wp_title: "審計工作底稿索引",
-  wp_subtitle: "總賬與明細賬勾稽核對表（W/P A 至 W/P EQ）",
-  wp_drawer_title: "底稿核驗詳情",
+  wp_title: "審計工作索引",
+  wp_subtitle: "總賬與明細賬勾稽核對表",
+  wp_drawer_title: "核驗詳情",
   wp_variance: "勾稽差額",
   wp_status_tied: "賬實相符",
   wp_status_not_performed: "待核對外部對賬單",
-  wp_tickmark: "核算標記說明",
-  wp_evidence_hash: "原始底稿指紋",
+  wp_note: "核算標記說明",
+  wp_evidence_hash: "原始指紋",
   wp_gl_balance: "總賬餘額",
   wp_subledger_balance: "明細賬餘額",
   wp_prepared_by: "編制人",
@@ -435,8 +476,9 @@ const zhTW: Translations = {
   wp_col_desc: "項目說明",
   wp_col_amount: "金額",
   wp_col_notes: "備註 / 證明索引",
-  wp_notes_title: "審計底稿附註與核驗說明",
+  wp_notes_title: "審計附註與核驗說明",
   wp_variance_tied: "勾稽差額：0.00（賬實相符）",
+  wp_not_performed: "未執行（未取得外部核對來源）",
 
   close_title: "月末結賬與稅務申報",
   close_subtitle: "期末檢核清單、公私賬分離審核與會計師簽核封存",
@@ -460,9 +502,9 @@ const zhTW: Translations = {
 
 const en: Translations = {
   nav_statements: "Financial Statements",
-  nav_etb: "Trial Balance (ETB)",
+  nav_etb: "Trial balance",
   nav_journals: "Journals & Ledger",
-  nav_workpapers: "Audit Workpapers",
+  nav_schedules: "Schedules",
   nav_close_tax: "Month-End Close & Tax",
   nav_database: "Database & Settings",
 
@@ -482,7 +524,7 @@ const en: Translations = {
   pnl_title: "Income Statement",
   bs_title: "Balance Sheet",
   cfs_title: "Statement of Cash Flows",
-  wp_ref_col: "W/P Ref",
+  statement_ref_col: "Ref",
   account_name_col: "Financial Line Item",
   amount_col: "Amount",
   ratio_col: "%",
@@ -524,9 +566,20 @@ const en: Translations = {
   row_cfs_net_change: "Net Increase / (Decrease) in Cash",
   row_cfs_open_cash: "Cash Balance at Beginning of Period",
   row_cfs_close_cash: "Cash Balance at End of Period",
+  row_cfs_addback_dep: "Add back: Depreciation & Amortization",
+  row_cfs_chg_ar: "Increase / Decrease in Accounts Receivable",
+  row_cfs_chg_prepay: "Increase / Decrease in Prepayments & Input Tax",
+  row_cfs_chg_ap: "Increase / Decrease in Payables & Accruals",
+  row_cfs_chg_tax: "Increase / Decrease in Statutory Taxes Payable",
+  row_cfs_direct_in: "Cash Received from Customers",
+  row_cfs_direct_out: "Cash Paid to Suppliers & Employees",
+  row_cfs_direct_tax: "Cash Paid for Taxes & Levies",
+  row_cfs_capex: "Payments for Property, Plant & Equipment",
+  row_cfs_fin_equity: "Capital Contributions / Dividends",
+  row_cfs_fin_loan: "Net Director's Loan / Owner Drawings Movement",
 
-  etb_title: "Extended Trial Balance (ETB)",
-  etb_subtitle: "10-Column Multi-Book Trial Balance with Adjusting Journal Entries",
+  tb_detail_title: "Trial balance",
+  tb_detail_subtitle: "10-Column Multi-Book Trial Balance with Adjusting Journal Entries",
   col_acc_code: "Account Code",
   col_acc_name: "Account Name",
   col_open_bal: "Opening Balance",
@@ -540,6 +593,8 @@ const en: Translations = {
   total_label: "Total",
   balanced: "Balanced",
   imbalanced: "Out of Balance",
+  dest_balance_sheet: "Balance Sheet (B/S)",
+  dest_income_statement: "Income Statement (P&L)",
 
   journal_title: "General Ledger & Journals",
   journal_subtitle: "Audit Trail, Expense Apportionment & Maker-Checker Verification",
@@ -566,19 +621,19 @@ const en: Translations = {
   cancel: "Cancel",
   no_journals: "No journal entries found matching criteria",
 
-  wp_title: "Audit Working Papers Index",
-  wp_subtitle: "Subledger to GL Reconciliation & Lead Schedules (W/P A through EQ)",
-  wp_drawer_title: "Working Paper Verification Details",
+  wp_title: "Audit Statements Index",
+  wp_subtitle: "Subledger to GL Reconciliation",
+  wp_drawer_title: "Statement Verification Details",
   wp_variance: "Variance",
   wp_status_tied: "Reconciled to GL",
   wp_status_not_performed: "Pending External Bank Statement",
-  wp_tickmark: "Tickmark Explanation",
+  wp_note: "Tickmark Explanation",
   wp_evidence_hash: "Evidence Hash",
   wp_gl_balance: "GL Balance",
   wp_subledger_balance: "Subledger Balance",
   wp_prepared_by: "Prepared by",
   wp_reviewed_by: "Reviewed by",
-  wp_view_detail: "View Working Paper",
+  wp_view_detail: "View Statement",
   wp_balanced_status: "Balanced (0.00)",
   wp_items_title: "Sub-schedule Line Items",
   wp_col_desc: "Item Description",
@@ -586,6 +641,7 @@ const en: Translations = {
   wp_col_notes: "Notes / Audit Ref",
   wp_notes_title: "Audit Notes & Methodology",
   wp_variance_tied: "Variance: 0.00 (Tied to GL)",
+  wp_not_performed: "Not performed (no external source)",
 
   close_title: "Month-End Close & Tax Filing",
   close_subtitle: "Pre-Close Checklist, Statutory Schedules & CPA Pack Sign-Off",
@@ -607,7 +663,7 @@ const en: Translations = {
   backup_snapshot_desc: "Creates a verified atomic snapshot of the accounting database for compliance and archiving.",
 };
 
-const dictionaries: Record<Language, Translations> = {
+export const DICTIONARIES: Record<Language, Translations> = {
   "zh-CN": zhCN,
   "zh-TW": zhTW,
   en: en,
@@ -628,7 +684,7 @@ const I18nContext = createContext<I18nContextType>({
 export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [lang, setLangState] = useState<Language>(() => {
     const saved = localStorage.getItem("agentic_acc_lang") as Language;
-    return saved && ["zh-CN", "zh-TW", "en"].includes(saved) ? saved : "zh-CN";
+    return saved && ["zh-CN", "zh-TW", "en"].includes(saved) ? saved : "zh-TW";
   });
 
   const setLang = (newLang: Language) => {
@@ -641,13 +697,24 @@ export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [lang]);
 
   return (
-    <I18nContext.Provider value={{ lang, setLang, t: dictionaries[lang] }}>
+    <I18nContext.Provider value={{ lang, setLang, t: DICTIONARIES[lang] }}>
       {children}
     </I18nContext.Provider>
   );
 };
 
 export const useI18n = (): I18nContextType => useContext(I18nContext);
+
+/**
+ * Three-way copy picker for micro-copy that lives next to the markup.
+ *
+ * The previous pattern was `lang === "en" ? "english" : "中文"`, which made
+ * 繁體 silently fall back to Simplified text. Every language key is required,
+ * so a missing translation is a compile error instead of a silent fallback.
+ */
+export function pick<T>(lang: Language, values: Record<Language, T>): T {
+  return values[lang] ?? values["zh-CN"];
+}
 
 export const LanguageSwitcher: React.FC = () => {
   const { lang, setLang } = useI18n();
@@ -709,57 +776,4 @@ export const LanguageSwitcher: React.FC = () => {
   );
 };
 
-export function cleanLabel(rawLabel: string, lang: Language): string {
-  if (!rawLabel) return "";
-
-  // Check if string contains English (Chinese) pattern
-  const match = rawLabel.match(/^(.*?)\s*\(([\u4e00-\u9fa5\w\s/、，·-]+)\)$/);
-  if (!match) {
-    // If not matching pattern, still ensure correct 账 vs 賬
-    if (lang === "zh-CN") return rawLabel.replace(/帳/g, "账");
-    if (lang === "zh-TW") return rawLabel.replace(/帳/g, "賬");
-    return rawLabel;
-  }
-
-  const enPart = match[1].trim();
-  const zhPart = match[2].trim();
-
-  if (lang === "en") {
-    return enPart;
-  }
-
-  if (lang === "zh-CN") {
-    return zhPart
-      .replace(/帳/g, "账")
-      .replace(/淨利/g, "净利润")
-      .replace(/主營業務/g, "主营业务")
-      .replace(/營業成本/g, "营业成本")
-      .replace(/管理及營運費用/g, "管理及营运费用")
-      .replace(/折舊及攤銷/g, "折旧及摊销")
-      .replace(/稅前/g, "税前")
-      .replace(/稅息/g, "息税")
-      .replace(/所得稅費用提列/g, "所得税费用")
-      .replace(/本期淨利/g, "本期净利润")
-      .replace(/貨幣資金/g, "货币资金")
-      .replace(/銀行存款/g, "银行存款")
-      .replace(/應收/g, "应收")
-      .replace(/預付/g, "预付款项")
-      .replace(/應付/g, "应付")
-      .replace(/應計費用/g, "应计费用")
-      .replace(/應交稅費/g, "应交税费")
-      .replace(/固定資產原值/g, "固定资产原值")
-      .replace(/累計折舊/g, "累计折旧")
-      .replace(/固定資產淨值/g, "固定资产净值")
-      .replace(/實收資本/g, "实收资本")
-      .replace(/保留盈餘/g, "未分配利润")
-      .replace(/銷售商品/g, "销售商品")
-      .replace(/購買商品/g, "购买商品")
-      .replace(/支付的各項稅費/g, "支付的各项税费")
-      .replace(/購建固定資產/g, "购建固定资产")
-      .replace(/業主/g, "股东/业主")
-      .replace(/往來款/g, "往来款");
-  }
-
-  // zh-TW: Traditional Chinese with 貝字旁 賬
-  return zhPart.replace(/帳/g, "賬");
-}
+/* Label localisation lives in src/lib/labels.ts — `localizeLabel()`. */

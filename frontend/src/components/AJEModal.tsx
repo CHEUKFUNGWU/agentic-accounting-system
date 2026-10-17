@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { Button, Dialog } from "./ui/shadcn";
 import { useI18n } from "../i18n";
+import { sanitizeAmountInput, toAmountInput } from "../lib/format";
+import { SCHEDULE_REFS, statementRefLabel } from "../lib/labels";
 
 interface AJEModalProps {
   open: boolean;
@@ -11,7 +13,7 @@ interface AJEModalProps {
     creditAccountCode: string;
     amount: string;
     memo: string;
-    wpRef: string;
+    statementRef: string;
   }) => Promise<void>;
 }
 
@@ -35,7 +37,7 @@ export const AJEModal: React.FC<AJEModalProps> = ({
   const { lang, t } = useI18n();
   const [debitCode, setDebitCode] = useState("6100");
   const [creditCode, setCreditCode] = useState("2110");
-  const [amount, setAmount] = useState("1800.0000");
+  const [amount, setAmount] = useState(() => toAmountInput("1800.00"));
   const [memo, setMemo] = useState(
     lang === "en"
       ? "Accrual of month-end audit and legal consultancy expenses"
@@ -43,7 +45,7 @@ export const AJEModal: React.FC<AJEModalProps> = ({
       ? "月底外部审计及顾问费用提列"
       : "月底外部審計及顧問費用提列"
   );
-  const [wpRef, setWpRef] = useState("W/P AA");
+  const [statementRef, setWpRef] = useState("AA");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -77,9 +79,9 @@ export const AJEModal: React.FC<AJEModalProps> = ({
       await onSubmit({
         debitAccountCode: debitCode,
         creditAccountCode: creditCode,
-        amount,
+        amount: toAmountInput(amount),
         memo,
-        wpRef,
+        statementRef,
       });
       onClose();
     } catch (err: any) {
@@ -98,7 +100,7 @@ export const AJEModal: React.FC<AJEModalProps> = ({
 
   const modalTitle = lang === "en" ? "Post Adjusting Entry (AJE)" : lang === "zh-CN" ? "提列期末调整分录" : "提列期末調整分錄";
   const modalDesc = lang === "en"
-    ? "Post adjustment to ETB column and update financial statements"
+    ? "Post the adjustment and update the financial statements"
     : lang === "zh-CN"
     ? "计入试算表期末调整栏 (AJE)，实时联动财务报表"
     : "計入試算表期末調整欄 (AJE)，實時聯動財務報表";
@@ -181,26 +183,33 @@ export const AJEModal: React.FC<AJEModalProps> = ({
             </label>
             <input
               type="text"
-              className="sh-input"
+              inputMode="decimal"
+              autoComplete="off"
+              className="sh-input tabular-nums"
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="0.0000"
+              onChange={(e) => setAmount(sanitizeAmountInput(e.target.value))}
+              onBlur={() => setAmount((current) => toAmountInput(current))}
+              placeholder="0.00"
               required
             />
           </div>
 
           <div>
             <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 500, marginBottom: "0.25rem" }}>
-              {lang === "en" ? "Lead Schedule (W/P Ref):" : lang === "zh-CN" ? "关联底稿索引 (W/P Ref):" : "關聯底稿索引 (W/P Ref):"}
+              {lang === "en" ? "Schedule (Ref):" : lang === "zh-CN" ? "关联索引 (Ref):" : "關聯索引 (Ref):"}
             </label>
-            <input
-              type="text"
-              className="sh-input"
-              value={wpRef}
+            <select
+              className="sh-select"
+              value={statementRef}
               onChange={(e) => setWpRef(e.target.value)}
-              placeholder="W/P AA"
               required
-            />
+            >
+              {SCHEDULE_REFS.map((ref) => (
+                <option key={ref} value={ref}>
+                  {ref} — {statementRefLabel(ref, lang)}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 
