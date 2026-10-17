@@ -55,3 +55,8 @@ data/
 # Tooling caches
 .impeccable/
 frontend/.impeccable/
+
+# Microsoft Office temporary lock files
+~$*.docx
+~$*.xlsx
+~$*.pptx

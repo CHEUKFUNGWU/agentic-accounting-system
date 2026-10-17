@@ -1,10 +1,36 @@
-# Agentic Accounting System for SMEs, OPCs & Sole Proprietors (Standalone 3-Statement Working Papers + Stateless MCP)
+# Agentic Accounting System product workspace
+
+This repository manages product knowledge, requirements, versions, acceptance, and retrospectives alongside the application source code.
+
+## Current workspace stage
+
+- The English product workflow, directory structure, and collaboration rules are established.
+- No formal requirements or version commitments have been registered in this workspace.
+- Existing application documentation is retained below. Its claims are not automatically approved product baselines or release evidence.
+
+## Workspace entry points
+
+| Task | Entry point |
+| --- | --- |
+| Read collaboration rules and workflow | [AGENTS.md](AGENTS.md), [Rules](00-rules/README.md) |
+| Register discussions, documents, and other inputs | [Raw inputs](01-inputs/README.md) |
+| Find product background and terminology | [Product knowledge](02-product/README.md) |
+| Explore the problem space, module map, and decisions | [Planning](03-planning/README.md) |
+| View or register candidate requirements | [Requirement pool](04-requirement-pool/README.md) |
+| Define and advance an individual requirement | [Requirement work packages](05-requirements/README.md) |
+| Plan and track a version | [Versions](06-versions/README.md) |
+| Record reviews, acceptance, and retrospectives | [Reviews](07-reviews/README.md) |
+| Find shared assets | [Assets](90-assets/README.md) |
+| Find closed or superseded materials | [Archive](99-archive/README.md) |
+| Read backend setup instructions | [Backend README](backend/README.md) |
+
+## Application overview
 
 An enterprise-grade **Agentic Accounting System** tailored for **SMEs (中小企)**, **OPCs (One-Person Companies / 一人有限公司 / Single-Director Pty Ltd / Single-Member LLC)**, and **Sole Proprietors (個體工商戶 / 獨資東主 / Sole Traders)** across **China, Hong Kong, Singapore, Australia, North America, and Europe**.
 
 Instead of heavyweight group consolidation, this architecture focuses deeply on **Standalone Entity Bookkeeping**, **Mixed Personal/Business Expense Apportionment (`公私混用拆分`)**, **Owner/Director Loan Compliance (`股東/董事往來內控`)**, and automated generation of **CPA-grade Standalone Three Financial Statement Working Papers (`單體三大報表底稿：延伸試算表 ETB + 明細底稿 W/P A~EQ + 損益表 + 資產負債表 + 現金流量表`)** via **Stateless Streamable HTTP MCP** and a **Hybrid Event-Driven Orchestrator**.
 
-## Core Highlights
+### Core Highlights
 
 1. **Automated Standalone Three Financial Statement Working Paper Engine (`三大報表底稿引擎`)**:
    - **Extended Trial Balance (`ETB 延伸試算表總底稿`)**: Tracks `Opening Balance` $\rightarrow$ `Period Operational DR/CR` $\rightarrow$ `Unadjusted Trial Balance` $\rightarrow$ `Month-End Adjusting Entries (AJE)` $\rightarrow$ `Adjusted Trial Balance (ATB)` $\rightarrow$ deterministic split into `Income Statement (P&L)` and `Balance Sheet (B/S)` columns with Working Paper references (`W/P Ref`).
@@ -34,7 +60,7 @@ Instead of heavyweight group consolidation, this architecture focuses deeply on 
 3. **Stateless Streamable HTTP MCP + Event-Driven Agent Orchestrator**:
    - Built on [`modelcontextprotocol/python-sdk`](https://github.com/modelcontextprotocol/python-sdk) (`stateless_http=True`) following the [MCP Streamable HTTP Specification (2026-07-28)](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports), paired with a PostgreSQL `LISTEN/NOTIFY` Transactional Outbox Orchestrator.
 
-## Repository Structure
+### Application repository structure
 
 ```text
 agentic-accounting-system/
