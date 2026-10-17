@@ -24,6 +24,7 @@ import { AccountsPayableModule } from './components/AccountsPayableModule';
 import { FixedAssetsModule } from './components/FixedAssetsModule';
 import { PeriodCloseModule } from './components/PeriodCloseModule';
 import { FONT_SIZE_ROOT_PX, getTranslations } from './utils/preferences';
+import type { Principal } from './auth';
 import type { AppPreferences } from './utils/preferences';
 import { LayoutGrid, BookOpen, Layers, Receipt, CreditCard, HardDrive, Columns3, FileSpreadsheet, Target, TrendingUp, ArrowLeftRight, Scale, Lock, ShieldCheck, Settings, Plus } from 'lucide-react';
 
@@ -44,7 +45,7 @@ export type ActiveModule =
   | 'audit-log'
   | 'settings';
 
-export default function App() {
+export default function App({ principal, onSignOut }: { principal: Principal; onSignOut: () => Promise<void> }) {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const workspaceRef = useRef<Workspace | null>(null);
   const queue = useRef<Promise<unknown>>(Promise.resolve());
@@ -69,6 +70,11 @@ export default function App() {
   }, []);
 
   const command = (action: string, payload: object = {}) => {
+    if (!principal.commands.includes(action)) {
+      const message = action.startsWith('period.') ? 'Period signing and reopening require MFA, which is not yet available.' : 'Your position is not authorized to perform this action.';
+      setError(message);
+      return Promise.reject(new Error(message));
+    }
     setPending(n => n + 1);
     const epoch = queueEpoch.current;
     const job = queue.current.then(async () => {
@@ -211,13 +217,16 @@ export default function App() {
         </div>
 
         <div className="p-4 border-t border-zinc-200">
+          <p className="mb-1 truncate text-xs font-semibold">{principal.displayName}</p>
+          <p className="mb-3 text-[10px] text-zinc-500">{principal.positionTitle}</p>
+          <button className="mb-3 text-xs text-zinc-500 underline" onClick={() => { void onSignOut().catch(reason => setError(reason.message)); }}>Sign out</button>
           <button
             type="button"
             onClick={() => setActiveTab('journal')}
             className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-zinc-950 hover:bg-zinc-800 transition-colors whitespace-nowrap cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>{t.nav.newEntry}</span>
+            <span>{principal.commands.includes("journal.create") ? t.nav.newEntry : "View journals"}</span>
           </button>
         </div>
       </aside>
@@ -263,6 +272,7 @@ export default function App() {
       {/* Main Content Viewport */}
       <main className="flex-1 md:pl-56 min-w-0">
         <div className="max-w-[1320px] w-full mx-auto px-4 sm:px-8 py-8">
+          <div className="mb-4 flex items-center justify-between gap-4 text-xs text-zinc-500 md:hidden"><span>{principal.displayName} · {principal.positionTitle}</span><button className="underline" onClick={() => { void onSignOut().catch(reason => setError(reason.message)); }}>Sign out</button></div>
           {error && <div role="alert" className="mb-4 flex items-center justify-between gap-4 border border-zinc-300 bg-white p-4 text-sm"><span>{error}</span><button onClick={() => setError('')} aria-label="Dismiss error">Dismiss</button></div>}
           {pending > 0 && <p role="status" className="mb-2 text-xs text-zinc-500">Saving to company file…</p>}
           <p className="mb-3 text-[11px] text-zinc-500">{workspace.entityName} · {workspace.currency} · {workspace.period} · {workspace.dataOrigin}</p>
@@ -305,6 +315,8 @@ export default function App() {
           {activeTab === 'journal' && (
             <JournalEntryModule
               entries={journalEntries}
+              canCreate={principal.commands.includes("journal.create")}
+              canReview={principal.isHuman && principal.commands.includes("journal.review")}
               onAddEntry={handleAddJournalEntry}
               onReviewEntry={(id) => act('journal.review', { id })}
               globalSearchQuery={globalSearchQuery}
@@ -382,14 +394,15 @@ export default function App() {
           )}
 
           {activeTab === 'period-close' && (
-            <PeriodCloseModule
+            <div><p className="mb-4 border border-zinc-200 bg-white p-3 text-xs text-zinc-600">Period signing and reopening are unavailable until MFA enrollment is implemented.</p><PeriodCloseModule
               checklist={closeChecklist}
               schedules={amortizationSchedules}
               isPeriodLocked={isPeriodLocked}
               onToggleChecklistTask={handleToggleChecklistTask}
               onPostAmortizationSchedule={handlePostAmortizationSchedule}
               onTogglePeriodLock={handleTogglePeriodLock}
-            />
+              canTogglePeriodLock={false}
+            /></div>
           )}
 
           {activeTab === 'audit-log' && (

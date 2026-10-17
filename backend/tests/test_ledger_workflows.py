@@ -2,6 +2,7 @@
 
 import pytest
 from sqlalchemy import select
+from conftest import agent_as, login_as
 
 from app.core.db import DatabaseManager, EntityModel, TrialBalanceAccountModel
 from app.core.ledger import get_lines
@@ -52,6 +53,7 @@ async def test_legacy_company_file_preserves_balances_and_lock(tmp_path):
 
 @pytest.mark.asyncio
 async def test_document_to_voucher_requires_review_and_posts_once(client):
+    await agent_as(client, "ap-clerk-01")
     response = await client.post(
         "/api/v1/documents",
         data={"entity_code": "HK-SME-01", "doc_type": "RECEIPT", "doc_date": "2026-10-17",
@@ -60,27 +62,30 @@ async def test_document_to_voucher_requires_review_and_posts_once(client):
     )
     assert response.status_code == 200, response.text
     document = response.json()["document"]
+    await login_as(client, "test-finance-human")
     downloaded = await client.get(f"/api/v1/documents/{document['document_id']}/file")
     assert downloaded.content == b"Synthetic invoice for workflow test"
 
+    await agent_as(client, "ap-clerk-01")
     converted = await client.post(
         f"/api/v1/documents/{document['document_id']}/to-voucher",
-        json={"principal_key": "ap-clerk-01", "debit_account_code": "6100", "credit_account_code": "5100"},
+        json={"debit_account_code": "6100", "credit_account_code": "5100"},
     )
     assert converted.status_code == 200, converted.text
     journal_id = converted.json()["journal_id"]
     assert (await repo.get_journal(journal_id))["status"] == "DRAFT"
     assert not any(line["journal_id"] == journal_id for line in await get_lines("HK-SME-01"))
 
-    submitted = await client.post(f"/api/v1/vouchers/{journal_id}/submit", json={"principal_key": "ap-clerk-01"})
+    submitted = await client.post(f"/api/v1/vouchers/{journal_id}/submit", json={})
     assert submitted.status_code == 200, submitted.text
-    self_review = await client.post(f"/api/v1/vouchers/{journal_id}/approve", json={"principal_key": "ap-clerk-01"})
-    assert self_review.status_code == 400
-    approved = await client.post(f"/api/v1/vouchers/{journal_id}/approve", json={"principal_key": "cpa-griffin"})
+    self_review = await client.post(f"/api/v1/vouchers/{journal_id}/approve", json={})
+    assert self_review.status_code == 403
+    await login_as(client, "test-cpa-human")
+    approved = await client.post(f"/api/v1/vouchers/{journal_id}/approve", json={})
     assert approved.status_code == 200, approved.text
     assert approved.json()["entry_status"] == "POSTED"
     lines = [line for line in await get_lines("HK-SME-01") if line["journal_id"] == journal_id]
     assert len(lines) == 2
-    repeated = await client.post(f"/api/v1/vouchers/{journal_id}/approve", json={"principal_key": "cpa-griffin"})
+    repeated = await client.post(f"/api/v1/vouchers/{journal_id}/approve", json={})
     assert repeated.status_code == 400
     assert [line for line in await get_lines("HK-SME-01") if line["journal_id"] == journal_id] == lines

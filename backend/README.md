@@ -18,8 +18,11 @@ Run from `backend/`:
 
 ```bash
 uv sync --extra dev
-uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+uv run python -m app.auth_cli create-user your-finance-login --position FINANCE_MANAGER
+AAS_COOKIE_SECURE=false uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
+
+The provisioning command securely prompts for a password. Sign in with that principal key at the default frontend. For the complete reviewer/admin setup, see [authentication setup](../docs/auth-implementation.md). `AAS_COOKIE_SECURE=false` is only for local HTTP development.
 
 The default company file uses SQLite. Set `AGENTIC_ACCOUNTING_DATA_DIR` to choose a local data directory. `DATABASE_URL` selects an explicit database connection instead.
 
@@ -39,7 +42,7 @@ Tests use temporary company files. They cover report balancing, maker/checker se
 
 ## Development limits
 
-- MCP currently accepts fixed demonstration credentials, exposed by the local surface inventory. REST endpoints do not yet authenticate the caller and still accept principal identifiers in request bodies. This build is for trusted local development. The proposed authentication work is recorded in [AUTH.md](../docs/AUTH.md).
+- REST and MCP now require database-backed credentials. Human login, local provisioning, and the remaining MFA/governance work are documented in [authentication setup](../docs/auth-implementation.md). Existing fixed demonstration tokens are invalid. Provision a human account before opening the default frontend. Period signing/closing remains blocked pending MFA.
 - Document conversion creates manual draft vouchers. Control-account lines can be refused by the submission guard; a complete invoice-to-payables subledger workflow is not implemented by that conversion endpoint.
 - SQLite startup handles the legacy table and column names. Upgrading an existing PostgreSQL schema requires a separate migration; `create_all` does not upgrade existing tables.
 - Automated checks do not establish statutory compliance or production readiness. Native desktop packaging, production deployment, concurrent posting, and a full browser acceptance pass are outside the checks performed for this commit preparation.

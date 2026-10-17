@@ -1,5 +1,6 @@
 import pytest
 from httpx import AsyncClient
+from conftest import agent_as, login_as
 
 @pytest.mark.asyncio
 async def test_system_overview_endpoint(client: AsyncClient):
@@ -21,6 +22,7 @@ async def test_desktop_company_file_and_backup_endpoints(client: AsyncClient):
     assert info["exists"] is True
 
     # 2. Company file backup snapshot
+    await login_as(client, "test-admin-human")
     backup_resp = await client.post("/api/v1/desktop/backup")
     assert backup_resp.status_code == 200
     backup_data = backup_resp.json()
@@ -47,6 +49,7 @@ async def test_reporting_and_aje_endpoints(client: AsyncClient):
         "memo": "Endpoint test accrued review fees",
         "statement_ref": "AP",
     }
+    await agent_as(client, "ap-clerk-01")
     aje_resp = await client.post("/api/v1/reporting/aje", json=aje_payload)
     assert aje_resp.status_code == 200
     res_data = aje_resp.json()
@@ -71,12 +74,14 @@ async def test_personal_split_and_review_workflow_endpoints(client: AsyncClient)
         "business_use_pct": "0.70",
         "evidence_uri": "s3://evidence/wh-test.pdf",
     }
+    await agent_as(client, "bookkeeper-maker-01")
     wh_resp = await client.post("/api/v1/webhooks/personal-expense-split", json=split_payload)
     assert wh_resp.status_code == 200
     wh_data = wh_resp.json()
     journal_id = wh_data["maker_result"]["split_entry"]["journal_id"]
 
     # 2. Fetch pending journals
+    await agent_as(client, "controller-checker-01")
     pending_resp = await client.get("/api/v1/journals/pending?entity_code=AU-OPC-01")
     assert pending_resp.status_code == 200
     pending_list = pending_resp.json()["journals"]
@@ -84,7 +89,6 @@ async def test_personal_split_and_review_workflow_endpoints(client: AsyncClient)
 
     # 3. Review and approve journal via endpoint
     review_payload = {
-        "reviewer_principal_key": "controller-checker-01",
         "action": "APPROVE",
     }
     review_resp = await client.post(f"/api/v1/journals/{journal_id}/review", json=review_payload)

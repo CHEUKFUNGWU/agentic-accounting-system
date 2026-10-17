@@ -83,6 +83,7 @@ class PositionSession:
     position: Position
     principal_key: str
     principal_id: str
+    credential_id: str = ""
 
     @property
     def label(self) -> str:
@@ -101,40 +102,14 @@ def current_session() -> PositionSession:
     return session
 
 
-# Development token roster. Production must issue per-bot credentials whose
-# scope set equals the position; the verification step replaces this dict.
-DEV_TOKENS: Dict[str, str] = {
-    "tok-cashier-01": "cashier-01",
-    "tok-ar-01": "ar-clerk-01",
-    "tok-ap-01": "ap-clerk-01",
-    "tok-fa-01": "fa-clerk-01",
-    "tok-tax-01": "tax-clerk-01",
-    "tok-gl-01": "gl-chief-01",
-    "tok-fm-01": "finance-manager-01",
-    "tok-cpa-01": "cpa-griffin",
-    "tok-founder-01": "founder-director-01",
-    "tok-audit-01": "auditor-readonly-01",
-}
-
-
-def resolve_token(token: str) -> Optional[PositionSession]:
-    principal_key = DEV_TOKENS.get(token)
-    if not principal_key:
-        return None
-    position = position_for_principal(principal_key)
-    if not position:
-        return None
-    from app.mcp_server import PRINCIPALS  # lazy: avoids an import cycle
-
-    principal = PRINCIPALS.get(principal_key)
+async def resolve_token(token: str) -> Optional[PositionSession]:
+    from app.core.auth import resolve_api_key
+    principal = await resolve_api_key(token)
     if not principal:
         return None
-    return PositionSession(
-        token=token,
-        position=position,
-        principal_key=principal_key,
-        principal_id=str(principal.principal_id),
-    )
+    return PositionSession(token="", position=principal.position,
+        principal_key=principal.principal_key, principal_id=principal.principal_id,
+        credential_id=principal.credential_id)
 
 
 # ---------------------------------------------------------------------------
@@ -228,7 +203,7 @@ class RequirePosition:
         headers = {k.decode().lower(): v.decode() for k, v in scope.get("headers", [])}
         raw = headers.get("authorization", "")
         token = raw[7:].strip() if raw.lower().startswith("bearer ") else ""
-        session = resolve_token(token)
+        session = await resolve_token(token)
 
         if not session:
             return await self._deny(
@@ -270,6 +245,7 @@ class RequirePosition:
 
             documents: List[str] = []
             redacted = _redact(args, documents)
+            redacted["_authenticated_credential_id"] = session.credential_id
 
             outcome, error_code, error_message, journal_id = "OK", None, None, args.get("journal_id")
             body = b"".join(capture_out.chunks)
@@ -1264,7 +1240,7 @@ def role_path(position: Position) -> str:
     return f"/mcp/{position.position_id.lower().replace('_', '-')}"
 
 
-ROLE_SERVERS: Dict[str, FastMCP] = {pid: build_role_server(pos) for pid, pos in POSITIONS.items()}
+ROLE_SERVERS: Dict[str, FastMCP] = {pid: build_role_server(pos) for pid, pos in POSITIONS.items() if pid != "ADMIN"}
 
 
 def mount_role_servers(app) -> Dict[str, str]:
@@ -1289,7 +1265,6 @@ async def describe_surfaces() -> List[Dict[str, Any]]:
                 "title": position.title_zh,
                 "title_en": position.title_en,
                 "principal_key": position.principal_key,
-                "dev_token": next((t for t, k in DEV_TOKENS.items() if k == position.principal_key), None),
                 "url": role_path(position) + "/",
                 "tool_count": len(tools),
                 "tools": tools,

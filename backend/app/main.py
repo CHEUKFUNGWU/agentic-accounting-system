@@ -15,11 +15,13 @@ import logging
 from contextlib import AsyncExitStack, asynccontextmanager
 from typing import Any, AsyncGenerator, Dict
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from app.api_auth import router as auth_router
+from app.core.auth import AuthPrincipal, get_current_principal, enforce_api_access, allowed_origins, seed_principals
 from app.api_monolith import router as monolith_router
 from app.api_documents import router as document_router
 from app.api_vouchers import router as voucher_router
@@ -46,6 +48,7 @@ logger = logging.getLogger("agentic_accounting.api")
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await repo.init_seed_data_if_needed()
     await sync_state_from_db()
+    await seed_principals()
 
     # Build the general-ledger core for every entity: chart of accounts, fiscal
     # periods, tax codes, and the migration vouchers that carry the old seeded
@@ -83,11 +86,12 @@ app = FastAPI(
         "Statutory Tax Schedule & Close Checklist) with Stateless Streamable HTTP MCP Gateway."
     ),
     lifespan=lifespan,
+    dependencies=[Depends(enforce_api_access)],
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -102,6 +106,7 @@ MCP_ROLE_SURFACES: Dict[str, str] = mount_role_servers(app)
 
 # Recording path (vouchers, attachments, general ledger) lives in its own module
 # so the shipping reporting endpoints stay untouched.
+app.include_router(auth_router)
 app.include_router(voucher_router)
 app.include_router(document_router)
 app.include_router(monolith_router)
@@ -178,12 +183,12 @@ class AdjustingEntryRequest(BaseModel):
 
 
 class LockScheduleRequest(BaseModel):
-    cpa_principal_key: str = Field(default="cpa-griffin")
+    model_config = {"extra": "forbid"}
     period: str = Field(default="2026-10")
 
 
 class JournalReviewRequest(BaseModel):
-    reviewer_principal_key: str = Field(default="controller-checker-01")
+    model_config = {"extra": "forbid"}
     action: str = Field(default="APPROVE", examples=["APPROVE", "REJECT"])
     rejection_reason: str = Field(default="")
 
@@ -218,9 +223,9 @@ async def get_three_statement_reporting_pack(entity_code: str, period: str = "20
 
 
 @app.post("/api/v1/webhooks/personal-expense-split")
-async def ingest_mixed_expense(body: PersonalExpenseSplitWebhook) -> Dict[str, Any]:
+async def ingest_mixed_expense(body: PersonalExpenseSplitWebhook, principal: AuthPrincipal = Depends(get_current_principal)) -> Dict[str, Any]:
     maker_res = await propose_expense_with_personal_split(
-        agent_principal_key="bookkeeper-maker-01",
+        agent_principal_key=principal.principal_key,
         entity_code=body.entity_code,
         expense_description=body.expense_description,
         gross_amount_paid=body.gross_amount_paid,
@@ -238,7 +243,7 @@ async def ingest_mixed_expense(body: PersonalExpenseSplitWebhook) -> Dict[str, A
 
 
 @app.post("/api/v1/reporting/aje")
-async def post_adjusting_entry(body: AdjustingEntryRequest) -> Dict[str, Any]:
+async def post_adjusting_entry(body: AdjustingEntryRequest, principal: AuthPrincipal = Depends(get_current_principal)) -> Dict[str, Any]:
     res = await propose_adjusting_entry(
         entity_code=body.entity_code,
         debit_account_code=body.debit_account_code,
@@ -246,6 +251,7 @@ async def post_adjusting_entry(body: AdjustingEntryRequest) -> Dict[str, Any]:
         amount=body.amount,
         memo=body.memo,
         statement_ref=body.statement_ref,
+        maker_principal_key=principal.principal_key,
     )
     if res.get("status") == "ERROR":
         raise HTTPException(status_code=400, detail=res["reason"])
@@ -254,10 +260,10 @@ async def post_adjusting_entry(body: AdjustingEntryRequest) -> Dict[str, Any]:
 
 
 @app.post("/api/v1/reporting/{entity_code}/{period}/lock")
-async def lock_reporting_pack_endpoint(entity_code: str, period: str, body: LockScheduleRequest) -> Dict[str, Any]:
+async def lock_reporting_pack_endpoint(entity_code: str, period: str, body: LockScheduleRequest, principal: AuthPrincipal = Depends(get_current_principal)) -> Dict[str, Any]:
     updated_pack = await lock_and_sign_reporting_pack(
         entity_code=entity_code,
-        cpa_principal_key=body.cpa_principal_key,
+        cpa_principal_key=principal.principal_key,
         period=period,
     )
     if updated_pack.get("status") == "ERROR":
@@ -285,9 +291,9 @@ async def get_journals() -> Dict[str, Any]:
 
 
 @app.post("/api/v1/journals/{journal_id}/review")
-async def review_journal_endpoint(journal_id: str, body: JournalReviewRequest) -> Dict[str, Any]:
+async def review_journal_endpoint(journal_id: str, body: JournalReviewRequest, principal: AuthPrincipal = Depends(get_current_principal)) -> Dict[str, Any]:
     res = await review_and_approve_proposal(
-        agent_principal_key=body.reviewer_principal_key,
+        agent_principal_key=principal.principal_key,
         journal_id=journal_id,
         action=body.action,
         rejection_reason=body.rejection_reason,

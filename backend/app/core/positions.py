@@ -55,6 +55,11 @@ class Position:
 #   6100 管理及營運費用 6410 折舊費用 7500 所得稅費用
 
 POSITIONS: Dict[str, Position] = {
+    "ADMIN": Position(position_id="ADMIN", title_en="System administrator", title_zh="系統管理員",
+        principal_key="admin-01", account_scope=frozenset(), can_prepare=False, can_review=False,
+        cash_custody=False, review_level=0, read_all_accounts=False, is_human=True,
+        mandate_en="Identity and credential governance only. No accounting authority.",
+        mandate_zh="只管理身份及憑證，沒有會計權限。"),
     "CASHIER": Position(
         position_id="CASHIER",
         title_en="Cashier",
@@ -161,6 +166,7 @@ POSITIONS: Dict[str, Position] = {
     ),
     "CPA_ADVISOR": Position(
         position_id="CPA_ADVISOR",
+        is_human=True,
         title_en="External CPA (bookkeeping oversight)",
         title_zh="外部會計師（帳務督導）",
         principal_key="cpa-griffin",
@@ -299,9 +305,32 @@ PRINCIPAL_ALIASES: Dict[str, str] = {
 }
 
 
+PRINCIPAL_POSITIONS: Dict[str, Position] = {}
+
+
 def position_for_principal(principal_key: str) -> Optional[Position]:
+    if principal_key in PRINCIPAL_POSITIONS:
+        return PRINCIPAL_POSITIONS[principal_key]
     for p in POSITIONS.values():
         if p.principal_key == principal_key:
             return p
     alias = PRINCIPAL_ALIASES.get(principal_key or "")
     return POSITIONS.get(alias) if alias else None
+
+
+def monolith_commands(position: Position) -> set[str]:
+    pos = position.position_id
+    actions = {"preferences.update"} if position.read_all_accounts else set()
+    if pos == "FINANCE_MANAGER":
+        actions |= {"journal.create", "journal.review", "invoice.create", "invoice.collect", "bill.create",
+                    "bill.approve", "bill.pay", "bank.reconcile", "bank.batch", "bank.exception", "tax.update",
+                    "tax.provision", "asset.register", "asset.depreciate", "close.checklist", "close.amortize",
+                    "agent.resolve", "budget.save", "forecast.save"}
+    if pos in {"GL_ACCOUNTANT", "CPA_ADVISOR"}:
+        actions |= {"journal.review", "close.checklist"}
+    if pos == "FOUNDER_DIRECTOR":
+        actions |= {"bill.approve"}
+    if not position.is_human:
+        actions.discard("journal.review")
+    # Signing and reopening remain unavailable until MFA enrollment is shipped.
+    return actions

@@ -612,7 +612,7 @@ async def propose_adjusting_entry(
     # provision belongs to the tax accountant, the depreciation run to the fixed
     # asset accountant. A hardcoded maker also meant nobody could submit it, since
     # only the maker may submit their own voucher.
-    from app.core.positions import position_for_accounts
+    from app.core.positions import position_for_accounts, position_for_principal
 
     owner_position = position_for_accounts([debit_account_code, credit_account_code])
     if not maker_principal_key and owner_position:
@@ -620,7 +620,8 @@ async def propose_adjusting_entry(
     maker = PRINCIPALS.get(maker_principal_key)
     if not maker or not maker.role.value.startswith("MAKER_"):
         return {"status": "ERROR", "reason": f"SOD_ROLE_VIOLATION: Principal '{maker_principal_key}' is not authorized to create AJE proposals."}
-    if owner_position and maker_principal_key != owner_position.principal_key:
+    maker_position = position_for_principal(maker_principal_key)
+    if owner_position and (not maker_position or maker_position.position_id != owner_position.position_id):
         return {
             "status": "ERROR",
             "reason": (

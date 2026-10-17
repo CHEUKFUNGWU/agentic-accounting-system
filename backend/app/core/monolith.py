@@ -7,6 +7,7 @@ trail in a single revision-checked database transaction.
 from __future__ import annotations
 
 import copy
+from contextvars import ContextVar
 import hashlib
 import json
 from datetime import date, datetime, timezone
@@ -49,6 +50,8 @@ def text(value, field: str, limit=500) -> str:
         raise WorkspaceError(f"INVALID_FIELD: {field} is required, up to {limit} characters.")
     return value.strip()
 
+
+_actor: ContextVar = ContextVar("monolith_actor", default=None)
 
 def iso_date(value, period=None) -> str:
     try:
@@ -97,7 +100,9 @@ def append_entry(state, *, memo, reference, lines, entry_date=None, source="Manu
         raise WorkspaceError("UNBALANCED_ENTRY: Journal debits and credits must be equal and positive.")
     entry = {"id": f"JE-{uuid4().hex[:12].upper()}", "date": iso_date(entry_date or posting_date(state), state["period"]),
              "reference": text(reference, "reference"), "memo": text(memo, "memo"), "source": source,
-             "status": status, "lines": normalized, "attachments": attachments or []}
+             "status": status, "lines": normalized, "attachments": attachments or [],
+             "createdByPrincipalKey": _actor.get().principal_key if _actor.get() else None,
+             "createdByPosition": _actor.get().position.position_id if _actor.get() else None}
     state["journalEntries"].insert(0, entry)
     if status == "Posted":
         cash = sum((money(l["debit"]) - money(l["credit"]) for l in normalized if l["accountCode"] == "1010"), Decimal(0))
@@ -116,7 +121,9 @@ def pair(debit_code, credit_code, amount):
 def audit(state, category, action, target, summary, amount=0):
     previous = state["auditLogs"][0]["hash"] if state["auditLogs"] else "GENESIS"
     event = {"id": f"AUD-{uuid4().hex[:12].upper()}", "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
-             "actorType": "User", "actorId": "Local desktop operator", "category": category, "action": action,
+             "actorType": "User" if not _actor.get() or _actor.get().is_human else "Agent",
+             "actorId": _actor.get().principal_key if _actor.get() else "Imported local operation",
+             "credentialId": _actor.get().credential_id if _actor.get() else None, "category": category, "action": action,
              "targetId": target, "summary": summary, "impactAmount": float(amount), "previousHash": previous}
     event["hash"] = hashlib.sha256(json.dumps(event, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     state["auditLogs"].insert(0, event)
@@ -167,7 +174,7 @@ def apply_command(state, action, payload):
             item["sha256"] = hashlib.sha256(raw).hexdigest()
         entry = append_entry(state, memo=p.get("memo"), reference=p.get("reference"), lines=p.get("lines", []),
                              entry_date=p.get("date"), source=source,
-                             status="Draft" if source == "Agentic Auto-Draft" else "Posted", attachments=attachments)
+                             status="Draft" if _actor.get() or source == "Agentic Auto-Draft" else "Posted", attachments=attachments)
         audit(state, "Journal Entry", "Create Entry", entry["id"], f"Recorded {entry['status'].lower()} journal: {entry['memo']}")
     elif action == "invoice.create":
         amount = money(p.get("amount"), positive=True)
@@ -341,12 +348,22 @@ def apply_command(state, action, payload):
         record = find(state, "journalEntries", p.get("id"))
         if record["status"] == "Posted":
             raise WorkspaceError("ALREADY_POSTED", 409)
+        actor = _actor.get()
+        if actor and record.get("createdByPrincipalKey") == actor.principal_key:
+            raise WorkspaceError("SOD_MAKER_CHECKER_VIOLATION: Another authorized person must review this journal.", 403)
+        if actor and record.get("createdByPosition"):
+            from app.core.positions import POSITIONS, may_review
+            if not may_review(actor.position, POSITIONS[record["createdByPosition"]]):
+                raise WorkspaceError("REVIEW_LEVEL_REQUIRED: This preparer's work requires a higher reviewer.", 403)
         # Validate again and generate cash movements through the same posting path.
         entry = append_entry(state, memo=record["memo"], reference=record["reference"], lines=record["lines"],
                              entry_date=record["date"], source=record["source"], attachments=record.get("attachments"))
         state["journalEntries"].remove(record)
         temporary_id = entry["id"]
         entry["id"] = record["id"]
+        entry["createdByPrincipalKey"] = record.get("createdByPrincipalKey")
+        entry["createdByPosition"] = record.get("createdByPosition")
+        entry["reviewedByPrincipalKey"] = _actor.get().principal_key if _actor.get() else None
         for cash in state["ledgerCashItems"]:
             if cash["entryId"] == temporary_id:
                 cash["entryId"] = record["id"]
@@ -446,9 +463,9 @@ async def load_workspace():
         return {**json.loads(record.payload_json), "revision": record.revision}
 
 
-async def execute_command(action, payload, revision, command_id):
+async def execute_command(action, payload, revision, command_id, principal):
     await load_workspace()
-    digest = hashlib.sha256(json.dumps([action, payload], sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    digest = hashlib.sha256(json.dumps([principal.principal_key, action, payload], sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     async with db_manager.session_factory() as session:
         record = await session.get(MonolithWorkspaceModel, "monolith")
         receipts = json.loads(record.receipts_json)
@@ -458,11 +475,20 @@ async def execute_command(action, payload, revision, command_id):
             return {**json.loads(record.payload_json), "revision": record.revision}
         if record.revision != revision:
             raise WorkspaceError("STALE_REVISION: Another session changed this workspace. Refresh before retrying.", 409)
+        from app.core.auth import monolith_actions
+        if action not in monolith_actions(principal):
+            message = "MFA_REQUIRED" if action in {"period.lock", "period.unlock"} else "COMMAND_NOT_AUTHORIZED"
+            raise WorkspaceError(message, 403)
+        if action == "journal.review" and not principal.is_human:
+            raise WorkspaceError("HUMAN_REVIEW_REQUIRED", 403)
         state = json.loads(record.payload_json)
+        actor_token = _actor.set(principal)
         try:
             apply_command(state, action, copy.deepcopy(payload))
         except (KeyError, TypeError, AttributeError, InvalidOperation) as exc:
             raise WorkspaceError("INVALID_PAYLOAD: Check the command fields and try again.") from exc
+        finally:
+            _actor.reset(actor_token)
         receipts[command_id] = digest
         result = await session.execute(update(MonolithWorkspaceModel).where(
             MonolithWorkspaceModel.workspace_id == "monolith", MonolithWorkspaceModel.revision == revision

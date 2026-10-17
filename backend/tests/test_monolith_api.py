@@ -9,6 +9,7 @@ from uuid import uuid4
 import pytest
 import pytest_asyncio
 from sqlalchemy import delete
+from conftest import login_as
 
 from app.core.db import MonolithWorkspaceModel, db_manager
 from app.core.monolith import WorkspaceError, apply_command, initial_state, trial_balance
@@ -105,11 +106,15 @@ async def test_invalid_journal_is_rejected_without_partial_changes(client, chang
 @pytest.mark.asyncio
 async def test_agent_entries_require_review_and_cash_is_written_once(client):
     before = await workspace(client)
-    draft = await command(client, 'journal.create', manual_entry(source='Agentic Auto-Draft'))
+    draft = await command(client, 'journal.create', manual_entry(source='Agentic Auto-Draft', createdByPrincipalKey='cpa-griffin'))
     assert draft['journalEntries'][0]['status'] == 'Draft'
     assert len(draft['ledgerCashItems']) == len(before['ledgerCashItems'])
     assert trial_balance(draft) == trial_balance(before)
+    assert draft['journalEntries'][0]['createdByPrincipalKey'] == 'test-finance-human'
+    assert draft['auditLogs'][0]['actorId'] == 'test-finance-human'
     entry_id = draft['journalEntries'][0]['id']
+    await command(client, 'journal.review', {'id': entry_id}, status=403)
+    await login_as(client, 'test-cpa-human')
     posted = await command(client, 'journal.review', {'id': entry_id})
     assert posted['journalEntries'][0]['id'] == entry_id
     assert posted['ledgerCashItems'][0]['entryId'] == entry_id
@@ -182,7 +187,7 @@ async def test_asset_depreciation_and_amortization_only_post_once_per_period(cli
 
 @pytest.mark.asyncio
 async def test_close_enforces_real_gates_and_lock_blocks_mutations(client):
-    await command(client, 'period.lock', status=409)
+    await command(client, 'period.lock', status=403)
     result = await command(client, 'bank.batch')
     await command(client, 'bank.exception', {'id': 'BF-906'})
     result = await command(client, 'asset.depreciate')
@@ -192,12 +197,14 @@ async def test_close_enforces_real_gates_and_lock_blocks_mutations(client):
     for item in result['closeChecklist']:
         if item['id'] != 'CLS-06' and not item['completed']:
             await command(client, 'close.checklist', {'id': item['id']})
-    locked = await command(client, 'period.lock')
-    assert locked['isPeriodLocked']
-    await command(client, 'journal.create', manual_entry(), status=409)
-    assert (await workspace(client))['isPeriodLocked']
-    unlocked = await command(client, 'period.unlock')
-    assert not unlocked['isPeriodLocked']
+    await command(client, 'period.lock', status=403)
+    state = await workspace(client)
+    apply_command(state, 'period.lock', {})
+    assert state['isPeriodLocked']
+    with pytest.raises(WorkspaceError, match='PERIOD_LOCKED'):
+        apply_command(state, 'journal.create', manual_entry())
+    apply_command(state, 'period.unlock', {})
+    assert not state['isPeriodLocked']
 
 
 @pytest.mark.asyncio

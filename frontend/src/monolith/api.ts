@@ -1,3 +1,4 @@
+import { apiRequest } from "./auth";
 import type { Account, JournalEntry, BankFeedItem, LedgerCashItem, TaxJurisdictionSchedule, AuditLogEntry, ReceivableInvoice, PayableBill, FixedAssetItem, CloseChecklistItem, AmortizationScheduleItem, BudgetAllocationItem, ForecastDrivers } from './utils/accountingLogic';
 import type { AgentTask } from './components/OverviewModule';
 import type { AppPreferences } from './utils/preferences';
@@ -28,14 +29,8 @@ export interface Workspace {
   forecastOverrides: Record<string, number>;
 }
 
-const base = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 async function request(path: string, init?: RequestInit): Promise<Workspace> {
-  const response = await fetch(`${base}/monolith${path}`, init);
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
-    throw new Error(body.detail || `Backend request failed (${response.status}).`);
-  }
-  return response.json();
+  return apiRequest<Workspace>(`/monolith${path}`, init);
 }
 export const loadWorkspace = () => request('/workspace');
 export const sendCommand = (action: string, payload: object, revision: number) => request('/commands', {

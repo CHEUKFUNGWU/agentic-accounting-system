@@ -2,9 +2,10 @@
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, HTTPException, Response, Depends
 from pydantic import BaseModel, Field
 
+from app.core.auth import AuthPrincipal, get_current_principal
 from app.core.monolith import WorkspaceError, execute_command, load_workspace, trial_balance
 
 router = APIRouter(prefix="/api/v1/monolith", tags=["monolith"])
@@ -26,10 +27,10 @@ async def get_workspace(response: Response):
 
 
 @router.post("/commands")
-async def command(body: CommandRequest, response: Response):
+async def command(body: CommandRequest, response: Response, principal: AuthPrincipal = Depends(get_current_principal)):
     response.headers["Cache-Control"] = "no-store"
     try:
-        return await execute_command(body.action, body.payload, body.revision, str(body.commandId))
+        return await execute_command(body.action, body.payload, body.revision, str(body.commandId), principal)
     except WorkspaceError as exc:
         raise HTTPException(status_code=exc.status, detail=str(exc)) from exc
 

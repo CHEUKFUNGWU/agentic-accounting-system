@@ -24,6 +24,7 @@ This repository manages product knowledge, requirements, versions, acceptance, a
 | Find closed or superseded materials | [Archive](99-archive/README.md) |
 | Open the adopted Monolith UI | [Frontend entry points and verification](docs/monolith-ui.md) |
 | Read backend setup instructions | [Backend README](backend/README.md) |
+| Set up human logins and agent credentials | [Authentication setup and implementation scope](docs/auth-implementation.md) |
 
 ## Application overview
 

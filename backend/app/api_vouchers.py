@@ -27,10 +27,12 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, HTTPException, UploadFile, Depends
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
+from app.core.auth import AuthPrincipal, get_current_principal
+from app.core.positions import out_of_scope
 from app.core import vouchers as vz
 from app.core import ledger as lg
 from app.core.repository import repo
@@ -66,7 +68,7 @@ class VoucherCreateRequest(BaseModel):
     accounting_date: str = Field(default_factory=lambda: date.today().isoformat())
     memo: str = Field(default="")
     source_module: str = Field(default="GL_MANUAL", examples=["GL_MANUAL", "BANK_REC", "EXPENSE_SPLIT"])
-    created_by_principal_key: str = Field(default="bookkeeper-maker-01")
+    model_config = {"extra": "forbid"}
     lines: List[VoucherLineRequest] = Field(default_factory=list)
     # Agent-proposed vouchers carry their own provenance; human ones leave the
     # confidence at 1.0 and an empty reasoning string.
@@ -75,7 +77,7 @@ class VoucherCreateRequest(BaseModel):
 
 
 class VoucherActionRequest(BaseModel):
-    principal_key: str = Field(default="bookkeeper-maker-01")
+    model_config = {"extra": "forbid"}
     reason: str = Field(default="")
 
 
@@ -208,8 +210,8 @@ async def list_vouchers(
 
 
 @router.post("/vouchers")
-async def create_voucher(body: VoucherCreateRequest) -> Dict[str, Any]:
-    maker = _maker(body.created_by_principal_key)
+async def create_voucher(body: VoucherCreateRequest, principal: AuthPrincipal = Depends(get_current_principal)) -> Dict[str, Any]:
+    maker = _maker(principal.principal_key)
     if not maker.role.value.startswith("MAKER_"):
         raise HTTPException(
             status_code=400,
@@ -230,6 +232,8 @@ async def create_voucher(body: VoucherCreateRequest) -> Dict[str, Any]:
         total_dr, total_cr = vz.assert_balanced(lines)
     except vz.VoucherError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    if out_of_scope(principal.position, [line["account_code"] for line in lines]):
+        raise HTTPException(403, "ACCOUNT_OUT_OF_SCOPE")
     await _assert_accounts_exist(body.entity_code, lines)
 
     # Fill in account names for display so the voucher reads like a voucher even
@@ -257,7 +261,7 @@ async def create_voucher(body: VoucherCreateRequest) -> Dict[str, Any]:
         "total_credit": str(total_cr),
         "lines": lines,
         "evidence_uris": [],
-        "created_by_principal_key": body.created_by_principal_key,
+        "created_by_principal_key": principal.principal_key,
         "created_by_principal_id": str(maker.principal_id),
         "ai_confidence_score": body.ai_confidence_score,
         "ai_reasoning_summary": body.ai_reasoning_summary,
@@ -273,9 +277,11 @@ async def get_voucher(journal_id: str) -> Dict[str, Any]:
 
 
 @router.put("/vouchers/{journal_id}")
-async def update_voucher(journal_id: str, body: VoucherUpdateRequest) -> Dict[str, Any]:
+async def update_voucher(journal_id: str, body: VoucherUpdateRequest, principal: AuthPrincipal = Depends(get_current_principal)) -> Dict[str, Any]:
     """Only DRAFT or REJECTED vouchers may be edited. Posted is immutable."""
     journal = await _load_voucher(journal_id)
+    if journal.get("created_by_principal_key") != principal.principal_key:
+        raise HTTPException(403, "NOT_YOUR_VOUCHER")
     if journal.get("status") not in ("DRAFT", "REJECTED"):
         raise HTTPException(
             status_code=400,
@@ -292,6 +298,8 @@ async def update_voucher(journal_id: str, body: VoucherUpdateRequest) -> Dict[st
             total_dr, total_cr = vz.assert_balanced(lines)
         except vz.VoucherError as e:
             raise HTTPException(status_code=400, detail=str(e))
+        if out_of_scope(principal.position, [line["account_code"] for line in lines]):
+            raise HTTPException(403, "ACCOUNT_OUT_OF_SCOPE")
         await _assert_accounts_exist(journal["entity_code"], lines)
         accounts = await vz.account_map(journal["entity_code"])
         for l in lines:
@@ -308,20 +316,24 @@ async def update_voucher(journal_id: str, body: VoucherUpdateRequest) -> Dict[st
 
 
 @router.post("/vouchers/{journal_id}/submit")
-async def submit_voucher(journal_id: str, body: VoucherActionRequest) -> Dict[str, Any]:
+async def submit_voucher(journal_id: str, body: VoucherActionRequest, principal: AuthPrincipal = Depends(get_current_principal)) -> Dict[str, Any]:
     """
     DRAFT -> PENDING_CHECKER. This is where the deterministic guard runs, and
     where the system refuses: unbalanced, single-line, control-account-in-GL,
     locked period, wrong role, or missing evidence.
     """
     journal = await _load_voucher(journal_id)
+    if journal.get("created_by_principal_key") != principal.principal_key:
+        raise HTTPException(403, "NOT_YOUR_VOUCHER")
     if journal.get("status") not in ("DRAFT", "REJECTED"):
         raise HTTPException(
             status_code=400,
             detail=f"INVALID_STATE: 憑證 {journal.get('voucher_no')} 目前狀態為 {journal.get('status')}，不可提交。",
         )
 
-    maker = _maker(body.principal_key)
+    maker = _maker(principal.principal_key)
+    if out_of_scope(principal.position, [line["account_code"] for line in journal.get("lines", [])]):
+        raise HTTPException(403, "ACCOUNT_OUT_OF_SCOPE")
     entity_code = journal["entity_code"]
     control = await _control_accounts(entity_code)
     try:
@@ -344,12 +356,12 @@ async def submit_voucher(journal_id: str, body: VoucherActionRequest) -> Dict[st
 
 
 @router.post("/vouchers/{journal_id}/approve")
-async def approve_voucher(journal_id: str, body: VoucherActionRequest) -> Dict[str, Any]:
+async def approve_voucher(journal_id: str, body: VoucherActionRequest, principal: AuthPrincipal = Depends(get_current_principal)) -> Dict[str, Any]:
     from app.mcp_server import review_and_approve_proposal
 
     journal = await _load_voucher(journal_id)
     res = await review_and_approve_proposal(
-        agent_principal_key=body.principal_key,
+        agent_principal_key=principal.principal_key,
         journal_id=journal_id,
         action="APPROVE",
     )
@@ -370,14 +382,14 @@ async def approve_voucher(journal_id: str, body: VoucherActionRequest) -> Dict[s
 
 
 @router.post("/vouchers/{journal_id}/reject")
-async def reject_voucher(journal_id: str, body: VoucherActionRequest) -> Dict[str, Any]:
+async def reject_voucher(journal_id: str, body: VoucherActionRequest, principal: AuthPrincipal = Depends(get_current_principal)) -> Dict[str, Any]:
     from app.mcp_server import review_and_approve_proposal
 
     if not body.reason.strip():
         raise HTTPException(status_code=400, detail="REJECT_REASON_REQUIRED: 駁回必須填寫理由。")
     await _load_voucher(journal_id)
     res = await review_and_approve_proposal(
-        agent_principal_key=body.principal_key,
+        agent_principal_key=principal.principal_key,
         journal_id=journal_id,
         action="REJECT",
         rejection_reason=body.reason.strip(),
@@ -396,7 +408,7 @@ async def reject_voucher(journal_id: str, body: VoucherActionRequest) -> Dict[st
 
 
 @router.post("/vouchers/{journal_id}/void")
-async def void_voucher(journal_id: str, body: VoucherActionRequest) -> Dict[str, Any]:
+async def void_voucher(journal_id: str, body: VoucherActionRequest, principal: AuthPrincipal = Depends(get_current_principal)) -> Dict[str, Any]:
     """Void a draft/rejected voucher: the number is kept, never reused."""
     if not body.reason.strip():
         raise HTTPException(status_code=400, detail="REASON_REQUIRED: 作廢必須填寫理由。")
@@ -406,7 +418,7 @@ async def void_voucher(journal_id: str, body: VoucherActionRequest) -> Dict[str,
             status_code=400,
             detail=f"CANNOT_VOID: 只有草稿或已駁回的憑證可以作廢（目前 {journal.get('status')}）。已過賬的憑證只能沖銷。",
         )
-    if journal.get("created_by_principal_key") != body.principal_key:
+    if journal.get("created_by_principal_key") != principal.principal_key:
         raise HTTPException(
             status_code=403,
             detail=f"NOT_YOUR_VOUCHER: 只能作廢自己編制的憑證（這張由 {journal.get('created_by_principal_key')} 編制）。",
@@ -418,7 +430,7 @@ async def void_voucher(journal_id: str, body: VoucherActionRequest) -> Dict[str,
 
 
 @router.post("/vouchers/{journal_id}/reverse")
-async def reverse_voucher(journal_id: str, body: VoucherActionRequest) -> Dict[str, Any]:
+async def reverse_voucher(journal_id: str, body: VoucherActionRequest, principal: AuthPrincipal = Depends(get_current_principal)) -> Dict[str, Any]:
     """
     Correction path. A posted voucher is never edited or deleted — it is
     reversed by a mirror-image voucher that goes through the same approval.
@@ -429,10 +441,12 @@ async def reverse_voucher(journal_id: str, body: VoucherActionRequest) -> Dict[s
             status_code=400,
             detail=f"CANNOT_REVERSE: 只有已過賬憑證可以沖銷（目前 {original.get('status')}）。",
         )
-    maker = _maker(body.principal_key)
+    maker = _maker(principal.principal_key)
     if not maker.role.value.startswith("MAKER_"):
         raise HTTPException(status_code=400, detail=f"SOD_ROLE_VIOLATION: '{maker.agent_name}' 不能製單。")
 
+    if out_of_scope(principal.position, [line["account_code"] for line in original.get("lines", [])]):
+        raise HTTPException(403, "ACCOUNT_OUT_OF_SCOPE")
     lines = []
     for l in original.get("lines", []):
         lines.append(
@@ -473,11 +487,11 @@ async def reverse_voucher(journal_id: str, body: VoucherActionRequest) -> Dict[s
                 "mime": "application/vnd.agentic-accounting.voucher",
                 "size": 0,
                 "sha256": original.get("entry_hash") or "",
-                "uploaded_by": body.principal_key,
+                "uploaded_by": principal.principal_key,
                 "uploaded_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             }
         ],
-        "created_by_principal_key": body.principal_key,
+        "created_by_principal_key": principal.principal_key,
         "created_by_principal_id": str(maker.principal_id),
         "reversal_of_journal_id": original["journal_id"],
         "ai_confidence_score": "1.0000",
@@ -492,8 +506,10 @@ async def reverse_voucher(journal_id: str, body: VoucherActionRequest) -> Dict[s
 # ---------------------------------------------------------------------------
 
 @router.post("/vouchers/{journal_id}/attachments")
-async def upload_attachment(journal_id: str, file: UploadFile = File(...)) -> Dict[str, Any]:
+async def upload_attachment(journal_id: str, file: UploadFile = File(...), principal: AuthPrincipal = Depends(get_current_principal)) -> Dict[str, Any]:
     journal = await _load_voucher(journal_id)
+    if journal.get("created_by_principal_key") != principal.principal_key:
+        raise HTTPException(403, "NOT_YOUR_VOUCHER")
     if journal.get("status") == "POSTED":
         raise HTTPException(
             status_code=400,
@@ -510,7 +526,7 @@ async def upload_attachment(journal_id: str, file: UploadFile = File(...)) -> Di
         filename=file.filename or "attachment",
         content=content,
         mime=file.content_type or "",
-        uploaded_by=journal.get("created_by_principal_key") or "unknown",
+        uploaded_by=principal.principal_key,
     )
     evidence = list(journal.get("evidence_uris") or [])
     evidence.append(record)
@@ -520,13 +536,15 @@ async def upload_attachment(journal_id: str, file: UploadFile = File(...)) -> Di
 
 
 @router.delete("/vouchers/{journal_id}/attachments/{stored_name}")
-async def detach_attachment(journal_id: str, stored_name: str) -> Dict[str, Any]:
+async def detach_attachment(journal_id: str, stored_name: str, principal: AuthPrincipal = Depends(get_current_principal)) -> Dict[str, Any]:
     """
     Detaching is allowed before posting and is recorded as an evidence log entry;
     the file itself is never destroyed, because a deleted receipt is exactly what
     an audit is looking for.
     """
     journal = await _load_voucher(journal_id)
+    if journal.get("created_by_principal_key") != principal.principal_key:
+        raise HTTPException(403, "NOT_YOUR_VOUCHER")
     if journal.get("status") == "POSTED":
         raise HTTPException(status_code=400, detail="VOUCHER_IMMUTABLE: 已過賬憑證的單據不可移除。")
     evidence = list(journal.get("evidence_uris") or [])
@@ -541,7 +559,7 @@ async def detach_attachment(journal_id: str, stored_name: str) -> Dict[str, Any]
                 "mime": "text/plain",
                 "size": 0,
                 "sha256": removed[0].get("sha256", ""),
-                "uploaded_by": journal.get("created_by_principal_key") or "unknown",
+                "uploaded_by": principal.principal_key,
                 "uploaded_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             }
         )
@@ -630,26 +648,26 @@ async def get_periods(entity_code: str) -> Dict[str, Any]:
 
 
 class ClosePeriodRequest(BaseModel):
-    principal_key: str = Field(default="gl-chief-01")
+    model_config = {"extra": "forbid"}
     period: str = Field(default="2026-10")
 
 
 @router.post("/entities/{entity_code}/periods/{period}/close")
-async def close_period_endpoint(entity_code: str, period: str, body: ClosePeriodRequest) -> Dict[str, Any]:
+async def close_period_endpoint(entity_code: str, period: str, body: ClosePeriodRequest, principal: AuthPrincipal = Depends(get_current_principal)) -> Dict[str, Any]:
     """
     Close the books for a period. Refuses over unposted vouchers or a ledger that
     does not balance, and records who closed it.
     """
     from app.core.positions import position_for_principal
 
-    position = position_for_principal(body.principal_key)
+    position = position_for_principal(principal.principal_key)
     if not position or not (position.can_review or position.is_human):
         raise HTTPException(
             status_code=403,
-            detail=f"NOT_AUTHORIZED_TO_CLOSE: {body.principal_key} 不能執行結帳。",
+            detail=f"NOT_AUTHORIZED_TO_CLOSE: {principal.principal_key} 不能執行結帳。",
         )
     try:
-        return await lg.close_period(entity_code, period, body.principal_key)
+        return await lg.close_period(entity_code, period, principal.principal_key)
     except lg.LedgerError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

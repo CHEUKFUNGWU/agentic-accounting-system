@@ -1,6 +1,7 @@
 # 认证、授权与管理后台设计方案（Auth & Governance Design Proposal）
 
-> 状态：**提案（未实施）** · 日期：2026-10-17
+> 状态：**设计提案（已部分实施）** · 日期：2026-10-17
+> 实施记录（英文）：[Authentication implementation and local setup](auth-implementation.md)。P0 与 P1 的认证基础已实现；MFA、完整治理 UI 与后续阶段仍未完成。下文保留原设计，当前行为以实施记录为准。
 > 范围：AI Agent 的 MCP 接入认证、人类用户登录、REST API 鉴权对齐、账号与 Agent 活动管理后台
 > 关联代码：`backend/app/mcp_roles.py`、`backend/app/mcp_server.py`、`backend/app/core/positions.py`、`backend/app/core/sod_guard.py`、`backend/app/main.py`、`backend/app/core/db.py`
 

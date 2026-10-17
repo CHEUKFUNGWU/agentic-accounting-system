@@ -29,6 +29,8 @@ interface JournalEntryModuleProps {
   entries: JournalEntry[];
   onAddEntry: (entry: JournalEntry) => Promise<JournalEntry>;
   onReviewEntry: (id: string) => void;
+  canCreate?: boolean;
+  canReview?: boolean;
   globalSearchQuery?: string;
 }
 
@@ -94,6 +96,8 @@ export const JournalEntryModule: React.FC<JournalEntryModuleProps> = ({
   entries,
   onAddEntry,
   onReviewEntry,
+  canCreate = true,
+  canReview = true,
   globalSearchQuery = '',
 }) => {
   const [date, setDate] = useState<string>('2026-10-16');
@@ -291,7 +295,7 @@ export const JournalEntryModule: React.FC<JournalEntryModuleProps> = ({
       reference: reference.trim(),
       memo: memo.trim(),
       source: sourceType,
-      status: 'Posted',
+      status: 'Draft',
       confidence: sourceType === 'Agentic Auto-Draft' ? 99.6 : 100,
       attachments: attachments.length > 0 ? [...attachments] : undefined,
       lines: finalLines,
@@ -590,9 +594,11 @@ export const JournalEntryModule: React.FC<JournalEntryModuleProps> = ({
 
             <button
               type="submit"
+              disabled={!canCreate}
+              title={!canCreate ? "Your position can view journals but cannot prepare them." : undefined}
               className="px-4 py-2 text-xs font-mono font-semibold bg-zinc-950 text-white hover:bg-zinc-800 transition-colors cursor-pointer"
             >
-              Post Entry
+              Save Draft
             </button>
           </div>
         </form>
@@ -658,7 +664,7 @@ export const JournalEntryModule: React.FC<JournalEntryModuleProps> = ({
                     <span className="text-xs font-mono text-zinc-400 shrink-0">
                       {entry.date}
                     </span>
-                    {entry.status !== 'Posted' && <button type="button" className="border border-zinc-300 px-2 py-1 text-xs text-zinc-950" onClick={() => onReviewEntry(entry.id)}>Review &amp; post</button>}
+                    {canReview && entry.status !== 'Posted' && <button type="button" className="border border-zinc-300 px-2 py-1 text-xs text-zinc-950" onClick={() => onReviewEntry(entry.id)}>Review &amp; post</button>}
                     <span className="text-xs font-medium text-zinc-900 truncate">
                       {entry.memo}
                     </span>

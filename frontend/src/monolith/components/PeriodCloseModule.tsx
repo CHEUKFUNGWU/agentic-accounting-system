@@ -16,6 +16,7 @@ interface PeriodCloseModuleProps {
   onToggleChecklistTask: (id: string) => void;
   onPostAmortizationSchedule: (id: string) => void;
   onTogglePeriodLock: () => void;
+  canTogglePeriodLock?: boolean;
 }
 
 export const PeriodCloseModule: React.FC<PeriodCloseModuleProps> = ({
@@ -25,6 +26,7 @@ export const PeriodCloseModule: React.FC<PeriodCloseModuleProps> = ({
   onToggleChecklistTask,
   onPostAmortizationSchedule,
   onTogglePeriodLock,
+  canTogglePeriodLock = true,
 }) => {
   const summary = useMemo(
     () => computePeriodCloseSummary(checklist, schedules, isPeriodLocked),
@@ -161,6 +163,8 @@ export const PeriodCloseModule: React.FC<PeriodCloseModuleProps> = ({
             <button
               type="button"
               onClick={onTogglePeriodLock}
+              disabled={!canTogglePeriodLock}
+              title={!canTogglePeriodLock ? "MFA enrollment is required before period signing or reopening." : undefined}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono font-semibold border transition-colors cursor-pointer ${
                 isPeriodLocked
                   ? 'bg-white text-zinc-950 border-zinc-950 hover:bg-zinc-100'

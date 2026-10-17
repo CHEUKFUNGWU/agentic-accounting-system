@@ -23,10 +23,12 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile, Depends
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
+from app.core.auth import AuthPrincipal, get_current_principal
+from app.core.positions import out_of_scope
 from app.core import vouchers as vz
 from app.core.ledger import LedgerError, account_by_code, resolve_counterparty
 from app.core.localization import q4
@@ -63,7 +65,7 @@ async def create_document(
     amount: str = Form("0.0000"),
     currency: str = Form(""),
     note: str = Form(""),
-    uploaded_by: str = Form(""),
+    principal: AuthPrincipal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     doc_type = (doc_type or "OTHER").upper()
     if doc_type not in DOC_TYPES:
@@ -83,7 +85,7 @@ async def create_document(
         filename=file.filename or "document",
         content=content,
         mime=file.content_type or "",
-        uploaded_by=uploaded_by or "unknown",
+        uploaded_by=principal.principal_key,
     )
 
     counterparty_id = None
@@ -109,7 +111,7 @@ async def create_document(
         "mime": stored["mime"],
         "size": stored["size"],
         "sha256": stored["sha256"],
-        "uploaded_by": uploaded_by or "unknown",
+        "uploaded_by": principal.principal_key,
         "note": note,
     }
     await repo.save_document(record)
@@ -117,14 +119,14 @@ async def create_document(
 
 
 class ToVoucherRequest(BaseModel):
-    principal_key: str = Field(default="ap-clerk-01")
+    model_config = {"extra": "forbid"}
     debit_account_code: str = Field(default="")
     credit_account_code: str = Field(default="")
     memo: str = Field(default="")
 
 
 @router.post("/documents/{document_id}/to-voucher")
-async def document_to_voucher(document_id: str, body: ToVoucherRequest) -> Dict[str, Any]:
+async def document_to_voucher(document_id: str, body: ToVoucherRequest, principal: AuthPrincipal = Depends(get_current_principal)) -> Dict[str, Any]:
     """
     Turn a captured document into a *draft* journal entry with the document
     attached. It still has to be submitted and reviewed — this call records, it
@@ -158,7 +160,9 @@ async def document_to_voucher(document_id: str, body: ToVoucherRequest) -> Dict[
     owner = position_for_accounts([body.debit_account_code, body.credit_account_code])
     from app.mcp_server import PRINCIPALS
 
-    maker_key = body.principal_key or (owner.principal_key if owner else "ap-clerk-01")
+    if out_of_scope(principal.position, [body.debit_account_code, body.credit_account_code]):
+        raise HTTPException(403, "ACCOUNT_OUT_OF_SCOPE")
+    maker_key = principal.principal_key
     maker = PRINCIPALS.get(maker_key)
     if not maker:
         raise HTTPException(status_code=404, detail=f"UNKNOWN_PRINCIPAL: '{maker_key}'")
