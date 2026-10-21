@@ -8,5 +8,6 @@ Maintain the rules for this product workspace and any reusable templates. Update
 | Information ownership and references | [source-of-truth.md](source-of-truth.md) |
 | Requirement statuses and stage gates | [status-and-gates.md](status-and-gates.md) |
 | Product workflow | [product-workflow.md](product-workflow.md) |
+| Engineering workflow: playbooks, review, evidence | [engineering-workflow.md](engineering-workflow.md) |
 
-Use these rules for product documentation alongside the application's existing development workflow.
+The engineering workflow governs code and documentation changes; the other rules govern product documentation and decisions.
