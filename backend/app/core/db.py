@@ -123,6 +123,7 @@ class JournalEntryModel(Base):
     __tablename__ = "journal_entries"
 
     journal_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    revision: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
     entity_code: Mapped[str] = mapped_column(String(32), ForeignKey("entities.entity_code"), index=True)
     source_module: Mapped[str] = mapped_column(String(32), default="MANUAL")
     status: Mapped[str] = mapped_column(String(32), default="POSTED", index=True)
@@ -204,6 +205,17 @@ class DocumentModel(Base):
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
     posted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class DocumentSourceModel(Base):
+    """Exact-byte source identity, not a ban on supporting evidence reuse."""
+
+    __tablename__ = "document_sources"
+
+    entity_code: Mapped[str] = mapped_column(String(32), ForeignKey("entities.entity_code"), primary_key=True)
+    sha256: Mapped[str] = mapped_column(String(64), primary_key=True)
+    document_id: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("documents.document_id"), nullable=True)
+    journal_id: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("journal_entries.journal_id"), nullable=True)
 
 
 class MCPAuditLogModel(Base):
@@ -503,9 +515,18 @@ class DatabaseManager:
     async def _ensure_columns(self) -> None:
         """
         `create_all()` creates missing tables but never ALTERs existing ones, so
-        additive columns must be applied explicitly. SQLite only — a Postgres
-        deployment should use a real migration tool.
+        additive columns must be applied explicitly. Legacy vocabulary migrations
+        are SQLite-only; the journal revision migration also runs on PostgreSQL.
         """
+        if self.is_postgres:
+            # BL-02 is an additive migration on both supported databases.
+            # PostgreSQL takes the table DDL lock and backfills existing rows.
+            async with self.engine.begin() as conn:
+                await conn.exec_driver_sql(
+                    "ALTER TABLE IF EXISTS journal_entries "
+                    "ADD COLUMN IF NOT EXISTS revision INTEGER NOT NULL DEFAULT 0"
+                )
+            return
         if not self.is_sqlite:
             return
         # Columns that carry audit vocabulary were renamed once. SQLite has
@@ -525,6 +546,7 @@ class DatabaseManager:
 
         wanted: Dict[str, Dict[str, str]] = {
             "journal_entries": {
+                "revision": "INTEGER NOT NULL DEFAULT 0",
                 "voucher_no": "VARCHAR(64)",
                 "period": "VARCHAR(16)",
                 "memo": "TEXT",

@@ -87,5 +87,5 @@ async def test_document_to_voucher_requires_review_and_posts_once(client):
     lines = [line for line in await get_lines("HK-SME-01") if line["journal_id"] == journal_id]
     assert len(lines) == 2
     repeated = await client.post(f"/api/v1/vouchers/{journal_id}/approve", json={})
-    assert repeated.status_code == 400
+    assert repeated.status_code == 409
     assert [line for line in await get_lines("HK-SME-01") if line["journal_id"] == journal_id] == lines

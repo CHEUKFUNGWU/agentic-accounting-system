@@ -48,7 +48,7 @@ async def test_1_prevent_double_approval_and_duplicate_posting():
 
     # First approval -> POSTED
     r1 = await m.review_and_approve_proposal(
-        agent_principal_key="controller-checker-01",
+        agent_principal_key="test-gl-human",
         journal_id=j_id,
         action="APPROVE",
     )
@@ -60,7 +60,7 @@ async def test_1_prevent_double_approval_and_duplicate_posting():
 
     # Second approval -> Must be rejected with ERROR, ETB must remain unchanged
     r2 = await m.review_and_approve_proposal(
-        agent_principal_key="controller-checker-01",
+        agent_principal_key="test-gl-human",
         journal_id=j_id,
         action="APPROVE",
     )
@@ -87,7 +87,7 @@ async def test_2_prevent_approving_rejected_or_rejecting_posted():
 
     # Reject proposal
     rej = await m.review_and_approve_proposal(
-        agent_principal_key="controller-checker-01",
+        agent_principal_key="test-gl-human",
         journal_id=j_id,
         action="REJECT",
         rejection_reason="Unclear business justification",
@@ -97,7 +97,7 @@ async def test_2_prevent_approving_rejected_or_rejecting_posted():
 
     # Attempt to approve rejected journal -> Must FAIL
     app_rej = await m.review_and_approve_proposal(
-        agent_principal_key="controller-checker-01",
+        agent_principal_key="test-gl-human",
         journal_id=j_id,
         action="APPROVE",
     )
@@ -312,9 +312,9 @@ async def test_7_hash_chain_sequential_integrity_prevents_forks():
     )
 
     # Approve out of creation order: B, then A, then C
-    res_b = await m.review_and_approve_proposal("controller-checker-01", p_b["journal_id"], "APPROVE")
-    res_a = await m.review_and_approve_proposal("controller-checker-01", p_a["journal_id"], "APPROVE")
-    res_c = await m.review_and_approve_proposal("controller-checker-01", p_c["journal_id"], "APPROVE")
+    res_b = await m.review_and_approve_proposal("test-gl-human", p_b["journal_id"], "APPROVE")
+    res_a = await m.review_and_approve_proposal("test-gl-human", p_a["journal_id"], "APPROVE")
+    res_c = await m.review_and_approve_proposal("test-gl-human", p_c["journal_id"], "APPROVE")
 
     assert res_b["status"] == "SUCCESS"
     assert res_a["status"] == "SUCCESS"
@@ -354,7 +354,7 @@ async def test_8_wp_dd_lead_schedule_strictly_excludes_rejected_splits():
 
     # Reject proposal
     await m.review_and_approve_proposal(
-        agent_principal_key="controller-checker-01",
+        agent_principal_key="test-gl-human",
         journal_id=j_id,
         action="REJECT",
         rejection_reason="Not business related",

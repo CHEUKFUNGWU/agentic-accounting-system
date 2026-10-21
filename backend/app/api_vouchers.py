@@ -223,7 +223,8 @@ async def create_voucher(body: VoucherCreateRequest, principal: AuthPrincipal = 
             detail="PERIOD_LOCKED: 該賬套已簽核封存，不可再新增憑證。",
         )
     try:
-        await lg.assert_writable(body.entity_code, body.period)
+        lg.validate_posting_date(body.accounting_date, body.period)
+        await lg.assert_writable(body.entity_code, body.period, body.accounting_date)
     except lg.LedgerError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -288,7 +289,14 @@ async def update_voucher(journal_id: str, body: VoucherUpdateRequest, principal:
             detail=f"VOUCHER_IMMUTABLE: 憑證 {journal.get('voucher_no')} 狀態為 {journal.get('status')}，"
                    "過賬後不可修改，請用沖銷分錄更正。",
         )
-    if body.accounting_date:
+    try:
+        lg.validate_posting_date(
+            body.accounting_date if body.accounting_date is not None else journal["accounting_date"],
+            journal.get("period"),
+        )
+    except lg.LedgerError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if body.accounting_date is not None:
         journal["accounting_date"] = body.accounting_date
     if body.memo is not None:
         journal["memo"] = body.memo.strip()
@@ -364,18 +372,10 @@ async def approve_voucher(journal_id: str, body: VoucherActionRequest, principal
         agent_principal_key=principal.principal_key,
         journal_id=journal_id,
         action="APPROVE",
+        authenticated_principal_id=principal.principal_id,
     )
     if res.get("status") == "ERROR":
-        raise HTTPException(status_code=400, detail=res.get("reason", "APPROVAL_FAILED"))
-
-    # Post-processing the shared engine does not do: a posted reversal closes
-    # out the voucher it reverses.
-    reversal_of = journal.get("reversal_of_journal_id")
-    if reversal_of and res.get("entry_status") == "POSTED":
-        original = await repo.get_journal(reversal_of)
-        if original and original.get("status") == "POSTED":
-            original["status"] = "REVERSED"
-            await repo.save_journal(original)
+        raise HTTPException(status_code=409 if res.get("conflict") else res.get("status_code", 400), detail=res.get("reason", "APPROVAL_FAILED"))
 
     fresh = await repo.get_journal(journal_id)
     return {"status": "SUCCESS", "entry_status": res.get("entry_status"), "voucher": _detail(fresh or journal)}
@@ -393,18 +393,13 @@ async def reject_voucher(journal_id: str, body: VoucherActionRequest, principal:
         journal_id=journal_id,
         action="REJECT",
         rejection_reason=body.reason.strip(),
+        authenticated_principal_id=principal.principal_id,
     )
     if res.get("status") == "ERROR":
-        raise HTTPException(status_code=400, detail=res.get("reason", "REJECT_FAILED"))
+        raise HTTPException(status_code=409 if res.get("conflict") else res.get("status_code", 400), detail=res.get("reason", "REJECT_FAILED"))
 
-    # The shared reviewer stores the reason under a different key; persist it in
-    # the column the UI reads.
-    fresh = await repo.get_journal(journal_id)
-    if fresh:
-        fresh["status"] = "REJECTED"
-        fresh["reject_reason"] = body.reason.strip()
-        await repo.save_journal(fresh)
-    return {"status": "SUCCESS", "voucher": _detail(fresh or {})}
+    # The shared reviewer commits status and reason together, once.
+    return {"status": "SUCCESS", "voucher": _detail(res["journal"])}
 
 
 @router.post("/vouchers/{journal_id}/void")
@@ -441,39 +436,38 @@ async def reverse_voucher(journal_id: str, body: VoucherActionRequest, principal
             status_code=400,
             detail=f"CANNOT_REVERSE: 只有已過賬憑證可以沖銷（目前 {original.get('status')}）。",
         )
+    if original.get("reversal_of_journal_id") or original.get("source_module") == "REVERSAL":
+        raise HTTPException(status_code=400, detail="REVERSAL_INVALID: reversing a posted reversal is not supported.")
     maker = _maker(principal.principal_key)
     if not maker.role.value.startswith("MAKER_"):
         raise HTTPException(status_code=400, detail=f"SOD_ROLE_VIOLATION: '{maker.agent_name}' 不能製單。")
 
-    if out_of_scope(principal.position, [line["account_code"] for line in original.get("lines", [])]):
+    from app.core.posting import PostingError, build_reversal_lines
+
+    try:
+        lines = await build_reversal_lines(original)
+    except PostingError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if out_of_scope(principal.position, [line["account_code"] for line in lines]):
         raise HTTPException(403, "ACCOUNT_OUT_OF_SCOPE")
-    lines = []
-    for l in original.get("lines", []):
-        lines.append(
-            {
-                "line_number": l["line_number"],
-                "account_code": l["account_code"],
-                "account_name": l.get("account_name", ""),
-                # mirror the entry
-                "debit": l.get("credit", "0.0000"),
-                "credit": l.get("debit", "0.0000"),
-                "memo": f"沖銷 {original.get('voucher_no')}：{l.get('memo') or ''}".strip("："),
-                "counterparty": l.get("counterparty", ""),
-                "tax_code": l.get("tax_code", ""),
-                "business_use_pct": l.get("business_use_pct", "1.0000"),
-            }
-        )
 
     entity_code = original["entity_code"]
+    accounting_date = date.today().isoformat()
+    try:
+        period = lg.validate_posting_date(accounting_date)
+        await lg.assert_writable(entity_code, period, accounting_date)
+    except lg.LedgerError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     journal = {
         "journal_id": vz.new_journal_id(),
         "entity_code": entity_code,
-        "period": original.get("period"),
-        "voucher_no": await vz.next_voucher_no(entity_code, original.get("period") or "2026-10"),
-        "accounting_date": date.today().isoformat(),
+        "period": period,
+        "voucher_no": await vz.next_voucher_no(entity_code, period),
+        "accounting_date": accounting_date,
         "currency": original.get("currency"),
         "status": "DRAFT",
         "source_module": "REVERSAL",
+        "entry_layer": original["entry_layer"],
         "memo": f"沖銷憑證 {original.get('voucher_no')}",
         "total_debit": original.get("total_credit"),
         "total_credit": original.get("total_debit"),
@@ -510,7 +504,7 @@ async def upload_attachment(journal_id: str, file: UploadFile = File(...), princ
     journal = await _load_voucher(journal_id)
     if journal.get("created_by_principal_key") != principal.principal_key:
         raise HTTPException(403, "NOT_YOUR_VOUCHER")
-    if journal.get("status") == "POSTED":
+    if journal.get("status") in ("POSTED", "REVERSED", "VOID"):
         raise HTTPException(
             status_code=400,
             detail="VOUCHER_IMMUTABLE: 已過賬憑證不可再附加單據，請以沖銷分錄更正後重開憑證。",
@@ -545,7 +539,7 @@ async def detach_attachment(journal_id: str, stored_name: str, principal: AuthPr
     journal = await _load_voucher(journal_id)
     if journal.get("created_by_principal_key") != principal.principal_key:
         raise HTTPException(403, "NOT_YOUR_VOUCHER")
-    if journal.get("status") == "POSTED":
+    if journal.get("status") in ("POSTED", "REVERSED", "VOID"):
         raise HTTPException(status_code=400, detail="VOUCHER_IMMUTABLE: 已過賬憑證的單據不可移除。")
     evidence = list(journal.get("evidence_uris") or [])
     kept = [e for e in evidence if e.get("stored_name") != stored_name]

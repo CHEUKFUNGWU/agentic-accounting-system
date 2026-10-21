@@ -31,7 +31,9 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 from uuid import uuid4
 
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.transactions import transaction_session
 from app.core.db import (
     ChartOfAccountsModel,
     CounterpartyModel,
@@ -81,21 +83,44 @@ def normal_balance_for(account_type: str, fs_category: str) -> str:
 
 def period_bounds(period_code: str) -> Tuple[str, str, int, int]:
     """('2026-10') -> (start_date, end_date, fiscal_year, period_number)."""
-    month = MONTH_RE.match(period_code or "")
+    month = MONTH_RE.fullmatch(period_code or "")
     if month:
         year, number = int(month.group(1)), int(month.group(2))
+        if not 1 <= year <= 9999 or not 1 <= number <= 12:
+            raise LedgerError(f"INVALID_PERIOD: '{period_code}'")
         last = calendar.monthrange(year, number)[1]
-        return f"{year}-{number:02d}-01", f"{year}-{number:02d}-{last:02d}", year, number
-    quarter = QUARTER_RE.match(period_code or "")
+        return f"{year:04d}-{number:02d}-01", f"{year:04d}-{number:02d}-{last:02d}", year, number
+    quarter = QUARTER_RE.fullmatch(period_code or "")
     if quarter:
         year, q = int(quarter.group(1)), int(quarter.group(2))
+        if not 1 <= year <= 9999:
+            raise LedgerError(f"INVALID_PERIOD: '{period_code}'")
         first_month = (q - 1) * 3 + 1
         last_month = first_month + 2
         last_day = calendar.monthrange(year, last_month)[1]
-        return f"{year}-{first_month:02d}-01", f"{year}-{last_month:02d}-{last_day:02d}", year, q
+        return f"{year:04d}-{first_month:02d}-01", f"{year:04d}-{last_month:02d}-{last_day:02d}", year, q
     raise LedgerError(
         f"INVALID_PERIOD: '{period_code}' 不是可辨識的會計期間（支援 YYYY-MM 與 YYYY-Qn）。"
     )
+
+
+def validate_posting_date(accounting_date: str, period_code: str | None = None) -> str:
+    """Require a real YYYY-MM-DD date within inclusive calendar period bounds.
+
+    Missing periods retain legacy compatibility by deriving a calendar month.
+    Explicit periods are never rewritten. Annual periods are not supported.
+    """
+    try:
+        parsed = date.fromisoformat(accounting_date)
+        if parsed.isoformat() != accounting_date:
+            raise ValueError("non-canonical date")
+    except (TypeError, ValueError) as exc:
+        raise LedgerError(f"INVALID_ACCOUNTING_DATE: '{accounting_date}' must be YYYY-MM-DD.") from exc
+    period = period_code if period_code is not None else accounting_date[:7]
+    start, end, _, _ = period_bounds(period)
+    if not start <= accounting_date <= end:
+        raise LedgerError(f"PERIOD_DATE_MISMATCH: {accounting_date} is outside {period} [{start}, {end}].")
+    return period
 
 
 def next_period_code(period_code: str) -> str:
@@ -122,9 +147,9 @@ def previous_period_code(period_code: str) -> str:
     raise LedgerError(f"INVALID_PERIOD: 無法推算 '{period_code}' 的上一期。")
 
 
-async def ensure_period(entity_code: str, period_code: str, status: str = "OPEN") -> Dict[str, Any]:
+async def ensure_period(entity_code: str, period_code: str, status: str = "OPEN", *, session: AsyncSession | None = None) -> Dict[str, Any]:
     start, end, year, number = period_bounds(period_code)
-    async with db_manager.session_factory() as session:
+    async with transaction_session(db_manager, session) as session:
         period_id = f"{entity_code}:{period_code}"
         existing = await session.get(FiscalPeriodModel, period_id)
         if existing:
@@ -140,7 +165,7 @@ async def ensure_period(entity_code: str, period_code: str, status: str = "OPEN"
             status=status,
         )
         session.add(model)
-        await session.commit()
+        await session.flush()
         return _period_dict(model)
 
 
@@ -160,12 +185,13 @@ def _period_dict(m: FiscalPeriodModel) -> Dict[str, Any]:
     }
 
 
-async def get_period(entity_code: str, period_code: str) -> Dict[str, Any]:
-    async with db_manager.session_factory() as session:
-        model = await session.get(FiscalPeriodModel, f"{entity_code}:{period_code}")
-    if not model:
-        return await ensure_period(entity_code, period_code)
-    return _period_dict(model)
+async def get_period(entity_code: str, period_code: str, *, session: AsyncSession | None = None) -> Dict[str, Any]:
+    period_bounds(period_code)
+    async with transaction_session(db_manager, session) as session:
+        model = await session.get(FiscalPeriodModel, f"{entity_code}:{period_code}", with_for_update=True)
+        if not model:
+            return await ensure_period(entity_code, period_code, session=session)
+        return _period_dict(model)
 
 
 async def list_periods(entity_code: str) -> List[Dict[str, Any]]:
@@ -181,15 +207,37 @@ async def list_periods(entity_code: str) -> List[Dict[str, Any]]:
         return [_period_dict(r) for r in rows]
 
 
-async def assert_writable(entity_code: str, period_code: str) -> Dict[str, Any]:
-    period = await get_period(entity_code, period_code)
-    if not period["is_writable"]:
-        raise LedgerError(
-            f"PERIOD_LOCKED: 期間 {period_code} 狀態為 {period['status']}"
-            + (f"，由 {period['closed_by_principal_key']} 於 {period['closed_at']} 封存。" if period["closed_at"] else "。")
-            + " 已封存的期間不可再寫入分錄。"
-        )
-    return period
+async def assert_writable(
+    entity_code: str, period_code: str, accounting_date: str | None = None,
+    *, session: AsyncSession | None = None,
+) -> Dict[str, Any]:
+    """Check all non-writable periods containing the actual accounting date.
+
+    Without a date, conservatively reject any lock overlapping the whole period.
+    The lookup joins the caller's transaction, without taking additional period
+    row locks after the selected period lock. This does not serialize concurrent
+    period close/post operations or prevent insertion of a new overlapping lock.
+    """
+    start, end, _, _ = period_bounds(period_code)
+    if accounting_date is not None:
+        validate_posting_date(accounting_date, period_code)
+        start = end = accounting_date
+    async with transaction_session(db_manager, session) as session:
+        period = await get_period(entity_code, period_code, session=session)
+        blocked = (await session.execute(select(FiscalPeriodModel).where(
+            FiscalPeriodModel.entity_code == entity_code,
+            FiscalPeriodModel.status.notin_(("OPEN", "SOFT_CLOSE")),
+            FiscalPeriodModel.start_date <= end,
+            FiscalPeriodModel.end_date >= start,
+        ).order_by(FiscalPeriodModel.period_code))).scalars().first()
+        if blocked is not None:
+            locked = _period_dict(blocked)
+            raise LedgerError(
+                f"PERIOD_LOCKED: 期間 {locked['period_code']} 狀態為 {locked['status']}"
+                + (f"，由 {locked['closed_by_principal_key']} 於 {locked['closed_at']} 封存。" if locked["closed_at"] else "。")
+                + " 已封存的期間不可再寫入分錄。"
+            )
+        return period
 
 
 # ---------------------------------------------------------------------------
@@ -214,10 +262,10 @@ def _account_dict(m: ChartOfAccountsModel) -> Dict[str, Any]:
     }
 
 
-async def get_chart(entity_code: str, include_inactive: bool = False) -> List[Dict[str, Any]]:
+async def get_chart(entity_code: str, include_inactive: bool = False, *, session: AsyncSession | None = None) -> List[Dict[str, Any]]:
     from sqlalchemy import select
 
-    async with db_manager.session_factory() as session:
+    async with transaction_session(db_manager, session) as session:
         stmt = (
             select(ChartOfAccountsModel)
             .where(ChartOfAccountsModel.entity_code == entity_code)
@@ -228,8 +276,8 @@ async def get_chart(entity_code: str, include_inactive: bool = False) -> List[Di
     return out if include_inactive else [a for a in out if a["is_active"]]
 
 
-async def account_by_code(entity_code: str, account_code: str) -> Optional[Dict[str, Any]]:
-    for account in await get_chart(entity_code, include_inactive=True):
+async def account_by_code(entity_code: str, account_code: str, *, session: AsyncSession | None = None) -> Optional[Dict[str, Any]]:
+    for account in await get_chart(entity_code, include_inactive=True, session=session):
         if account["account_code"] == account_code:
             return account
     return None
@@ -387,20 +435,21 @@ async def list_tax_codes(entity_code: str) -> List[Dict[str, Any]]:
 # The ledger
 # ---------------------------------------------------------------------------
 
-async def write_lines_for_entry(journal: Dict[str, Any]) -> List[Dict[str, Any]]:
+async def write_lines_for_entry(journal: Dict[str, Any], *, session: AsyncSession | None = None) -> List[Dict[str, Any]]:
     """
     Project a posted voucher into the ledger. Called once, at posting: drafts keep
     their own `lines_json` so they stay editable, and the ledger only ever sees
     entries that have been approved.
     """
     entity_code = journal["entity_code"]
-    period_code = journal.get("period") or str(journal.get("accounting_date"))[:7]
+    period_code = validate_posting_date(journal.get("accounting_date"), journal.get("period"))
     entry_layer = journal.get("entry_layer") or "OPERATIONAL"
     currency = journal.get("currency") or ""
     rate = str(journal.get("exchange_rate") or "1.00000000")
 
     written: List[Dict[str, Any]] = []
-    async with db_manager.session_factory() as session:
+    async with transaction_session(db_manager, session) as session:
+        await assert_writable(entity_code, period_code, journal["accounting_date"], session=session)
         # Replacing rather than appending makes the write idempotent: a retry
         # after a partial failure cannot double-post the same voucher.
         existing = (
@@ -410,7 +459,7 @@ async def write_lines_for_entry(journal: Dict[str, Any]) -> List[Dict[str, Any]]
             await session.delete(row)
 
         for line in journal.get("lines", []):
-            account = await account_by_code(entity_code, line["account_code"])
+            account = await account_by_code(entity_code, line["account_code"], session=session)
             if not account:
                 raise LedgerError(f"COA_MISSING_ACCOUNT: 科目 {line['account_code']} 不存在於科目表。")
             tx_dr, tx_cr = q4(line.get("debit") or 0), q4(line.get("credit") or 0)
@@ -443,7 +492,7 @@ async def write_lines_for_entry(journal: Dict[str, Any]) -> List[Dict[str, Any]]
             )
             session.add(model)
             written.append({"account_code": model.account_code, "line_id": model.line_id})
-        await session.commit()
+        await session.flush()
     return written
 
 
@@ -454,20 +503,23 @@ async def get_lines(
     counterparty_id: str = "",
     limit: int = 0,
 ) -> List[Dict[str, Any]]:
-    from sqlalchemy import select
-
+    """Read movements by inclusive accounting dates, regardless of stored label."""
+    bounds = period_bounds(period_code) if period_code else None
     async with db_manager.session_factory() as session:
         stmt = select(JournalLineModel).where(JournalLineModel.entity_code == entity_code)
         if account_code:
             stmt = stmt.where(JournalLineModel.account_code == account_code)
-        if period_code:
-            stmt = stmt.where(JournalLineModel.period_code == period_code)
+        if bounds:
+            stmt = stmt.where(JournalLineModel.accounting_date >= bounds[0],
+                              JournalLineModel.accounting_date <= bounds[1])
         if counterparty_id:
             stmt = stmt.where(JournalLineModel.counterparty_id == counterparty_id)
         stmt = stmt.order_by(JournalLineModel.accounting_date, JournalLineModel.line_number)
         if limit:
             stmt = stmt.limit(limit)
         rows = (await session.execute(stmt)).scalars().all()
+    for row in rows:
+        validate_posting_date(row.accounting_date, row.period_code)
     return [
         {
             "line_id": m.line_id,
@@ -537,10 +589,14 @@ async def derive_balances(entity_code: str, period_code: str) -> Dict[str, Accou
     One pass over the entity's lines produces every account's opening, period
     movement, adjustments and closing balance for a given period.
     """
-    period = await get_period(entity_code, period_code)
-    start_date = period["start_date"]
+    await get_period(entity_code, period_code)
+    start_date, end_date, _, _ = period_bounds(period_code)
     chart = await get_chart(entity_code, include_inactive=True)
     lines = await get_lines(entity_code)
+    # Fail closed on legacy corruption, including future rows and unknown accounts.
+    # Do not reinterpret historical dates or silently repair persisted periods.
+    for line in lines:
+        validate_posting_date(line["accounting_date"], line["period_code"])
 
     balances: Dict[str, AccountBalance] = {}
     for account in chart:
@@ -552,7 +608,7 @@ async def derive_balances(entity_code: str, period_code: str) -> Dict[str, Accou
                 continue
             dr = Decimal(line["func_debit"] or "0")
             cr = Decimal(line["func_credit"] or "0")
-            if line["period_code"] == period_code:
+            if start_date <= line["accounting_date"] <= end_date:
                 if line["entry_layer"] in ADJUSTMENT_LAYERS:
                     aj_dr += dr
                     aj_cr += cr
@@ -645,10 +701,13 @@ async def trial_balance(entity_code: str, period_code: str) -> List[Dict[str, An
 async def assert_trial_balance(entity_code: str, period_code: str) -> Dict[str, Any]:
     """Σ debits ≡ Σ credits, entity-wide and for the period. This is the check
     that has to pass before a period may be locked."""
+    start, end, _, _ = period_bounds(period_code)
     lines = await get_lines(entity_code)
+    for line in lines:
+        validate_posting_date(line["accounting_date"], line["period_code"])
     all_dr = sum((Decimal(l["func_debit"] or "0") for l in lines), ZERO)
     all_cr = sum((Decimal(l["func_credit"] or "0") for l in lines), ZERO)
-    period_lines = [l for l in lines if l["period_code"] == period_code]
+    period_lines = [l for l in lines if start <= l["accounting_date"] <= end]
     p_dr = sum((Decimal(l["func_debit"] or "0") for l in period_lines), ZERO)
     p_cr = sum((Decimal(l["func_credit"] or "0") for l in period_lines), ZERO)
     return {
@@ -730,11 +789,15 @@ async def close_period(entity_code: str, period_code: str, principal_key: str) -
     if period["status"] == "LOCKED":
         raise LedgerError(f"PERIOD_ALREADY_LOCKED: 期間 {period_code} 已經封存。")
 
+    start, end, _, _ = period_bounds(period_code)
     journals = await _journals(entity_code)
-    pending = [
-        j for j in journals
-        if j.get("period") == period_code and j.get("status") in ("DRAFT", "PENDING_CHECKER", "AWAITING_CPA")
-    ]
+    pending = []
+    for journal in journals:
+        if journal.get("status") not in ("DRAFT", "PENDING_CHECKER", "AWAITING_CPA"):
+            continue
+        validate_posting_date(journal.get("accounting_date"), journal.get("period"))
+        if start <= journal["accounting_date"] <= end:
+            pending.append(journal)
     if pending:
         listing = "、".join((j.get("voucher_no") or j.get("journal_id", "")) for j in pending[:5])
         raise LedgerError(
@@ -851,6 +914,7 @@ async def migrate_entity_core(
 
     from app.core.repository import repo
 
+    period_bounds(seed_period)
     legacy = await repo.get_trial_balance_accounts(entity_code)
     if not legacy:
         return {"status": "NO_SEED_DATA"}
@@ -895,14 +959,14 @@ async def migrate_entity_core(
         (
             "OPENING",
             prior,
-            f"{prior}-{calendar.monthrange(int(prior[:4]), int(prior[5:7]))[1]:02d}",
+            period_bounds(prior)[1],
             "期初餘額",
             [(r.account_code, r.opening_balance) for r in legacy if r.opening_balance != ZERO],
         ),
         (
             "OPERATIONAL",
             seed_period,
-            f"{seed_period}-15",
+            f"{period_bounds(seed_period)[0][:7]}-15",
             "本期發生額",
             [(r.account_code, r.period_op_debit) for r in legacy if r.period_op_debit != ZERO]
             + [(r.account_code, -r.period_op_credit) for r in legacy if r.period_op_credit != ZERO],
@@ -910,7 +974,7 @@ async def migrate_entity_core(
         (
             "AJE_MONTH_END",
             seed_period,
-            f"{seed_period}-28",
+            f"{period_bounds(seed_period)[0][:7]}-28",
             "期末調整分錄",
             [(r.account_code, r.adjustment_debit) for r in legacy if r.adjustment_debit != ZERO]
             + [(r.account_code, -r.adjustment_credit) for r in legacy if r.adjustment_credit != ZERO],
@@ -950,6 +1014,8 @@ async def _write_migration_voucher(
     """
     from app.core.repository import repo
 
+    validate_posting_date(accounting_date, period_code)
+    await assert_writable(entity_code, period_code, accounting_date)
     lines: List[Dict[str, Any]] = []
     total_dr = total_cr = ZERO
     for index, (account_code, signed) in enumerate(amounts, start=1):
@@ -1046,7 +1112,7 @@ async def cash_flow_breakdown(entity_code: str, period_code: str) -> Dict[str, A
     cash_codes = {code for code, a in chart.items() if a["fs_category"] == "CASH"}
     period = await get_period(entity_code, period_code)
 
-    lines = [l for l in await get_lines(entity_code) if l["period_code"] == period_code]
+    lines = await get_lines(entity_code, period_code=period_code)
     by_entry: Dict[str, List[Dict[str, Any]]] = {}
     for line in lines:
         by_entry.setdefault(line["journal_id"], []).append(line)

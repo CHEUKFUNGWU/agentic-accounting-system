@@ -17,7 +17,7 @@ from typing import Any, AsyncGenerator, Dict
 
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.api_auth import router as auth_router
@@ -26,7 +26,7 @@ from app.api_monolith import router as monolith_router
 from app.api_documents import router as document_router
 from app.api_vouchers import router as voucher_router
 from app.mcp_roles import mount_role_servers
-from app.core.repository import repo
+from app.core.repository import JournalConflict, repo
 from app.core.ledger import migrate_entity_core
 from app.mcp_server import (
     ENTITIES,
@@ -88,6 +88,11 @@ app = FastAPI(
     lifespan=lifespan,
     dependencies=[Depends(enforce_api_access)],
 )
+
+@app.exception_handler(JournalConflict)
+async def journal_conflict_handler(request, exc: JournalConflict):
+    return JSONResponse(status_code=409, content={"detail": str(exc)})
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -297,9 +302,10 @@ async def review_journal_endpoint(journal_id: str, body: JournalReviewRequest, p
         journal_id=journal_id,
         action=body.action,
         rejection_reason=body.rejection_reason,
+        authenticated_principal_id=principal.principal_id,
     )
     if res.get("status") == "ERROR":
-        raise HTTPException(status_code=400, detail=res["reason"])
+        raise HTTPException(status_code=409 if res.get("conflict") else res.get("status_code", 400), detail=res["reason"])
     return res
 
 

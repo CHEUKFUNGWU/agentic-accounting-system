@@ -22,7 +22,9 @@ number, a per-line 摘要, the attached source documents, and a signature strip.
 from __future__ import annotations
 
 import hashlib
+import os
 import re
+import tempfile
 from datetime import date, datetime, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -80,8 +82,19 @@ def save_attachment(entity_code: str, filename: str, content: bytes, mime: str, 
     sha256 = hashlib.sha256(content).hexdigest()
     stored_name = f"{sha256[:16]}-{_safe_filename(filename)}"
     target = _entity_dir(entity_code) / stored_name
-    if not target.exists():
-        target.write_bytes(content)
+    # Publish complete bytes with an exclusive link. Other processes must not
+    # observe a partially written evidence file, or overwrite existing evidence.
+    fd, staging = tempfile.mkstemp(dir=target.parent, prefix=".upload-")
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(content)
+        try:
+            os.link(staging, target)
+        except FileExistsError:
+            if target.read_bytes() != content:
+                raise VoucherError("DOCUMENT_HASH_MISMATCH: Existing evidence bytes differ.")
+    finally:
+        os.unlink(staging)  # Only the private staging link, never evidence.
     return {
         "kind": "voucher_attachment",
         "name": _safe_filename(filename),
@@ -113,9 +126,17 @@ def voucher_prefix(period: str) -> str:
     return f"記-{period}"
 
 
-async def next_voucher_no(entity_code: str, period: str) -> str:
-    existing = await repo.get_journals(entity_code=entity_code)
-    used = [j.get("voucher_no") or "" for j in existing]
+async def next_voucher_no(entity_code: str, period: str, *, session=None) -> str:
+    if session is None:
+        existing = await repo.get_journals(entity_code=entity_code)
+        used = [j.get("voucher_no") or "" for j in existing]
+    else:
+        from sqlalchemy import select
+        from app.core.db import JournalEntryModel
+
+        used = list((await session.scalars(select(JournalEntryModel.voucher_no).where(
+            JournalEntryModel.entity_code == entity_code,
+        ))).all())
     n = 1
     while f"{voucher_prefix(period)}-{n:04d}" in used:
         n += 1
@@ -336,6 +357,7 @@ def summarise(journal: Dict[str, Any]) -> Dict[str, Any]:
     lines = journal.get("lines", []) or []
     return {
         "journal_id": journal.get("journal_id"),
+        "revision": journal.get("revision"),
         "voucher_no": journal.get("voucher_no"),
         "entity_code": journal.get("entity_code"),
         "period": journal.get("period"),

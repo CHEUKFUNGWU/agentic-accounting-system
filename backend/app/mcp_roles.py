@@ -28,7 +28,7 @@ Exposure matrix (see core/positions.py for the authoritative scopes):
     submit_voucher             .       x        x          x      .       .
     reverse_voucher            .       x        x          x      .       .
     get_pending_reviews        .       .        x          x      x       .
-    review_voucher             .       .        x          x      x       .
+    review_voucher             .       .        .          .      .       .   (human only; not on agent surfaces)
     raise_exception            x       x        x          x      .       .
     list_exceptions            .       .        x          x      .       .
     resolve_exception          .       .        .          x      .       .
@@ -43,7 +43,7 @@ import logging
 import re
 import time
 from contextvars import ContextVar
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
@@ -63,7 +63,7 @@ from app.core.positions import (
     required_reviewer,
     visible_accounts,
 )
-from app.core.posting import PostingError, post_voucher
+from app.core.posting import PostingError, build_reversal_lines, post_voucher
 from app.core.repository import repo
 
 logger = logging.getLogger("agentic_accounting.mcp_audit")
@@ -422,6 +422,9 @@ async def _create_voucher(
     lines: List[Dict[str, Any]],
     uncertain: Optional[List[str]] = None,
     attachments: Optional[List[Dict[str, str]]] = None,
+    *,
+    db_session=None,
+    proposal=None,
 ) -> Dict[str, Any]:
     position = session.position
     if not position.can_prepare:
@@ -432,7 +435,7 @@ async def _create_voucher(
     from app.core.ledger import LedgerError, assert_writable
 
     try:
-        await assert_writable(entity_code, period_of(accounting_date))
+        await assert_writable(entity_code, period_of(accounting_date), accounting_date, session=db_session)
     except LedgerError as e:
         raise ToolError(str(e))
 
@@ -465,7 +468,11 @@ async def _create_voucher(
             f"但這張憑證包含 {', '.join(outside)}。請交對應崗位編制。"
         )
 
-    accounts = await _accounts_by_code(entity_code)
+    if db_session is None:
+        accounts = await _accounts_by_code(entity_code)
+    else:
+        from app.core.ledger import get_chart
+        accounts = {a["account_code"]: a for a in await get_chart(entity_code, include_inactive=True, session=db_session)}
     missing = [c for c in codes if c not in accounts]
     if missing:
         raise ToolError(f"COA_MISSING_ACCOUNT: 科目 {', '.join(missing)} 不存在於科目表。")
@@ -488,14 +495,11 @@ async def _create_voucher(
             )
         )
 
-    from app.mcp_server import PRINCIPALS
-
-    principal = PRINCIPALS[session.principal_key]
     journal = {
         "journal_id": str(uuid4()),
         "entity_code": entity_code,
         "period": period_of(accounting_date),
-        "voucher_no": await vz.next_voucher_no(entity_code, period_of(accounting_date)),
+        "voucher_no": await vz.next_voucher_no(entity_code, period_of(accounting_date), session=db_session),
         "accounting_date": accounting_date,
         "currency": "AUD",
         "status": "DRAFT",
@@ -507,7 +511,7 @@ async def _create_voucher(
         "lines": parsed,
         "evidence_uris": evidence,
         "created_by_principal_key": session.principal_key,
-        "created_by_principal_id": str(principal.principal_id),
+        "created_by_principal_id": session.principal_id,
         # The declarer's own uncertainty is carried into the record so the
         # reviewer sees what the machine was unsure about, not just its output.
         "ai_reasoning_summary": ("UNCERTAIN: " + "；".join(uncertain)) if uncertain else "",
@@ -517,7 +521,12 @@ async def _create_voucher(
     if entity:
         journal["currency"] = entity.get("currency", "AUD")
 
-    await repo.save_journal(journal)
+    if proposal is not None:
+        journal["proposal_json"] = json.dumps(proposal, ensure_ascii=False)
+    if db_session is None:
+        await repo.save_journal(journal)
+    else:
+        await repo.insert_draft(journal, session=db_session)
     return {
         "journal_id": journal["journal_id"],
         "voucher_no": journal["voucher_no"],
@@ -529,7 +538,9 @@ async def _create_voucher(
 
 
 def period_of(accounting_date: str) -> str:
-    return accounting_date[:7]
+    from app.core.ledger import validate_posting_date
+
+    return validate_posting_date(accounting_date)
 
 
 async def _propose_entry_from_document(
@@ -591,34 +602,37 @@ async def _propose_entry_from_document(
             "（例如 vendor / amount / date / tax）。複核人要比對的是你讀到了什麼。"
         )
 
-    result = await _create_voucher(
-        session,
-        entity_code=entity_code,
-        accounting_date=accounting_date,
-        memo=memo,
-        basis="MATCHED" if matched_to else "EXTRACTED",
-        lines=proposed_lines,
-        uncertain=uncertain,
-        attachments=[{"filename": filename, "content_base64": content_b64, "mime": (document or {}).get("mime", "")}],
-    )
+    from app.core import document_sources as sources
 
-    journal = await repo.get_journal(result["journal_id"])
-    if journal:
-        journal["proposal_json"] = json.dumps(
-            {
-                "document_kind": document_kind or "unknown",
-                "document_name": filename,
-                "document_sha256": actual_sha256,
-                "matched_to": matched_to or None,
-                "extracted_fields": extracted_fields,
-                "uncertain": uncertain or [],
-                "proposed_by_position": position.position_id,
-                "proposed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-            },
-            ensure_ascii=False,
-        )
-        await repo.save_journal(journal)
-        result["proposal"] = json.loads(journal["proposal_json"])
+    proposal = {
+        "document_kind": document_kind or "unknown",
+        "document_name": filename,
+        "document_sha256": actual_sha256,
+        "matched_to": matched_to or None,
+        "extracted_fields": extracted_fields,
+        "uncertain": uncertain or [],
+        "proposed_by_position": position.position_id,
+        "proposed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    }
+    try:
+        async with sources.entity_transaction(entity_code) as db_session:
+            source = await sources.require_unused(db_session, entity_code, actual_sha256)
+            result = await _create_voucher(
+                session,
+                entity_code=entity_code,
+                accounting_date=accounting_date,
+                memo=memo,
+                basis="MATCHED" if matched_to else "EXTRACTED",
+                lines=proposed_lines,
+                uncertain=uncertain,
+                attachments=[{"filename": filename, "content_base64": content_b64, "mime": (document or {}).get("mime", "")}],
+                db_session=db_session,
+                proposal=proposal,
+            )
+            await sources.link_source(db_session, source, result["journal_id"])
+    except (sources.SourceError, vz.VoucherError) as e:
+        raise ToolError(str(e))
+    result["proposal"] = proposal
 
     result["message"] = (
         "提案已建立並綁定文件雜湊。複核人會比對 extracted_fields 與原始單據，"
@@ -722,7 +736,13 @@ async def _reverse_voucher(session: PositionSession, journal_id: str, reason: st
     if original.get("status") != "POSTED":
         raise ToolError(f"CANNOT_REVERSE: 只有已過賬憑證可沖銷（目前 {original.get('status')}）。")
 
-    original_codes = [l["account_code"] for l in original.get("lines", [])]
+    if original.get("reversal_of_journal_id") or original.get("source_module") == "REVERSAL":
+        raise ToolError("REVERSAL_INVALID: reversing a posted reversal is not supported.")
+    try:
+        lines = await build_reversal_lines(original, reason=reason)
+    except PostingError as exc:
+        raise ToolError(str(exc)) from exc
+    original_codes = [line["account_code"] for line in lines]
     outside = out_of_scope(session.position, original_codes)
     if outside:
         raise ToolError(
@@ -730,36 +750,28 @@ async def _reverse_voucher(session: PositionSession, journal_id: str, reason: st
             "請交對應崗位或會計主任沖銷。"
         )
 
-    lines = []
-    for l in original.get("lines", []):
-        lines.append(
-            {
-                "line_number": l["line_number"],
-                "account_code": l["account_code"],
-                "account_name": l.get("account_name", ""),
-                "debit": l.get("credit", "0.0000"),
-                "credit": l.get("debit", "0.0000"),
-                "memo": f"沖銷 {original.get('voucher_no')}：{reason}",
-                "counterparty": l.get("counterparty", ""),
-                "tax_code": l.get("tax_code", ""),
-                "business_use_pct": l.get("business_use_pct", "1.0000"),
-            }
-        )
-
     from app.mcp_server import PRINCIPALS
 
     principal = PRINCIPALS[session.principal_key]
     entity_code = original["entity_code"]
-    period = original.get("period") or period_of(date.today().isoformat())
+    from app.core.ledger import LedgerError, assert_writable
+
+    accounting_date = date.today().isoformat()
+    try:
+        period = period_of(accounting_date)
+        await assert_writable(entity_code, period, accounting_date)
+    except LedgerError as e:
+        raise ToolError(str(e))
     journal = {
         "journal_id": str(uuid4()),
         "entity_code": entity_code,
         "period": period,
         "voucher_no": await vz.next_voucher_no(entity_code, period),
-        "accounting_date": date.today().isoformat(),
+        "accounting_date": accounting_date,
         "currency": original.get("currency"),
         "status": "DRAFT",
         "source_module": "REVERSAL",
+        "entry_layer": original["entry_layer"],
         "basis": "MANUAL",
         "memo": f"沖銷憑證 {original.get('voucher_no')}：{reason}",
         "total_debit": original.get("total_credit"),
@@ -812,25 +824,17 @@ async def _review_voucher(
             f"INVALID_STATE: 憑證 {journal.get('voucher_no')} 狀態為 {journal.get('status')}，不在待複核佇列。"
         )
 
-    preparer_key = journal.get("created_by_principal_key")
-    preparer = position_for_principal(preparer_key or "")
-    if not preparer:
-        raise ToolError(f"UNKNOWN_PREPARER_POSITION: 無法判定 '{preparer_key}' 的崗位。")
+    from app.core.reviewer import authorize_review, validate_verdict
 
-    # 1) 崗位規則：誰的憑證該誰複核。
-    if not may_review(session.position, preparer):
-        required = required_reviewer(preparer)
-        raise ToolError(
-            f"SOD_POSITION_VIOLATION: {session.position.title_zh} 不可複核 {preparer.title_zh} 編制的憑證，"
-            f"應由 {required.title_zh}（{required.position_id}）複核。"
-        )
-    # 2) 製單人不可複核自己編的。
-    if str(journal.get("created_by_principal_id")) == session.principal_id:
-        raise ToolError("SOD_MAKER_CHECKER_VIOLATION: 製單人不可複核自己編制的憑證。")
-
-    verdict = (verdict or "").upper()
-    if verdict not in ("APPROVE", "REJECT", "ESCALATE"):
-        raise ToolError("INVALID_VERDICT: verdict 必須是 APPROVE / REJECT / ESCALATE。")
+    try:
+        verdict = validate_verdict(verdict)
+        authority = await authorize_review(session.principal_key, journal, principal_id=session.principal_id)
+    except ValueError as exc:
+        raise ToolError(str(exc)) from exc
+    preparer = authority.preparer
+    # Use current auth-bound authority, never a stale/display session position.
+    session = replace(session, position=authority.position,
+                      principal_id=str(authority.identity.principal_id))
 
     # 3) 複核要有內容：核准必須附上檢查清單，否則只是蓋章。
     if verdict == "APPROVE" and not (checked or []):
@@ -891,14 +895,6 @@ async def _review_voucher(
         )
     except PostingError as e:
         raise ToolError(str(e))
-
-    # 沖銷憑證過賬後，原憑證標記為已沖銷（不刪不改）。
-    reversal_of = journal.get("reversal_of_journal_id")
-    if reversal_of:
-        original = await repo.get_journal(reversal_of)
-        if original and original.get("status") == "POSTED":
-            original["status"] = "REVERSED"
-            await repo.save_journal(original)
 
     return {
         "voucher_no": journal.get("voucher_no"),
@@ -1177,22 +1173,10 @@ def build_role_server(position: Position) -> FastMCP:
             """Vouchers waiting for this position. Never includes your own work."""
             return await _get_pending_reviews(current_session(), entity_code)
 
-        @server.tool()
-        async def review_voucher(
-            journal_id: str,
-            verdict: str,
-            checked: Optional[List[str]] = None,
-            reason: str = "",
-        ) -> Dict[str, Any]:
-            """
-            Approve, reject or escalate a voucher.
-
-            verdict: APPROVE / REJECT / ESCALATE.
-            APPROVE requires `checked` — the list of things you actually verified.
-            REJECT and ESCALATE require `reason`.
-            Escalation is for capability, scope or missing evidence, not for amount.
-            """
-            return await _review_voucher(current_session(), journal_id, verdict, checked, reason)
+        # review_voucher is deliberately not registered: these surfaces only admit
+        # agent credentials, and review decisions require a human (ADR-0001 O2-g).
+        # _review_voucher remains the shared implementation, guarded again by
+        # authorize_review for any future human-authenticated session.
 
     # ---- exceptions -----------------------------------------------------
     if position.can_prepare or position.can_review:

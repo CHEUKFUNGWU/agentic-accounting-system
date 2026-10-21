@@ -39,7 +39,7 @@ async def test_maker_cannot_approve_own_proposal():
     assert "SOD_MAKER_CHECKER_VIOLATION" in self_approve_res["reason"]
 
     # 3. Checker approval -> Must succeed and produce SHA-256 hash
-    checker_key = "controller-checker-01"
+    checker_key = "test-gl-human"
     approve_res = await review_and_approve_proposal(
         agent_principal_key=checker_key,
         journal_id=journal_id,
@@ -63,7 +63,7 @@ async def test_rejection_flow():
     Validates that a reviewer can reject a proposal with a formal reason.
     """
     maker_key = "bookkeeper-maker-01"
-    checker_key = "controller-checker-01"
+    checker_key = "test-gl-human"
 
     prop_res = await propose_expense_with_personal_split(
         agent_principal_key=maker_key,

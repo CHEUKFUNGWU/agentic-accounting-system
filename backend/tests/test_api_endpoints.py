@@ -81,7 +81,7 @@ async def test_personal_split_and_review_workflow_endpoints(client: AsyncClient)
     journal_id = wh_data["maker_result"]["split_entry"]["journal_id"]
 
     # 2. Fetch pending journals
-    await agent_as(client, "controller-checker-01")
+    await login_as(client, "test-gl-human")
     pending_resp = await client.get("/api/v1/journals/pending?entity_code=AU-OPC-01")
     assert pending_resp.status_code == 200
     pending_list = pending_resp.json()["journals"]

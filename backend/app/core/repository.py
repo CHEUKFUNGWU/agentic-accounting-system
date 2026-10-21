@@ -11,7 +11,11 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import delete, func, select, text, update
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.transactions import transaction_session
 
 from app.core.db import (
     CustomAJELogModel,
@@ -102,6 +106,7 @@ def journal_to_dict(m: "JournalEntryModel") -> Dict[str, Any]:
     """Single place that turns a stored voucher row into the API shape."""
     return {
         "journal_id": m.journal_id,
+        "revision": m.revision,
         "entity_code": m.entity_code,
         "source_module": m.source_module,
         "status": m.status,
@@ -133,6 +138,15 @@ def journal_to_dict(m: "JournalEntryModel") -> Dict[str, Any]:
         "proposal_json": m.proposal_json,
         "lines": json.loads(m.lines_json or "[]"),
     }
+
+
+class JournalConflict(ValueError):
+    """The persisted voucher changed, or the requested write is not allowed."""
+
+
+def _journal_datetime(value):
+    # get_journal returns ISO strings, while SQLAlchemy DateTime needs datetime.
+    return datetime.fromisoformat(value) if isinstance(value, str) else value
 
 
 class AccountingRepository:
@@ -352,43 +366,116 @@ class AccountingRepository:
             ]
 
     async def save_journal(self, entry: Dict[str, Any]) -> None:
-        async with self.manager.session_factory() as session:
-            model = JournalEntryModel(
-                journal_id=entry["journal_id"],
-                entity_code=entry["entity_code"],
-                source_module=entry.get("source_module", "MANUAL"),
-                status=entry.get("status", "POSTED"),
-                accounting_date=entry["accounting_date"],
-                currency=entry["currency"],
-                total_debit=str(entry["total_debit"]),
-                total_credit=str(entry["total_credit"]),
-                created_by_principal_key=entry["created_by_principal_key"],
-                created_by_principal_id=str(entry["created_by_principal_id"]),
-                approved_by_principal_key=entry.get("approved_by_principal_key"),
-                approved_by_principal_id=str(entry.get("approved_by_principal_id")) if entry.get("approved_by_principal_id") else None,
-                ai_confidence_score=str(entry.get("ai_confidence_score", "1.0000")),
-                ai_reasoning_summary=entry.get("ai_reasoning_summary", ""),
-                evidence_uris=json.dumps(entry.get("evidence_uris", [])),
-                entry_hash=entry.get("entry_hash"),
-                prev_entry_hash=entry.get("prev_entry_hash"),
-                lines_json=json.dumps(entry.get("lines", [])),
-                voucher_no=entry.get("voucher_no"),
-                period=entry.get("period"),
-                memo=entry.get("memo"),
-                reject_reason=entry.get("reject_reason"),
-                submitted_at=entry.get("submitted_at"),
-                reversal_of_journal_id=entry.get("reversal_of_journal_id"),
-                basis=entry.get("basis"),
-                entry_layer=entry.get("entry_layer"),
-                review_notes=entry.get("review_notes"),
-                proposal_json=entry.get("proposal_json"),
-            )
-            await session.merge(model)
-            await session.commit()
+        """Create from a dict, or replace the revision read by this caller.
 
-    async def get_journal(self, journal_id: str) -> Optional[Dict[str, Any]]:
-        async with self.manager.session_factory() as session:
-            stmt = select(JournalEntryModel).where(JournalEntryModel.journal_id == journal_id)
+        Existing rows require a revision, including zero for migrated rows.
+        Never infer one at save time: that would make stale dicts unconditional
+        overwrites again. Only update the caller's revision after commit.
+        """
+        try:
+            async with self.manager.session_factory() as session, session.begin():
+                if self.manager.is_sqlite:
+                    await session.execute(text("BEGIN IMMEDIATE"))
+                current = (await session.execute(
+                    select(JournalEntryModel).where(
+                        JournalEntryModel.journal_id == entry["journal_id"]
+                    ).with_for_update()
+                )).scalar_one_or_none()
+                if current is not None and entry.get("revision") != current.revision:
+                    raise JournalConflict("VOUCHER_REVISION_CONFLICT: Reload before saving.")
+                if current is None and "revision" in entry:
+                    raise JournalConflict("VOUCHER_REVISION_CONFLICT: Voucher no longer exists.")
+                model = self._journal_model(entry)
+                values = {key: value for key, value in vars(model).items() if not key.startswith("_")}
+                if current is None:
+                    session.add(model)
+                    revision = 0
+                else:
+                    revision = current.revision + 1
+                    if current.status in ("POSTED", "REVERSED", "VOID"):
+                        # The only finalized transition is a status-only reversal.
+                        changed = [key for key, value in values.items()
+                                   if key != "status" and value != getattr(current, key)]
+                        if changed or not (model.status == current.status or
+                                           current.status == "POSTED" and model.status == "REVERSED"):
+                            raise JournalConflict("VOUCHER_IMMUTABLE: Finalized fields cannot change.")
+                        values = {"status": model.status}
+                    else:
+                        transitions = {
+                            "DRAFT": {"DRAFT", "PENDING_CHECKER", "VOID"},
+                            "REJECTED": {"REJECTED", "DRAFT", "PENDING_CHECKER", "VOID"},
+                            "PENDING_CHECKER": {"PENDING_CHECKER", "AWAITING_CPA", "REJECTED"},
+                            "AWAITING_CPA": {"AWAITING_CPA", "REJECTED"},
+                        }
+                        if model.status not in transitions.get(current.status, set()):
+                            raise JournalConflict("VOUCHER_STATE_CONFLICT: Use the posting engine to finalize.")
+                        for key in ("entry_hash", "prev_entry_hash", "block_index", "posted_at"):
+                            if key in values and values[key] != getattr(current, key):
+                                raise JournalConflict("VOUCHER_IMMUTABLE: Only posting may seal a voucher.")
+                    result = await session.execute(update(JournalEntryModel).where(
+                        JournalEntryModel.journal_id == current.journal_id,
+                        JournalEntryModel.revision == current.revision,
+                        JournalEntryModel.status == current.status,
+                    ).values(**values, revision=revision).execution_options(synchronize_session=False))
+                    if result.rowcount != 1:
+                        raise JournalConflict("VOUCHER_REVISION_CONFLICT: Reload before saving.")
+        except IntegrityError as exc:
+            raise JournalConflict("VOUCHER_CREATE_CONFLICT: Journal ID already exists or is invalid.") from exc
+        entry["revision"] = revision
+
+    async def insert_draft(self, entry: Dict[str, Any], *, session: AsyncSession) -> None:
+        """Insert only, in a caller transaction. Never mutate the caller's dict.
+
+        Updates must still go through save_journal's revision/state guards.
+        """
+        if entry.get("status") != "DRAFT" or "revision" in entry:
+            raise JournalConflict("VOUCHER_CREATE_CONFLICT: Expected a new draft.")
+        if any(entry.get(key) for key in ("entry_hash", "prev_entry_hash", "block_index", "posted_at")):
+            raise JournalConflict("VOUCHER_IMMUTABLE: Draft cannot be sealed.")
+        session.add(self._journal_model(entry))
+        await session.flush()
+
+    @staticmethod
+    def _journal_model(entry: Dict[str, Any]) -> JournalEntryModel:
+        model = JournalEntryModel(
+            journal_id=entry["journal_id"],
+            entity_code=entry["entity_code"],
+            source_module=entry.get("source_module", "MANUAL"),
+            status=entry.get("status", "POSTED"),
+            accounting_date=entry["accounting_date"],
+            currency=entry["currency"],
+            total_debit=str(entry["total_debit"]),
+            total_credit=str(entry["total_credit"]),
+            created_by_principal_key=entry["created_by_principal_key"],
+            created_by_principal_id=str(entry["created_by_principal_id"]),
+            approved_by_principal_key=entry.get("approved_by_principal_key"),
+            approved_by_principal_id=str(entry["approved_by_principal_id"]) if entry.get("approved_by_principal_id") else None,
+            ai_confidence_score=str(entry.get("ai_confidence_score", "1.0000")),
+            ai_reasoning_summary=entry.get("ai_reasoning_summary", ""),
+            evidence_uris=json.dumps(entry.get("evidence_uris", [])),
+            entry_hash=entry.get("entry_hash"),
+            prev_entry_hash=entry.get("prev_entry_hash"),
+            lines_json=json.dumps(entry.get("lines", [])),
+            voucher_no=entry.get("voucher_no"),
+            period=entry.get("period"),
+            memo=entry.get("memo"),
+            reject_reason=entry.get("reject_reason"),
+            submitted_at=_journal_datetime(entry.get("submitted_at")),
+            reversal_of_journal_id=entry.get("reversal_of_journal_id"),
+            basis=entry.get("basis"),
+            entry_layer=entry.get("entry_layer"),
+            review_notes=entry.get("review_notes"),
+            proposal_json=entry.get("proposal_json"),
+        )
+        for key in ("block_index", "posted_at", "created_at"):
+            if key in entry:
+                value = entry[key]
+                setattr(model, key, _journal_datetime(value) if key.endswith("_at") else value)
+        return model
+
+    async def get_journal(self, journal_id: str, *, session: AsyncSession | None = None) -> Optional[Dict[str, Any]]:
+        async with transaction_session(self.manager, session) as session:
+            stmt = select(JournalEntryModel).where(JournalEntryModel.journal_id == journal_id).with_for_update()
             res = await session.execute(stmt)
             m = res.scalar_one_or_none()
             if not m:
@@ -629,6 +716,8 @@ class AccountingRepository:
         block_index: int,
         approved_by_principal_key: str,
         approved_by_principal_id: Optional[str],
+        review_notes: Optional[str] = None,
+        session: AsyncSession | None = None,
     ) -> None:
         """
         Guarded transition to POSTED. Refuses unless the voucher is awaiting a
@@ -637,36 +726,50 @@ class AccountingRepository:
         This replaced `post_journal_and_update_etb`: posting no longer writes
         balances anywhere, because balances are derived from journal_lines.
         """
-        async with self.manager.session_factory() as session:
-            async with session.begin():
-                stmt = (
-                    select(JournalEntryModel)
-                    .where(JournalEntryModel.journal_id == journal_id)
-                    .with_for_update()
+        if session is None:
+            async with self.manager.session_factory() as owned, owned.begin():
+                if self.manager.is_sqlite:
+                    await owned.execute(text("BEGIN IMMEDIATE"))
+                await self.mark_posted(
+                    journal_id, entry_hash=entry_hash, prev_entry_hash=prev_entry_hash,
+                    block_index=block_index, approved_by_principal_key=approved_by_principal_key,
+                    approved_by_principal_id=approved_by_principal_id,
+                    review_notes=review_notes, session=owned,
                 )
-                model = (await session.execute(stmt)).scalar_one_or_none()
-                if not model:
-                    raise ValueError(f"Journal '{journal_id}' not found in database.")
-                if model.status not in ("PENDING_CHECKER", "AWAITING_CPA"):
-                    raise ValueError(
-                        f"CANNOT_POST_FINALIZED_JOURNAL: 憑證 '{journal_id}' 目前狀態為 '{model.status}'，"
-                        "不可重複過賬或過賬已結案的分錄。"
-                    )
-                model.status = "POSTED"
-                model.entry_hash = entry_hash
-                model.prev_entry_hash = prev_entry_hash
-                model.block_index = block_index
-                model.posted_at = datetime.now(timezone.utc)
-                model.approved_by_principal_key = approved_by_principal_key
-                model.approved_by_principal_id = approved_by_principal_id
+            return
+        async with transaction_session(self.manager, session) as session:
+            stmt = (
+                select(JournalEntryModel)
+                .where(JournalEntryModel.journal_id == journal_id)
+                .with_for_update()
+            )
+            model = (await session.execute(stmt)).scalar_one_or_none()
+            if not model:
+                raise ValueError(f"Journal '{journal_id}' not found in database.")
+            if model.status not in ("PENDING_CHECKER", "AWAITING_CPA"):
+                raise ValueError(
+                    f"CANNOT_POST_FINALIZED_JOURNAL: 憑證 '{journal_id}' 目前狀態為 '{model.status}'，"
+                    "不可重複過賬或過賬已結案的分錄。"
+                )
+            model.status = "POSTED"
+            model.revision += 1
+            model.entry_hash = entry_hash
+            model.prev_entry_hash = prev_entry_hash
+            model.block_index = block_index
+            model.posted_at = datetime.now(timezone.utc)
+            model.approved_by_principal_key = approved_by_principal_key
+            model.approved_by_principal_id = approved_by_principal_id
+            if review_notes is not None:
+                model.review_notes = review_notes
+            await session.flush()
 
-    async def get_latest_posted_hash(self, entity_code: str) -> str:
-        async with self.manager.session_factory() as session:
+    async def get_latest_posted_hash(self, entity_code: str, *, session: AsyncSession | None = None) -> str:
+        async with transaction_session(self.manager, session) as session:
             stmt = (
                 select(JournalEntryModel.entry_hash)
                 .where(
                     JournalEntryModel.entity_code == entity_code,
-                    JournalEntryModel.status == "POSTED",
+                    JournalEntryModel.status.in_(("POSTED", "REVERSED")),
                     JournalEntryModel.entry_hash.isnot(None),
                 )
                 .order_by(JournalEntryModel.block_index.desc(), JournalEntryModel.posted_at.desc(), JournalEntryModel.created_at.desc())
@@ -676,13 +779,14 @@ class AccountingRepository:
             h = res.scalar_one_or_none()
             return h or "GENESIS_BLOCK_0000000000000000000000000000000000000000000000000000000000"
 
-    async def get_next_block_index(self, entity_code: str) -> int:
-        async with self.manager.session_factory() as session:
+    async def get_next_block_index(self, entity_code: str, *, session: AsyncSession | None = None) -> int:
+        async with transaction_session(self.manager, session) as session:
             stmt = (
                 select(func.max(JournalEntryModel.block_index))
                 .where(
                     JournalEntryModel.entity_code == entity_code,
-                    JournalEntryModel.status == "POSTED",
+                    JournalEntryModel.status.in_(("POSTED", "REVERSED")),
+                    JournalEntryModel.entry_hash.isnot(None),
                 )
             )
             res = await session.execute(stmt)
@@ -702,11 +806,15 @@ class AccountingRepository:
         """
         async with self.manager.session_factory() as session:
             async with session.begin():
+                if self.manager.is_sqlite:
+                    await session.execute(text("BEGIN IMMEDIATE"))
                 stmt = select(JournalEntryModel).where(JournalEntryModel.journal_id == journal["journal_id"]).with_for_update()
                 res = await session.execute(stmt)
                 m = res.scalar_one_or_none()
                 if not m:
                     raise ValueError(f"Journal '{journal['journal_id']}' not found in database.")
+                if journal.get("revision") != m.revision:
+                    raise JournalConflict("VOUCHER_REVISION_CONFLICT: Reload before posting.")
                 if m.status not in ("PENDING_CHECKER", "AWAITING_CPA"):
                     raise ValueError(
                         f"CANNOT_REVIEW_FINALIZED_JOURNAL: Journal '{journal['journal_id']}' is already in status '{m.status}'. "
@@ -714,6 +822,7 @@ class AccountingRepository:
                     )
 
                 m.status = "POSTED"
+                m.revision += 1
                 m.approved_by_principal_key = journal.get("approved_by_principal_key")
                 m.approved_by_principal_id = journal.get("approved_by_principal_id")
                 m.entry_hash = journal.get("entry_hash")

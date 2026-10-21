@@ -5,6 +5,8 @@ import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
+# Never let a developer's DATABASE_URL override test isolation.
+os.environ.pop("DATABASE_URL", None)
 # Point database to isolated temp directory for test execution
 _temp_dir = tempfile.mkdtemp(prefix="agentic_acc_test_")
 os.environ["AGENTIC_ACCOUNTING_DATA_DIR"] = _temp_dir
@@ -12,6 +14,17 @@ os.environ["AGENTIC_ACCOUNTING_DATA_DIR"] = _temp_dir
 from app.core.db import db_manager
 from app.core.repository import repo
 from app.main import app
+
+# Review decisions require a human (ADR-0001 O2-g); tests that review use these.
+HUMAN_IDS = {}
+
+
+def human_session(key, position):
+    from app.core.positions import POSITIONS
+    from app.mcp_roles import PositionSession
+    return PositionSession(principal_key=key, principal_id=HUMAN_IDS[key], position=POSITIONS[position],
+                           credential_id="test", token="test")
+
 
 @pytest.fixture(scope="session", autouse=True)
 def cleanup_temp_dir():
@@ -32,6 +45,17 @@ async def initialize_test_database():
     from app.core.auth import seed_principals, provision_principal
     await seed_principals()
     await provision_principal("test-finance-human", "Test finance operator", "FINANCE_MANAGER", password="test-fixture-password-only")
+    HUMAN_IDS["test-gl-human"] = await provision_principal(
+        "test-gl-human", "Test chief accountant", "GL_ACCOUNTANT", password="test-fixture-password-only")
+    # Same legacy approval limit as the seeded chief-accountant agent it replaces.
+    from sqlalchemy import select, update
+    from app.core.auth import PrincipalModel
+    async with db_manager.session_factory() as db:
+        limit = await db.scalar(select(PrincipalModel.max_auto_approve_func_amount)
+                                .where(PrincipalModel.principal_key == "controller-checker-01"))
+        await db.execute(update(PrincipalModel).where(PrincipalModel.principal_key == "test-gl-human")
+                         .values(max_auto_approve_func_amount=limit))
+        await db.commit()
     await provision_principal("test-cpa-human", "Test external reviewer", "CPA_ADVISOR", password="test-fixture-password-only")
     await provision_principal("test-admin-human", "Test administrator", "ADMIN", password="test-fixture-password-only")
     for code, meta in ENTITIES.items():

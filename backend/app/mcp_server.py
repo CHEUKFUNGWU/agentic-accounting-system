@@ -33,7 +33,7 @@ from app.core.sod_guard import (
     ProposedLine,
 )
 from app.core.posting import PostingError, post_voucher
-from app.core.repository import repo
+from app.core.repository import JournalConflict, repo
 from app.core.reporting import (
     TrialBalanceAccountRow,
     EntityLegalStructure,
@@ -515,6 +515,15 @@ async def propose_expense_with_personal_split(
     except AccountingInvariantError as e:
         return {"status": "ERROR", "reason": str(e)}
 
+    from app.core.ledger import LedgerError, assert_writable, validate_posting_date
+
+    accounting_date = date.today().isoformat()
+    try:
+        period_code = validate_posting_date(accounting_date)
+        await assert_writable(entity_code, period_code, accounting_date)
+    except LedgerError as e:
+        return {"status": "ERROR", "reason": str(e)}
+
     split_entry = {
         "journal_id": str(uuid4()),
         "entity_code": entity_code,
@@ -530,13 +539,14 @@ async def propose_expense_with_personal_split(
     PERSONAL_SPLITS_LOG.setdefault(entity_code, []).append(split_entry)
 
     journal_id = split_entry["journal_id"]
-    JOURNAL_LEDGER[journal_id] = {
+    journal = {
         "journal_id": journal_id,
         "entity_code": entity_code,
         "book_scope": "PRIMARY_STANDALONE",
         "source_module": "EXPENSE_SPLIT",
         "status": JournalStatus.PENDING_CHECKER.value,
-        "accounting_date": date.today().isoformat(),
+        "accounting_date": accounting_date,
+        "period": period_code,
         "currency": entity["currency"],
         "total_debit": str(gross),
         "total_credit": str(gross),
@@ -559,7 +569,8 @@ async def propose_expense_with_personal_split(
     }
 
     await repo.save_personal_split(split_entry)
-    await repo.save_journal(JOURNAL_LEDGER[journal_id])
+    await repo.save_journal(journal)
+    JOURNAL_LEDGER[journal_id] = journal
 
     await orchestrator.publish_outbox_event(
         event_type="adjustment.personal_split_proposed",
@@ -594,7 +605,14 @@ async def propose_adjusting_entry(
     if not entity:
         return {"status": "ERROR", "reason": f"Unknown entity_code: {entity_code}"}
     period_code = period_code or DEFAULT_PERIOD
-    accounting_date = accounting_date or f"{period_code}-28"
+    from app.core.ledger import LedgerError, period_bounds, validate_posting_date
+
+    try:
+        # Preserve the monthly day-28 convention; quarters use their final month.
+        accounting_date = accounting_date or f"{period_bounds(period_code)[1][:7]}-28"
+        validate_posting_date(accounting_date, period_code)
+    except LedgerError as e:
+        return {"status": "ERROR", "reason": str(e)}
 
     if PACK_STATUS_STATE.get(entity_code) == "REVIEWED_AND_LOCKED":
         return {"status": "ERROR", "reason": f"PERIOD_CUTOFF_VIOLATION: Cannot post AJE to entity '{entity_code}' in REVIEWED_AND_LOCKED status."}
@@ -642,7 +660,7 @@ async def propose_adjusting_entry(
         return {"status": "ERROR", "reason": "Debit and credit accounts must differ."}
 
     try:
-        await assert_writable(entity_code, period_code)
+        await assert_writable(entity_code, period_code, accounting_date)
     except Exception as e:
         return {"status": "ERROR", "reason": str(e)}
 
@@ -761,28 +779,27 @@ async def review_and_approve_proposal(
     action: str = "APPROVE",
     rejection_reason: str = "",
     reviewer_principal_key: Optional[str] = None,
+    authenticated_principal_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Controller Reviewer Agent / Human CPA Tool:
     Enforces Maker != Checker Segregation of Duties (SoD), validates proposal confidence
     and account scope, and seals POSTED entries with a SHA-256 cryptographic hash chain.
+
+    Compatibility limit: clients still send only journal_id, not the revision
+    they viewed. We review the latest persisted snapshot and detect changes from
+    that read through commit, but cannot detect decisions based on an old screen.
     """
+    from app.core.reviewer import authorize_review, ReviewAuthorizationError, validate_verdict
+
+    try:
+        action = validate_verdict(action, ("APPROVE", "REJECT"))
+    except ValueError as exc:
+        return {"status": "ERROR", "reason": str(exc), "status_code": 400}
     effective_key = reviewer_principal_key or agent_principal_key
-    reviewer = PRINCIPALS.get(effective_key)
-    if not reviewer:
-        return {"status": "ERROR", "reason": f"Unknown reviewer principal key: '{effective_key}'"}
 
-    if reviewer.role not in (AgentRole.CHECKER_CONTROLLER, AgentRole.HUMAN_CPA):
-        return {
-            "status": "ERROR",
-            "reason": f"SOD_MAKER_CHECKER_VIOLATION: Principal '{reviewer.agent_name}' with role '{reviewer.role.value}' cannot review proposals.",
-        }
-
-    journal = JOURNAL_LEDGER.get(journal_id)
-    if not journal:
-        journal = await repo.get_journal(journal_id)
-        if journal:
-            JOURNAL_LEDGER[journal_id] = journal
+    # A review must never use the process-local reporting cache as its snapshot.
+    journal = await repo.get_journal(journal_id)
     if not journal:
         return {"status": "ERROR", "reason": f"Journal entry '{journal_id}' not found."}
 
@@ -791,14 +808,14 @@ async def review_and_approve_proposal(
         return {
             "status": "ERROR",
             "reason": f"CANNOT_REVIEW_FINALIZED_JOURNAL: Journal '{journal_id}' is already in status '{current_status}'. Cannot review multiple times.",
+            "conflict": True,
         }
 
-    # Strict Maker != Checker enforcement: Maker cannot review/approve/reject their own proposal
-    if str(reviewer.principal_id) == str(journal.get("created_by_principal_id")):
-        return {
-            "status": "ERROR",
-            "reason": "SOD_MAKER_CHECKER_VIOLATION: Approver/Reviewer Principal ID cannot equal Creator Principal ID.",
-        }
+    try:
+        authority = await authorize_review(effective_key, journal, principal_id=authenticated_principal_id)
+    except ReviewAuthorizationError as exc:
+        return {"status": "ERROR", "reason": str(exc), "status_code": 403}
+    reviewer = authority.identity
 
     entity_code = journal["entity_code"]
     if PACK_STATUS_STATE.get(entity_code) == "REVIEWED_AND_LOCKED":
@@ -806,10 +823,14 @@ async def review_and_approve_proposal(
 
     if action.upper() == "REJECT":
         journal["status"] = JournalStatus.REJECTED.value
-        journal["rejection_reason"] = rejection_reason
+        journal["reject_reason"] = rejection_reason
         if rejection_reason:
             journal["ai_reasoning_summary"] = f"REJECTED: {rejection_reason}"
-        await repo.save_journal(journal)
+        try:
+            await repo.save_journal(journal)
+        except JournalConflict as exc:
+            return {"status": "ERROR", "reason": str(exc), "conflict": True}
+        JOURNAL_LEDGER[journal_id] = journal
         await orchestrator.publish_outbox_event(
             event_type="proposal.rejected",
             entity_code=entity_code,
@@ -849,8 +870,9 @@ async def review_and_approve_proposal(
                 approver_principal_key=effective_key,
             )
         except PostingError as e:
-            return {"status": "ERROR", "reason": str(e)}
+            return {"status": "ERROR", "reason": str(e), "conflict": e.is_conflict}
 
+        JOURNAL_LEDGER[journal_id] = journal
         await orchestrator.publish_outbox_event(
             event_type="journal.posted",
             entity_code=entity_code,
@@ -870,7 +892,11 @@ async def review_and_approve_proposal(
             "entry_hash": sealed["entry_hash"],
         }
     else:
-        await repo.save_journal(journal)
+        try:
+            await repo.save_journal(journal)
+        except JournalConflict as exc:
+            return {"status": "ERROR", "reason": str(exc), "conflict": True}
+        JOURNAL_LEDGER[journal_id] = journal
         await orchestrator.publish_outbox_event(
             event_type="proposal.awaiting_cpa",
             entity_code=entity_code,

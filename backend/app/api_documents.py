@@ -33,6 +33,7 @@ from app.core import vouchers as vz
 from app.core.ledger import LedgerError, account_by_code, resolve_counterparty
 from app.core.localization import q4
 from app.core.repository import repo
+from app.core import document_sources as sources
 
 router = APIRouter(prefix="/api/v1", tags=["documents"])
 
@@ -80,13 +81,16 @@ async def create_document(
     if not entity:
         raise HTTPException(status_code=404, detail=f"ENTITY_NOT_FOUND: '{entity_code}'")
 
-    stored = vz.save_attachment(
-        entity_code=entity_code,
-        filename=file.filename or "document",
-        content=content,
-        mime=file.content_type or "",
-        uploaded_by=principal.principal_key,
-    )
+    try:
+        stored = vz.save_attachment(
+            entity_code=entity_code,
+            filename=file.filename or "document",
+            content=content,
+            mime=file.content_type or "",
+            uploaded_by=principal.principal_key,
+        )
+    except vz.VoucherError as e:
+        raise HTTPException(400, str(e))
 
     counterparty_id = None
     counterparty_label = counterparty_name.strip()
@@ -114,8 +118,11 @@ async def create_document(
         "uploaded_by": principal.principal_key,
         "note": note,
     }
-    await repo.save_document(record)
-    return {"document": record}
+    try:
+        canonical = await sources.capture(record, content)
+    except sources.SourceError as e:
+        raise HTTPException(400, str(e))
+    return {"document": canonical}
 
 
 class ToVoucherRequest(BaseModel):
@@ -132,11 +139,17 @@ async def document_to_voucher(document_id: str, body: ToVoucherRequest, principa
     attached. It still has to be submitted and reviewed — this call records, it
     does not post.
     """
-    from app.core.positions import position_for_accounts
+    try:
+        async with sources.document_transaction(document_id) as (session, model):
+            return await _convert_document(model, body, principal, session)
+    except sources.SourceError as e:
+        raise HTTPException(e.status_code, str(e))
 
-    document = await repo.get_document(document_id)
-    if not document:
-        raise HTTPException(status_code=404, detail=f"DOCUMENT_NOT_FOUND: '{document_id}'")
+
+async def _convert_document(model, body, principal, session):
+    document = repo._document_dict(model)
+    sources.verify_document(model)
+    source = await sources.require_unused(session, model.entity_code, model.sha256)
     if document["status"] != "NEW":
         raise HTTPException(
             status_code=400,
@@ -145,8 +158,8 @@ async def document_to_voucher(document_id: str, body: ToVoucherRequest, principa
     if not body.debit_account_code or not body.credit_account_code:
         raise HTTPException(status_code=400, detail="ACCOUNTS_REQUIRED: 需要借方與貸方科目。")
 
-    debit = await account_by_code(document["entity_code"], body.debit_account_code)
-    credit = await account_by_code(document["entity_code"], body.credit_account_code)
+    debit = await account_by_code(document["entity_code"], body.debit_account_code, session=session)
+    credit = await account_by_code(document["entity_code"], body.credit_account_code, session=session)
     if not debit or not credit:
         raise HTTPException(status_code=400, detail="COA_MISSING_ACCOUNT: 科目不存在於科目表。")
 
@@ -157,24 +170,26 @@ async def document_to_voucher(document_id: str, body: ToVoucherRequest, principa
             detail="AMOUNT_REQUIRED: 單據金額為零，無法產生分錄。請先補上金額。",
         )
 
-    owner = position_for_accounts([body.debit_account_code, body.credit_account_code])
-    from app.mcp_server import PRINCIPALS
-
     if out_of_scope(principal.position, [body.debit_account_code, body.credit_account_code]):
         raise HTTPException(403, "ACCOUNT_OUT_OF_SCOPE")
     maker_key = principal.principal_key
-    maker = PRINCIPALS.get(maker_key)
-    if not maker:
-        raise HTTPException(status_code=404, detail=f"UNKNOWN_PRINCIPAL: '{maker_key}'")
 
+    from app.core.ledger import LedgerError, assert_writable, validate_posting_date
+
+    accounting_date = document["doc_date"]
+    try:
+        period = validate_posting_date(accounting_date)
+        await assert_writable(document["entity_code"], period, accounting_date, session=session)
+    except LedgerError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     label = document["counterparty_name"] or document["filename"]
     memo = body.memo or f"{document['doc_type']} · {label}"
     journal = {
         "journal_id": str(uuid4()),
         "entity_code": document["entity_code"],
-        "period": (document["doc_date"] or date.today().isoformat())[:7],
-        "voucher_no": await vz.next_voucher_no(document["entity_code"], (document["doc_date"] or date.today().isoformat())[:7]),
-        "accounting_date": document["doc_date"] or date.today().isoformat(),
+        "period": period,
+        "voucher_no": await vz.next_voucher_no(document["entity_code"], period, session=session),
+        "accounting_date": accounting_date,
         "currency": document["currency"],
         "status": "DRAFT",
         "source_module": "GL_MANUAL",
@@ -221,29 +236,29 @@ async def document_to_voucher(document_id: str, body: ToVoucherRequest, principa
             }
         ],
         "created_by_principal_key": maker_key,
-        "created_by_principal_id": str(maker.principal_id),
+        "created_by_principal_id": principal.principal_id,
         "ai_confidence_score": "1.0000",
         "ai_reasoning_summary": "",
     }
-    await repo.save_journal(journal)
-    await repo.link_document_to_journal(document_id, journal["journal_id"])
+    await repo.insert_draft(journal, session=session)
+    await sources.link_source(session, source, journal["journal_id"], model)
     return {"journal_id": journal["journal_id"], "voucher_no": journal["voucher_no"], "status": "DRAFT"}
 
 
 @router.post("/documents/{document_id}/void")
 async def void_document(document_id: str, body: Dict[str, Any] | None = None) -> Dict[str, Any]:
-    document = await repo.get_document(document_id)
-    if not document:
-        raise HTTPException(status_code=404, detail=f"DOCUMENT_NOT_FOUND: '{document_id}'")
-    if document["status"] == "POSTED":
-        raise HTTPException(
-            status_code=400,
-            detail="DOCUMENT_LINKED: 單據已轉成憑證，請改用沖銷分錄。",
-        )
     reason = str((body or {}).get("reason") or "")
     if not reason.strip():
         raise HTTPException(status_code=400, detail="REASON_REQUIRED: 作廢必須填寫理由。")
-    await repo.set_document_status(document_id, "VOID", note=reason.strip())
+    try:
+        async with sources.document_transaction(document_id) as (session, model):
+            source = await sources.registry(session, model.entity_code, model.sha256)
+            if model.journal_id or model.status == "POSTED" or source.journal_id:
+                raise HTTPException(400, "DOCUMENT_LINKED: Source already has a journal.")
+            model.status = "VOID"
+            model.note = reason.strip()
+    except sources.SourceError as e:
+        raise HTTPException(e.status_code, str(e))
     return {"document_id": document_id, "status": "VOID"}
 
 
