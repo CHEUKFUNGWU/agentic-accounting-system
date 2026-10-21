@@ -60,3 +60,8 @@ frontend/.impeccable/
 ~$*.docx
 ~$*.xlsx
 ~$*.pptx
+
+# Licensed reference material kept locally only; never commit (copyright, open-source release)
+docs/reference/
+# Third-party UI reference screenshots; release rights not held (ADR-0001 D6)
+90-assets/ui-references/
