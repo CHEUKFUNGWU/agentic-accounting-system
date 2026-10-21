@@ -1,6 +1,6 @@
 # ADR-0001：Agent-first MCP 架構
 
-- 狀態：Accepted（D1～D6 方向，owner 於 2026-10-21 核准，見 [SRC-0017](../01-inputs/2026-10-21-agent-first-mcp-architecture-request.md#owner-decision-2026-10-21-remaining-recommendations)）。O1、O3、O4 仍待決定。核准不構成版本承諾，也不改變需求狀態
+- 狀態：Accepted（D1～D6 方向，owner 於 2026-10-21 核准，見 [SRC-0017](../01-inputs/2026-10-21-agent-first-mcp-architecture-request.md#owner-decision-2026-10-21-remaining-recommendations)）。O1、O3、O4、O5 仍待決定。核准不構成版本承諾，也不改變需求狀態
 - 日期：2026-10-21
 - 來源：[SRC-0017](../01-inputs/2026-10-21-agent-first-mcp-architecture-request.md)、[SRC-0005](../01-inputs/2026-10-18-roadmap-request.md)、[SRC-0006](../01-inputs/2026-10-18-roadmap-code-baseline.md)、[SRC-0007](../01-inputs/2026-10-18-roadmap-primary-sources.md)
 - 相關候選需求：REQ-0002、REQ-0003、REQ-0006、REQ-0007、REQ-0008、REQ-0016、REQ-0023（狀態只維護於[需求池](../04-requirement-pool/requirement-pool.md)）
@@ -160,6 +160,23 @@ Observed（2026-10-21）：Monolith 路徑已移除非人類崗位的 `journal.r
 
 預設採共用資料庫加 RLS（D3）。是否另外正式支援每 tenant 一個資料庫，取決於在地化與隔離需求，待 owner 與目標採用者確認。
 
+### O5. 外掛市集發布與第三方客戶端權限
+
+來源：[SRC-0021](../01-inputs/2026-10-21-marketplace-distribution-request.md)。候選需求 REQ-0034。
+
+待 owner 決定：是否提供託管版。ChatGPT plugin 目錄與 Claude Connectors Directory 的上架項目都指向單一公開 HTTPS MCP server，因此上架等於由我們託管客戶的帳本。自架採用者各有不同網址，改以自訂 connector 連接，不需上架。
+
+權限設計建議（未決定），建立在 D2、D3 之上：
+
+- 身分取自 OAuth 授權，不綁定 ChatGPT 或 Claude 的 thread／session ID。伺服器無法驗證 thread ID；MCP 的 `Mcp-Session-Id` 只代表傳輸連線；綁定對話也擋不住同一對話中的提示注入。宿主提供的對話參照只記入審計紀錄，不作授權依據。
+- 經 ChatGPT 或 Claude 的每次呼叫都視為 Agent 呼叫，即使指令是 owner 本人在對話中輸入。宿主自己的確認視窗無法在伺服器端驗證。此點延伸 O2-g。
+- 第三方客戶端只能取得查詢與提案範圍。核准、駁回、過帳、結帳鎖期、政策與憑證管理永不授權給它們。
+- 核准在本系統介面登入後進行，可經 MCP URL 模式 elicitation 導向；一人公司的自我核准同樣在此進行並加註。
+- 每個宿主各自取得授權，綁定 tenant、entity 與崗位，可分別撤銷；O2-d 速率限制按每個授權計算。
+- 工具輸出會進入宿主模型的上下文：輸出最小化、遮罩銀行帳號，並在隱私政策中說明。
+
+待確認：ChatGPT 與 Claude 是否支援 URL 模式 elicitation；Anthropic 官方文件中的目錄上架要求。
+
 ## 4. 考慮過的替代方案
 
 | 方案 | 不採用的理由 |
@@ -200,3 +217,4 @@ Observed（2026-10-21）：Monolith 路徑已移除非人類崗位的 `journal.r
 - D4 的內容併入 REQ-0007。
 - D5 的事件機制併入 REQ-0008。
 - D6 可能需要新增「開源發布準備」候選需求，須 owner 確認後才登記到需求池。
+- O5 已登記為候選需求 REQ-0034（owner 於 2026-10-21 要求，[SRC-0021](../01-inputs/2026-10-21-marketplace-distribution-request.md)）。
