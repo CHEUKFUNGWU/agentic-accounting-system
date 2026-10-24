@@ -1,8 +1,8 @@
 # ADR-0001：Agent-first MCP 架構
 
-- 狀態：Accepted（D1～D6 方向，owner 於 2026-10-21 核准，見 [SRC-0017](../01-inputs/2026-10-21-agent-first-mcp-architecture-request.md#owner-decision-2026-10-21-remaining-recommendations)）。O1、O3、O4、O5 仍待決定。核准不構成版本承諾，也不改變需求狀態
+- 狀態：Accepted（D1～D6 方向，owner 於 2026-10-21 核准，見 [SRC-0017](../01-inputs/2026-10-21-agent-first-mcp-architecture-request.md#owner-decision-2026-10-21-remaining-recommendations)）。O1 於 2026-10-24 決定（[SRC-0023](../01-inputs/2026-10-24-license-decision.md)）；O3、O4、O5 仍待決定。核准不構成版本承諾，也不改變需求狀態
 - 日期：2026-10-21
-- 來源：[SRC-0017](../01-inputs/2026-10-21-agent-first-mcp-architecture-request.md)、[SRC-0005](../01-inputs/2026-10-18-roadmap-request.md)、[SRC-0006](../01-inputs/2026-10-18-roadmap-code-baseline.md)、[SRC-0007](../01-inputs/2026-10-18-roadmap-primary-sources.md)
+- 來源：[SRC-0017](../01-inputs/2026-10-21-agent-first-mcp-architecture-request.md)、[SRC-0005](../01-inputs/2026-10-18-roadmap-request.md)、[SRC-0006](../01-inputs/2026-10-18-roadmap-code-baseline.md)、[SRC-0007](../01-inputs/2026-10-18-roadmap-primary-sources.md)、[SRC-0023](../01-inputs/2026-10-24-license-decision.md)
 - 相關候選需求：REQ-0002、REQ-0003、REQ-0006、REQ-0007、REQ-0008、REQ-0016、REQ-0023（狀態只維護於[需求池](../04-requirement-pool/requirement-pool.md)）
 
 ## 1. 背景
@@ -130,6 +130,17 @@ Inferred：開源後，每一個必要的執行期依賴都由採用者承擔部
 - 是否要求貢獻者簽 CLA 或 DCO。若日後要雙授權或更改授權，需事先保留權利。PR 不對外開放（D6 第 8 項）後，此項影響大幅降低。
 - 是否註冊名稱或商標。
 - 已發布版本的授權不能追溯收回，因此須在首次公開前決定。
+
+#### 決定（owner 於 2026-10-24 決定，[SRC-0023](../01-inputs/2026-10-24-license-decision.md)）
+
+- 核心系統（後端、MCP 伺服器、前端）採 AGPL-3.0-or-later（版本選擇由 owner 於 2026-10-24 決定）。
+- 供第三方整合的套件（MCP 工具定義、客戶端 SDK、ChatGPT 與 Claude 外掛或 skill 套件）採 Apache-2.0。這些套件目前尚未獨立存在。
+- 註冊產品名稱或商標。名稱尚未確定：owner 認為可能是 nomaledger，「Monolith」可能是 AI 工具取的名。
+- 若日後開放外部 PR，須要求 CLA，以保留雙授權與更改授權的權利。
+- 已確認：依賴套件授權均與 AGPL-3.0 相容（2026-10-24 依已安裝套件檢查）。
+- 已確認：Monolith UI 由 owner 於 Google AI Studio 生成，未以第三方素材作設計參考（owner 於 2026-10-24 確認）。
+- 已加入 LICENSE（gnu.org 官方 AGPL-3.0 原文，2026-10-24）與 README 授權說明。
+- 待確認：產品名稱與各市場商標檢索、版權人名稱，以及名稱確定後將「Monolith」更名。owner 於 2026-10-24 延後處理，將交由同事跟進。
 
 ### O2. 自主權門檻
 

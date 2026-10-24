@@ -96,3 +96,7 @@ agentic-accounting-system/
         └── components/
             └── AgentGovernanceDashboard.tsx # Interactive 3-Statement Working Paper, ETB & Lead Schedule UI
 ```
+
+## License
+
+The core system (backend, MCP servers and frontend) is licensed under the GNU Affero General Public License v3.0 or later (`AGPL-3.0-or-later`); see [LICENSE](LICENSE). Integration packages for third parties, such as MCP tool definitions, client SDKs and ChatGPT or Claude plugin packages, will be licensed under Apache-2.0 when they are published separately. See [ADR-0001 O1](03-planning/adr-0001-agent-first-mcp-architecture.md) and [SRC-0023](01-inputs/2026-10-24-license-decision.md).

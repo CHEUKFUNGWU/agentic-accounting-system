@@ -8,7 +8,9 @@ web
 
 ## Users
 
-The user confirmed accountants reviewing transactions and completing month-end close as the primary audience for the redesign. The prototype must support switching between Traditional Chinese and English.
+Paying customers are small businesses and one-person companies (OPC); accountants and bookkeepers are not expected to pay ([SRC-0022](01-inputs/2026-10-24-personal-agent-positioning.md)). The owner's personal agent submits documents and proposals through MCP. The owner, or an invited accountant, reviews and approves; in the one-person company profile the owner is the approver ([ADR-0001](03-planning/adr-0001-agent-first-mcp-architecture.md)). Accountants join at statutory points such as audit and tax lodgment, as invited collaborators.
+
+The user earlier confirmed accountants reviewing transactions and completing month-end close as the primary audience for the redesign. That workflow remains the first prototype workflow. The prototype must support switching between Traditional Chinese and English.
 
 ## Product Purpose
 
