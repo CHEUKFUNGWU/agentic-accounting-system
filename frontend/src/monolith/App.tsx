@@ -3,11 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { calculateReconciliationSummary, computeTaxScheduleLiability, CHART_OF_ACCOUNTS } from './utils/accountingLogic';
 import type { JournalEntry, FixedAssetItem } from './utils/accountingLogic';
 import { loadWorkspace, sendCommand, type Workspace } from './api';
-import { OverviewModule } from './components/OverviewModule';
+import { OverviewModule, type AgentTask } from './components/OverviewModule';
+import { TaskQueuePane } from './components/TaskQueuePane';
+import { TASK_PANE_MEDIA, pendingTaskCount, queueCopy } from './utils/taskQueue';
 import { JournalEntryModule } from './components/JournalEntryModule';
 import { GeneralLedgerModule } from './components/GeneralLedgerModule';
 import { TrialBalanceModule } from './components/TrialBalanceModule';
@@ -26,7 +28,7 @@ import { PeriodCloseModule } from './components/PeriodCloseModule';
 import { FONT_SIZE_ROOT_PX, getTranslations } from './utils/preferences';
 import type { Principal } from './auth';
 import type { AppPreferences } from './utils/preferences';
-import { LayoutGrid, BookOpen, Layers, Receipt, CreditCard, HardDrive, Columns3, FileSpreadsheet, Target, TrendingUp, ArrowLeftRight, Scale, Lock, ShieldCheck, Settings, Plus } from 'lucide-react';
+import { LayoutGrid, BookOpen, Layers, Receipt, CreditCard, HardDrive, Columns3, FileSpreadsheet, Target, TrendingUp, ArrowLeftRight, Scale, Lock, ShieldCheck, Settings, Plus, PanelRight } from 'lucide-react';
 
 export type ActiveModule =
   | 'overview'
@@ -45,7 +47,7 @@ export type ActiveModule =
   | 'audit-log'
   | 'settings';
 
-export default function App({ principal, onSignOut }: { principal: Principal; onSignOut: () => Promise<void> }) {
+export default function App({ principal, onSignOut, showTaskPane = true }: { principal: Principal; onSignOut: () => Promise<void>; showTaskPane?: boolean }) {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const workspaceRef = useRef<Workspace | null>(null);
   const queue = useRef<Promise<unknown>>(Promise.resolve());
@@ -55,6 +57,31 @@ export default function App({ principal, onSignOut }: { principal: Principal; on
   const [activeTab, setActiveTab] = useState<ActiveModule>('overview');
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
   const [focusedAccountCode, setFocusedAccountCode] = useState<string | null>(null);
+  const [taskDocked, setTaskDocked] = useState(() => window.matchMedia(TASK_PANE_MEDIA).matches);
+  const [taskOpen, setTaskOpen] = useState(() => showTaskPane && window.matchMedia(TASK_PANE_MEDIA).matches);
+  const taskToggleRef = useRef<HTMLButtonElement>(null);
+  const previousContext = useRef('');
+  const taskVisible = showTaskPane && taskOpen;
+  const closeTaskPane = useCallback(() => {
+    setTaskOpen(false);
+    requestAnimationFrame(() => taskToggleRef.current?.focus());
+  }, []);
+  useEffect(() => {
+    if (!showTaskPane) return;
+    const media = window.matchMedia(TASK_PANE_MEDIA);
+    const resize = () => { setTaskDocked(media.matches); if (!media.matches) setTaskOpen(false); };
+    media.addEventListener('change', resize);
+    return () => media.removeEventListener('change', resize);
+  }, [showTaskPane]);
+  const workspaceContext = workspace ? `${workspace.workspaceId}:${workspace.period}` : '';
+  useEffect(() => {
+    if (previousContext.current && previousContext.current !== workspaceContext) {
+      setTaskOpen(false);
+      setGlobalSearchQuery('');
+      setFocusedAccountCode(null);
+    }
+    previousContext.current = workspaceContext;
+  }, [workspaceContext]);
 
   const receive = (next: Workspace) => {
     workspaceRef.current = next;
@@ -122,6 +149,13 @@ export default function App({ principal, onSignOut }: { principal: Principal; on
   );
   const { journalEntries, bankItems, ledgerCashItems, taxSchedules, agentTasks, auditLogs, receivables, payables, fixedAssets, closeChecklist, amortizationSchedules, isPeriodLocked } = workspace;
   const t = getTranslations(preferences.language);
+  const taskText = queueCopy(preferences.language);
+  const handleNavigateTask = (task: AgentTask) => {
+    setGlobalSearchQuery('');
+    setFocusedAccountCode(null);
+    setActiveTab(task.targetTab);
+    if (!taskDocked) closeTaskPane();
+  };
   const handleUpdatePreferences = (updates: Partial<AppPreferences>) => act('preferences.update', updates);
   const handleAddJournalEntry = async (entry: JournalEntry) => {
     const next = await command('journal.create', entry);
@@ -166,8 +200,8 @@ export default function App({ principal, onSignOut }: { principal: Principal; on
     { id: 'settings', label: t.nav.settings, icon: Settings },
   ];
 
-  return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-zinc-50 text-zinc-950">
+  return (<>
+    <div className="monolith-shell min-h-screen flex flex-col md:flex-row bg-zinc-50 text-zinc-950" data-task-open={taskVisible ? 'true' : 'false'}>
       {/* Left Sidebar Navigation Pane (Desktop) */}
       <aside
         aria-label="Sidebar Navigation"
@@ -275,7 +309,10 @@ export default function App({ principal, onSignOut }: { principal: Principal; on
           <div className="mb-4 flex items-center justify-between gap-4 text-xs text-zinc-500 md:hidden"><span>{principal.displayName} · {principal.positionTitle}</span><button className="underline" onClick={() => { void onSignOut().catch(reason => setError(reason.message)); }}>Sign out</button></div>
           {error && <div role="alert" className="mb-4 flex items-center justify-between gap-4 border border-zinc-300 bg-white p-4 text-sm"><span>{error}</span><button onClick={() => setError('')} aria-label="Dismiss error">Dismiss</button></div>}
           {pending > 0 && <p role="status" className="mb-2 text-xs text-zinc-500">Saving to company file…</p>}
-          <p className="mb-3 text-[11px] text-zinc-500">{workspace.entityName} · {workspace.currency} · {workspace.period} · {workspace.dataOrigin}</p>
+          <div className="workspace-context">
+            <p className="mb-3 text-[11px] text-zinc-500">{workspace.entityName} · {workspace.currency} · {workspace.period} · {workspace.dataOrigin}</p>
+            {showTaskPane && <button ref={taskToggleRef} type="button" data-testid="task-pane-toggle" className="task-queue-toggle" aria-controls="monolith-task-pane" aria-expanded={taskVisible} onClick={() => setTaskOpen(open => !open)}><PanelRight size={15} />{taskText.trigger}<span>{pendingTaskCount(agentTasks)}</span></button>}
+          </div>
           <GlobalSearchBar
             query={globalSearchQuery}
             onQueryChange={(q) => {
@@ -440,5 +477,6 @@ export default function App({ principal, onSignOut }: { principal: Principal; on
         </div>
       </main>
     </div>
-  );
+    {showTaskPane && <TaskQueuePane key={workspaceContext} tasks={agentTasks} currency={workspace.currency} period={workspace.period} entityName={workspace.entityName} language={preferences.language} open={taskVisible} modal={!taskDocked} onClose={closeTaskPane} onNavigate={handleNavigateTask} />}
+  </>);
 }

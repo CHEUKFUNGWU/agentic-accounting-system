@@ -50,6 +50,19 @@ export default function AuthGate() {
     window.addEventListener('aas:session-expired', expired);
     return () => { active = false; window.removeEventListener('aas:session-expired', expired); };
   }, []);
+  useEffect(() => {
+    if (principal?.canReadWorkspace) return;
+    // Unauthenticated/governance screens follow system appearance without reading a workspace.
+    const root = document.documentElement;
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    root.style.fontSize = '16px';
+    root.lang = 'en';
+    root.dataset.font = 'inter';
+    const apply = () => root.classList.toggle('dark', media.matches);
+    apply();
+    media.addEventListener('change', apply);
+    return () => media.removeEventListener('change', apply);
+  }, [principal]);
   const logout = async () => { await signOut(); setPrincipal(null); setPassword(''); setError(''); };
   const submit = async (event: FormEvent) => {
     event.preventDefault(); setBusy(true); setError('');

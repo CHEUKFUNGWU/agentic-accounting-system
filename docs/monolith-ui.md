@@ -23,7 +23,7 @@ Open `http://127.0.0.1:5173/` or `http://127.0.0.1:5173/app.html`.
 
 Overview, Journal Entry, General Ledger, Receivables, Payables, Fixed Assets, Trial Balance, Statements, Budgeting, Forecasting, Reconciliation, Tax, Period Close, Audit Log, and Settings.
 
-The supplied layout, monochrome theme, typography controls, navigation, search, charts, tables, CSV/PDF exports, and local interactions are retained. English is the supplied default. Its additional language choices are Simplified Chinese, Spanish, and Japanese.
+The supplied module layouts, typography controls, 15-entry navigation, search, charts, tables, CSV/PDF exports and accounting interactions are retained. The owner-approved [sidebar/canvas appearance and optional task pane](ui-appearance.md) now apply to the actual entry, with Light/Dark and 10px panels / 6px controls. Provenance: [SRC-0014](../01-inputs/2026-10-20-ui-adoption-request.md). English remains the default; existing additional language choices are Simplified Chinese, Spanish and Japanese, including the new task pane copy.
 
 ## Verification
 
@@ -38,6 +38,6 @@ The supplied tests run using Node.js's native TypeScript support, requiring Node
 
 The UI now loads and saves through the [Monolith backend contract](monolith-backend.md). It initially uses the supplied example dataset in a separate workspace, then persists changes in the company database. Refreshing the browser or restarting the backend preserves journals, subledgers, plans, preferences, and audit events.
 
-The visual design is retained. Loading, save failures, pending saves, source metadata, and explicit draft review now reflect real server responses. Financial mutations are validated on the server before success is shown. The backend receives commands rather than unrestricted client state replacements.
+The existing business layouts and behaviors are retained under the adopted visual skin. Loading, save failures, pending saves, source metadata, and explicit draft review reflect real server responses. Financial mutations are validated on the server before success is shown. The backend receives commands rather than unrestricted client state replacements.
 
 Payments record disbursements in the books; they do not initiate bank transfers. Tax provision posting records an accrual and does not submit a tax return. Existing regional company records remain separate and accessible through their earlier interfaces.

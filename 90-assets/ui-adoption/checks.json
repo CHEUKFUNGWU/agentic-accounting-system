@@ -1,0 +1,156 @@
+{
+  "passed": 46,
+  "checks": [
+    "Actual AuthGate login is retained with production skin",
+    "No preview strip or fetch adapter is present",
+    "Workspace is not read before authentication",
+    "Authenticated workspace retains all 15 original modules",
+    "Live task pane defaults docked on wide screens",
+    "Workspace metadata is used without preview labels",
+    "Light main panel and field radii match approved design",
+    "Overview module opens through existing navigation",
+    "Journal Entry module opens through existing navigation",
+    "General Ledger module opens through existing navigation",
+    "Receivables module opens through existing navigation",
+    "Payables module opens through existing navigation",
+    "Fixed Assets module opens through existing navigation",
+    "Trial Balance module opens through existing navigation",
+    "Statements module opens through existing navigation",
+    "Budgeting module opens through existing navigation",
+    "Forecasting module opens through existing navigation",
+    "Reconciliation module opens through existing navigation",
+    "Tax module opens through existing navigation",
+    "Period Close module opens through existing navigation",
+    "Audit Log module opens through existing navigation",
+    "Settings module opens through existing navigation",
+    "Dark preference is saved by the real API",
+    "Authenticated session and server theme survive reload",
+    "Live queue search filters the actual workspace tasks",
+    "Task click uses direct App navigation without executing commands",
+    "Task navigation clears stale global search",
+    "Existing authorized task resolution updates the live queue",
+    "All filter includes resolved server records without changing them",
+    "Queue language follows existing server preference",
+    "Existing MFA period-signing gate remains intact",
+    "Narrow viewport closes docking and preserves mobile navigation",
+    "Mobile drawer is portaled outside inert App and receives focus",
+    "Modal guard redirects escaped focus",
+    "Drawer focus wraps within the dialog",
+    "Escape restores App interaction and trigger focus",
+    "Mobile task navigation closes drawer without processing task",
+    "Real sign-out removes workspace and task portal",
+    "Administrator remains in governance without accounting UI",
+    "Administrator branch never loads accounting workspace",
+    "Server still denies administrator workspace access",
+    "Position-scoped role is not granted full workspace by UI adoption",
+    "Real 401 still expires the session and removes task UI",
+    "Signed-out appearance follows OS without protected workspace reads",
+    "No unhandled browser exceptions",
+    "Actual authenticated preference/task API commands were exercised"
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/me"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/login"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/monolith/workspace"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/monolith/commands",
+      "action": "preferences.update"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/monolith/workspace"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/me"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/monolith/workspace"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/monolith/commands",
+      "action": "agent.resolve"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/monolith/workspace"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/monolith/commands",
+      "action": "preferences.update"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/monolith/commands",
+      "action": "preferences.update"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/logout"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/login"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/overview"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/monolith/workspace"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/logout"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/login"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/logout"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/login"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/monolith/workspace"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/me"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/logout"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/monolith/commands",
+      "action": "preferences.update"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/monolith/workspace"
+    }
+  ],
+  "unhandledErrors": [],
+  "note": "Actual AuthGate/App, real API and CSRF with disposable SQLite and QA-only accounts. No preview adapter or personal database."
+}

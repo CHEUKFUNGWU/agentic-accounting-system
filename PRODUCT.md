@@ -24,6 +24,8 @@ The repository supports entity and period selection, documents, vouchers, a ledg
 
 Existing React 18, TypeScript and Vite frontend, with installed Lucide icons and Radix UI components. Preserve the user's ongoing application and backend changes. The owner subsequently selected the supplied Monolith Ledger interface for direct adoption as the default UI. Its interface is now connected to a persistent Monolith workspace seeded from the supplied examples, with the earlier regional accounting workspace preserved at `/connected.html`. Monolith data and the legacy company entities remain separate; see `SRC-0003` and `docs/monolith-backend.md`. The earlier independent review prototype remains at `/prototype.html`. See `SRC-0002` in the source register and `docs/monolith-ui.md` for data boundaries.
 
+The owner approved applying the reviewed sidebar/canvas reskin, dual themes, 10px panel / 6px control corners, and optional task pane to the actual frontend in [SRC-0014](01-inputs/2026-10-20-ui-adoption-request.md). The implementation retains the existing 15 modules, authenticated API and server preferences. The task pane uses live workspace tasks and direct module navigation; no preview fixture or fetch adapter is included in the default entry. See [current UI appearance](docs/ui-appearance.md). Local isolated verification is recorded; production deployment remains unverified.
+
 ## Evidence on Hand
 
 README.md, frontend/src/app and frontend/src/components describe the present product. Spark AI Studio Pty Ltd is an existing example entity. The repo contains no user-provided brand assets or approved production financial dataset for this redesign.

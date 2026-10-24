@@ -19,6 +19,8 @@ export default defineConfig({
         // Both existing public entry URLs open the supplied interface.
         app: resolve(__dirname, "app.html"),
         prototype: resolve(__dirname, "prototype.html"),
+        readerPrototype: resolve(__dirname, "reader-prototype.html"),
+        productPrototype: resolve(__dirname, "product-prototype.html"),
         connected: resolve(__dirname, "connected.html"),
         classic: resolve(__dirname, "classic.html"),
       },

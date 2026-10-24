@@ -1,0 +1,209 @@
+/* Adopted UI, SRC-0014. No preview adapter, fixture or comparison controls. */
+/* Same Inter face as the existing frontend, served locally for isolated preview. */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('@fontsource-variable/inter/files/inter-latin-wght-normal.woff2') format('woff2');
+}
+/* Preview-only tokens. No selector affects the default application document. */
+html[data-ui='reader'] {
+  --reskin-task-width: 300px;
+  --reskin-radius-panel: 10px;
+  --reskin-radius-control: 6px;
+  --reskin-radius-label: 4px;
+  --reskin-canvas: #f8f9f7;
+  --reskin-pane: #eeefec;
+  --reskin-surface: #ffffff;
+  --reskin-soft: #f1f3ee;
+  --reskin-hover: #e5e9e2;
+  --reskin-selected: #dbe5db;
+  --reskin-text: #282e29;
+  --reskin-muted: #626c61;
+  --reskin-subtle: #727a70;
+  --reskin-border: #dce1d7;
+  --reskin-border-strong: #bac6b7;
+  --reskin-sage: #44644f;
+  --reskin-button: #242c25;
+  --reskin-button-text: #f9faf7;
+}
+html[data-ui='reader'].dark {
+  --reskin-canvas: #171819;
+  --reskin-pane: #232426;
+  --reskin-surface: #1d1f20;
+  --reskin-soft: #252827;
+  --reskin-hover: #303531;
+  --reskin-selected: #303c36;
+  --reskin-text: #e7e8e1;
+  --reskin-muted: #a4ada3;
+  --reskin-subtle: #a0a99f;
+  --reskin-border: #343a34;
+  --reskin-border-strong: #535f51;
+  --reskin-sage: #b0cbbb;
+  --reskin-button: #e0e6da;
+  --reskin-button-text: #202a20;
+}
+/* Skin changes color, material and small corners. Module DOM, spacing and layout stay intact. */
+html[data-ui='reader'] { color-scheme: light; }
+html[data-ui='reader'].dark { color-scheme: dark; }
+html[data-ui='reader'] body,
+html[data-ui='reader'] #root > div,
+html[data-ui='reader'] #root > div > main,
+html[data-ui='reader'] .bg-zinc-50 {
+  background-color: var(--reskin-canvas) !important;
+  color: var(--reskin-text);
+}
+html[data-ui='reader'] .bg-white { background-color: var(--reskin-surface) !important; }
+html[data-ui='reader'] [class*='bg-zinc-50/'],
+html[data-ui='reader'] .bg-zinc-100,
+html[data-ui='reader'] [class*='bg-zinc-100/'] { background-color: var(--reskin-soft) !important; }
+html[data-ui='reader'] .bg-zinc-200\/60 { background-color: var(--reskin-hover) !important; }
+html[data-ui='reader'] .bg-zinc-950 {
+  background-color: var(--reskin-button) !important;
+  color: var(--reskin-button-text) !important;
+}
+html[data-ui='reader'] .bg-zinc-950 .text-white,
+html[data-ui='reader'] .bg-zinc-950.text-white { color: var(--reskin-button-text) !important; }
+html[data-ui='reader'] .text-zinc-950,
+html[data-ui='reader'] .text-zinc-900,
+html[data-ui='reader'] .text-zinc-800,
+html[data-ui='reader'] .text-zinc-700 { color: var(--reskin-text) !important; }
+html[data-ui='reader'] .text-zinc-600,
+html[data-ui='reader'] .text-zinc-500 { color: var(--reskin-muted) !important; }
+html[data-ui='reader'] .text-zinc-400 { color: var(--reskin-subtle) !important; }
+html[data-ui='reader'] .border-zinc-100,
+html[data-ui='reader'] .border-zinc-200,
+html[data-ui='reader'] .border-zinc-300,
+html[data-ui='reader'] .divide-zinc-100 > :not([hidden]) ~ :not([hidden]),
+html[data-ui='reader'] .divide-zinc-200 > :not([hidden]) ~ :not([hidden]) { border-color: var(--reskin-border) !important; }
+html[data-ui='reader'] .border-zinc-950 { border-color: var(--reskin-border-strong) !important; }
+html[data-ui='reader'] input,
+html[data-ui='reader'] select,
+html[data-ui='reader'] textarea { color: var(--reskin-text); caret-color: var(--reskin-sage); accent-color: var(--reskin-sage); }
+html[data-ui='reader'] input::placeholder,
+html[data-ui='reader'] textarea::placeholder { color: var(--reskin-subtle); }
+html[data-ui='reader'] :focus-visible { outline: 2px solid var(--reskin-sage); outline-offset: 3px; }
+html[data-ui='reader'] ::selection { background: var(--reskin-selected); color: var(--reskin-text); }
+html[data-ui='reader'] ::-webkit-scrollbar { width: 6px; height: 6px; }
+html[data-ui='reader'] ::-webkit-scrollbar-thumb { background: var(--reskin-border-strong); border-radius: 5px; }
+html[data-ui='reader'] ::-webkit-scrollbar-track { background: transparent; }
+
+/* Small corners on the main canvas only. Never clip parents: search, focus rings and menus must remain visible. */
+html[data-ui='reader'] #root main :where(section.border, article.border, fieldset.border, div.border.bg-white, div.border.bg-zinc-50, div.border.bg-zinc-100, [role='region'].border):not([class*='rounded-']) {
+  border-radius: var(--reskin-radius-panel);
+}
+html[data-ui='reader'] #root main :where(section.border:not(.grid), div.border.bg-white) > :is(div, header):first-child {
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
+}
+html[data-ui='reader'] #root main :where(section.border:not(.grid), div.border.bg-white) > :is(div, footer):last-child {
+  border-bottom-left-radius: inherit;
+  border-bottom-right-radius: inherit;
+}
+html[data-ui='reader'] #root main :where(button, select, textarea, input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='hidden']), [role='tablist'].border, [role='group'].border, div.inline-flex.border):not([class*='rounded-']) {
+  border-radius: var(--reskin-radius-control);
+}
+html[data-ui='reader'] #root main div.border:has(> input[role='searchbox']) {
+  border-radius: var(--reskin-radius-control);
+}
+html[data-ui='reader'] #root main span.border:not([class*='rounded-']) {
+  border-radius: var(--reskin-radius-label);
+}
+
+/* The referenced sidepane: inset round shell, quiet surface and sage selection. */
+html[data-ui='reader'] aside[aria-label='Sidebar Navigation'] {
+  top: 8px;
+  bottom: 8px;
+  left: 8px;
+  width: calc(14rem - 8px);
+  background-color: var(--reskin-pane) !important;
+  border: 0;
+  border-radius: 15px;
+  overflow: hidden;
+}
+html[data-ui='reader'] aside[aria-label='Sidebar Navigation'] > div:first-child > div:first-child { border-bottom-color: transparent !important; }
+html[data-ui='reader'] nav[aria-label='Primary Accounting Modules'] { padding-left: 9px; padding-right: 9px; }
+html[data-ui='reader'] nav[aria-label='Primary Accounting Modules'] button { border-radius: 6px; }
+html[data-ui='reader'] nav[aria-label='Primary Accounting Modules'] button svg { color: var(--reskin-sage); }
+html[data-ui='reader'] nav[aria-label='Primary Accounting Modules'] button.bg-zinc-950,
+html[data-ui='reader'] [aria-label='Mobile Module Switcher'] button.bg-zinc-950 {
+  background-color: var(--reskin-selected) !important;
+  color: var(--reskin-sage) !important;
+}
+html[data-ui='reader'] nav[aria-label='Primary Accounting Modules'] button:not(.bg-zinc-950):hover { background-color: var(--reskin-hover) !important; color: var(--reskin-text) !important; }
+html[data-ui='reader'] [aria-label='Mobile Module Switcher'] { background-color: var(--reskin-pane); }
+html[data-ui='reader'] [aria-label='Mobile Module Switcher'] button:not(.bg-zinc-950) { background-color: var(--reskin-pane) !important; }
+
+/* Chart structure and data stay original; adapt only the existing monochrome SVG ink. */
+html[data-ui='reader'] svg[data-testid='sankey-svg'] path { stroke: var(--reskin-muted) !important; }
+html[data-ui='reader'] svg[data-testid='sankey-svg'] rect[fill='#ffffff'] { fill: var(--reskin-surface) !important; stroke: var(--reskin-border) !important; }
+html[data-ui='reader'] svg[data-testid='sankey-svg'] rect:not([fill='#ffffff']):not([fill='none']):not([fill^='url']) { fill: var(--reskin-text) !important; }
+html[data-ui='reader'] svg[data-testid='sankey-svg'] .fill-zinc-950 { fill: var(--reskin-text) !important; }
+html[data-ui='reader'] svg[data-testid='sankey-svg'] .fill-zinc-500 { fill: var(--reskin-muted) !important; }
+@media (hover: hover) {
+  html[data-ui='reader'] .hover\:bg-zinc-50:hover,
+  html[data-ui='reader'] .hover\:bg-zinc-100:hover { background-color: var(--reskin-hover) !important; }
+  html[data-ui='reader'] .hover\:bg-zinc-950:hover { background-color: var(--reskin-button) !important; color: var(--reskin-button-text) !important; }
+  html[data-ui='reader'] .hover\:bg-zinc-950:hover * { color: var(--reskin-button-text) !important; }
+}
+
+/* Workspace-backed task pane. */
+html[data-ui='reader'] .task-queue-pane { position: fixed; inset: 0 0 0 auto; width: var(--reskin-task-width); display: flex; flex-direction: column; padding: 28px 20px 22px; background: var(--reskin-surface); border-left: 1px solid var(--reskin-border); color: var(--reskin-text); z-index: 25; font-family: var(--active-font-sans); }
+html[data-ui='reader'] .task-queue-pane[hidden] { display: none; }
+html[data-ui='reader'] .task-queue-pane[role='dialog'] { z-index: 90; }
+html[data-ui='reader'] .task-queue-backdrop { position: fixed; inset: 0; z-index: 80; background: #0007; border: 0; width: 100%; cursor: default; }
+html[data-ui='reader'] .task-queue-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 9px; }
+html[data-ui='reader'] .task-queue-header > div { flex: 1; }
+html[data-ui='reader'] .task-queue-header h2 { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0; font-size: 16px; font-weight: 550; }
+html[data-ui='reader'] .task-queue-header h2 span { font-size: 11px; font-weight: 400; color: var(--reskin-sage); }
+html[data-ui='reader'] .task-queue-header p { font-size: 11px; color: var(--reskin-muted); line-height: 1.8; margin: 11px 0 0; }
+html[data-ui='reader'] .task-queue-icon { display: inline-flex; align-items: center; justify-content: center; padding: 4px; border: 0; background: none; color: var(--reskin-muted); cursor: pointer; border-radius: 4px; }
+html[data-ui='reader'] .task-queue-icon:hover { background: var(--reskin-hover); }
+html[data-ui='reader'] .task-queue-context { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 20px 0 17px; font-size: 9px; color: var(--reskin-muted); }
+html[data-ui='reader'] .task-queue-search { display: flex; align-items: center; gap: 9px; border-radius: 5px; background: var(--reskin-soft); color: var(--reskin-muted); padding: 10px 11px; }
+html[data-ui='reader'] .task-queue-search > svg { flex-shrink: 0; }
+html[data-ui='reader'] .task-queue-search:focus-within { outline: 1px solid var(--reskin-sage); }
+html[data-ui='reader'] .task-queue-search input { min-width: 0; width: 100%; font-size: 11px; border: 0; outline: none; background: none; color: var(--reskin-text); caret-color: var(--reskin-sage); }
+html[data-ui='reader'] .task-queue-search input::placeholder { color: var(--reskin-muted); }
+html[data-ui='reader'] .task-queue-filters { display: flex; gap: 26px; margin: 23px 0 9px; border-bottom: 1px solid var(--reskin-border); }
+html[data-ui='reader'] .task-queue-filters button { border: 0; background: none; padding: 0 0 13px; border-bottom: 1px solid transparent; font-size: 11px; color: var(--reskin-muted); cursor: pointer; }
+html[data-ui='reader'] .task-queue-filters button[aria-pressed='true'] { border-bottom-color: var(--reskin-sage); color: var(--reskin-sage); }
+html[data-ui='reader'] .task-queue-filters span { font-size: 10px; margin-left: 7px; font-variant-numeric: tabular-nums; }
+html[data-ui='reader'] .task-queue-list { flex: 1; min-height: 0; overflow-y: auto; padding-top: 5px; }
+html[data-ui='reader'] .task-queue-item { display: block; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--reskin-border); background: none; padding: 18px 11px; color: var(--reskin-text); cursor: pointer; }
+html[data-ui='reader'] .task-queue-item.selected { background: var(--reskin-selected); border-bottom-color: transparent; border-radius: 6px; }
+html[data-ui='reader'] .task-queue-item:not(.selected):hover { background: var(--reskin-hover); }
+html[data-ui='reader'] .task-queue-item-top { display: flex; align-items: center; gap: 9px; font-size: 11px; color: var(--reskin-sage); }
+html[data-ui='reader'] .task-queue-item-top > svg:last-child { margin-left: auto; }
+html[data-ui='reader'] .task-queue-item strong { display: block; margin-top: 14px; font-size: 13px; line-height: 1.8; font-weight: 500; overflow-wrap: anywhere; }
+html[data-ui='reader'] .task-queue-code { display: block; font-size: 9px; color: var(--reskin-muted); margin-top: 8px; }
+html[data-ui='reader'] .task-queue-item-bottom { display: flex; align-items: center; justify-content: space-between; gap: 9px; margin-top: 14px; font-size: 10px; color: var(--reskin-muted); }
+html[data-ui='reader'] .task-queue-item-bottom > span:last-child { color: var(--reskin-text); font-variant-numeric: tabular-nums; font-size: 11px; }
+html[data-ui='reader'] .task-queue-notice { font-size: 10px; line-height: 1.9; margin: 14px 0 0; padding-top: 13px; border-top: 1px solid var(--reskin-border); color: var(--reskin-sage); }
+html[data-ui='reader'] .task-queue-footer { display: flex; align-items: flex-start; gap: 10px; color: var(--reskin-sage); border-top: 1px solid var(--reskin-border); padding-top: 19px; margin-top: 20px; }
+html[data-ui='reader'] .task-queue-footer svg { flex-shrink: 0; margin-top: 3px; }
+html[data-ui='reader'] .task-queue-footer p { font-size: 11px; line-height: 1.8; margin: 0; }
+html[data-ui='reader'] .task-queue-footer p > span { display: block; font-size: 10px; color: var(--reskin-muted); margin-top: 7px; }
+html[data-ui='reader'] .task-queue-empty { text-align: center; padding: 40px 5px; color: var(--reskin-muted); font-size: 12px; }
+html[data-ui='reader'] .task-queue-empty svg { margin: 0 auto 17px; color: var(--reskin-sage); }
+html[data-ui='reader'] .task-queue-empty button { margin-top: 18px; padding: 5px; color: var(--reskin-sage); border: 0; background: none; cursor: pointer; font-size: 11px; }
+
+html[data-ui='reader'] .task-queue-entity { margin:-5px 0 15px; font-size:10px; color:var(--reskin-muted); line-height:1.7; overflow-wrap:anywhere; }
+/* The context toggle uses live workspace data; it does not execute accounting commands. */
+html[data-ui='reader'] .workspace-context { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+html[data-ui='reader'] .workspace-context > p { margin:0; min-width:0; }
+html[data-ui='reader'] .task-queue-toggle { display:inline-flex; align-items:center; gap:8px; flex-shrink:0; padding:7px 10px; border:1px solid var(--reskin-border-strong); border-radius:6px; color:var(--reskin-sage); cursor:pointer; font-size:11px; }
+html[data-ui='reader'] .task-queue-toggle[aria-expanded='true'] { background:var(--reskin-selected); }
+html[data-ui='reader'] .task-queue-toggle:hover { background:var(--reskin-hover); }
+html[data-ui='reader'] .task-queue-toggle span { font-variant-numeric:tabular-nums; }
+@media (min-width:1600px) {
+  html[data-ui='reader'] .monolith-shell[data-task-open='true'] > main { padding-right:var(--reskin-task-width); }
+}
+@media (max-width:767px) {
+  html[data-ui='reader'] .task-queue-pane { width:min(340px, calc(100vw - 24px)); padding:23px 18px 20px; }
+  html[data-ui='reader'] .workspace-context { align-items:flex-start; }
+}
+@media (prefers-reduced-motion:reduce) {
+  html[data-ui='reader'] *, html[data-ui='reader'] *::before, html[data-ui='reader'] *::after { animation:none!important; transition:none!important; scroll-behavior:auto!important; }
+}

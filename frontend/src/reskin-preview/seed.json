@@ -1,0 +1,919 @@
+{
+  "workspaceId": "monolith",
+  "entityName": "Monolith Ledger",
+  "currency": "USD",
+  "period": "2026-10",
+  "dataOrigin": "Supplied demonstration dataset",
+  "accounts": [
+    {
+      "code": "1010",
+      "name": "Operating Cash — Mercury SVB",
+      "category": "Asset",
+      "normalBalance": "debit",
+      "openingBalance": 1469700
+    },
+    {
+      "code": "1020",
+      "name": "Treasury Sweep — BlackRock",
+      "category": "Asset",
+      "normalBalance": "debit",
+      "openingBalance": 850000
+    },
+    {
+      "code": "1100",
+      "name": "Accounts Receivable — Enterprise",
+      "category": "Asset",
+      "normalBalance": "debit",
+      "openingBalance": 310000
+    },
+    {
+      "code": "1400",
+      "name": "Prepaid Cloud Infrastructure",
+      "category": "Asset",
+      "normalBalance": "debit",
+      "openingBalance": 140000
+    },
+    {
+      "code": "2010",
+      "name": "Accounts Payable — Trade",
+      "category": "Liability",
+      "normalBalance": "credit",
+      "openingBalance": 112000
+    },
+    {
+      "code": "2150",
+      "name": "Accrued Tax Liability",
+      "category": "Liability",
+      "normalBalance": "credit",
+      "openingBalance": 122100
+    },
+    {
+      "code": "2400",
+      "name": "Deferred Revenue — Annual SaaS",
+      "category": "Liability",
+      "normalBalance": "credit",
+      "openingBalance": 380000
+    },
+    {
+      "code": "3010",
+      "name": "Common Stock & Paid-In Capital",
+      "category": "Equity",
+      "normalBalance": "credit",
+      "openingBalance": 1200000
+    },
+    {
+      "code": "3200",
+      "name": "Retained Earnings",
+      "category": "Equity",
+      "normalBalance": "credit",
+      "openingBalance": 489400
+    },
+    {
+      "code": "4010",
+      "name": "Enterprise SaaS Subscriptions",
+      "category": "Revenue",
+      "normalBalance": "credit",
+      "openingBalance": 675000
+    },
+    {
+      "code": "4020",
+      "name": "Usage & Compute Overages",
+      "category": "Revenue",
+      "normalBalance": "credit",
+      "openingBalance": 243600
+    },
+    {
+      "code": "4030",
+      "name": "Implementation & Advisory Services",
+      "category": "Revenue",
+      "normalBalance": "credit",
+      "openingBalance": 120000
+    },
+    {
+      "code": "5010",
+      "name": "Cloud & GPU Inference Hosting",
+      "category": "Expense",
+      "normalBalance": "debit",
+      "openingBalance": 130800
+    },
+    {
+      "code": "6010",
+      "name": "R&D Payroll & Engineering",
+      "category": "Expense",
+      "normalBalance": "debit",
+      "openingBalance": 217500
+    },
+    {
+      "code": "6120",
+      "name": "Go-To-Market & Demand Gen",
+      "category": "Expense",
+      "normalBalance": "debit",
+      "openingBalance": 90000
+    },
+    {
+      "code": "6250",
+      "name": "General, Legal & Audit Operations",
+      "category": "Expense",
+      "normalBalance": "debit",
+      "openingBalance": 45000
+    },
+    {
+      "code": "6800",
+      "name": "Corporate Tax Provision Expense",
+      "category": "Expense",
+      "normalBalance": "debit",
+      "openingBalance": 89100
+    }
+  ],
+  "journalEntries": [
+    {
+      "id": "JE-2026-0942",
+      "date": "2026-10-16",
+      "reference": "INV-ENT-8841",
+      "memo": "Enterprise annual contract recognition — Vaneck Global Corp",
+      "source": "Agentic Auto-Draft",
+      "status": "Posted",
+      "confidence": 99.4,
+      "attachments": [
+        {
+          "id": "att-942-1",
+          "name": "Vaneck_MSA_Invoice_8841.pdf",
+          "sizeBytes": 248320,
+          "mimeType": "application/pdf",
+          "uploadedAt": "2026-10-16"
+        }
+      ],
+      "lines": [
+        {
+          "id": "L-1",
+          "accountCode": "1010",
+          "accountName": "Operating Cash — Mercury SVB",
+          "description": "Wire settlement #8841",
+          "debit": 185000,
+          "credit": 0
+        },
+        {
+          "id": "L-2",
+          "accountCode": "4010",
+          "accountName": "Enterprise SaaS Subscriptions",
+          "description": "Q4 recognized portion",
+          "debit": 0,
+          "credit": 145000
+        },
+        {
+          "id": "L-3",
+          "accountCode": "2400",
+          "accountName": "Deferred Revenue — Annual SaaS",
+          "description": "Deferred multi-quarter obligation",
+          "debit": 0,
+          "credit": 40000
+        }
+      ]
+    },
+    {
+      "id": "JE-2026-0941",
+      "date": "2026-10-15",
+      "reference": "AWS-OCT-2026",
+      "memo": "Production cluster GPU & H100 inference compute amortization",
+      "source": "Agentic Auto-Draft",
+      "status": "Posted",
+      "confidence": 98.8,
+      "attachments": [
+        {
+          "id": "att-941-1",
+          "name": "AWS_Oct2026_Settlement.pdf",
+          "sizeBytes": 184320,
+          "mimeType": "application/pdf",
+          "uploadedAt": "2026-10-15"
+        }
+      ],
+      "lines": [
+        {
+          "id": "L-4",
+          "accountCode": "5010",
+          "accountName": "Cloud & GPU Inference Hosting",
+          "description": "October compute cluster usage",
+          "debit": 64200,
+          "credit": 0
+        },
+        {
+          "id": "L-5",
+          "accountCode": "1400",
+          "accountName": "Prepaid Cloud Infrastructure",
+          "description": "Drawdown on committed spend",
+          "debit": 0,
+          "credit": 24200
+        },
+        {
+          "id": "L-6",
+          "accountCode": "1010",
+          "accountName": "Operating Cash — Mercury SVB",
+          "description": "Net ACH settlement to AWS",
+          "debit": 0,
+          "credit": 40000
+        }
+      ]
+    },
+    {
+      "id": "JE-2026-0940",
+      "date": "2026-10-14",
+      "reference": "PAY-2026-20",
+      "memo": "Bi-weekly engineering & product R&D payroll disbursement",
+      "source": "System Accrual",
+      "status": "Posted",
+      "confidence": 100,
+      "attachments": [
+        {
+          "id": "att-940-1",
+          "name": "Rippling_Batch_20_Register.csv",
+          "sizeBytes": 62400,
+          "mimeType": "text/csv",
+          "uploadedAt": "2026-10-14"
+        }
+      ],
+      "lines": [
+        {
+          "id": "L-7",
+          "accountCode": "6010",
+          "accountName": "R&D Payroll & Engineering",
+          "description": "Gross salaries & employer taxes",
+          "debit": 142500,
+          "credit": 0
+        },
+        {
+          "id": "L-8",
+          "accountCode": "1010",
+          "accountName": "Operating Cash — Mercury SVB",
+          "description": "Rippling batch disbursement",
+          "debit": 0,
+          "credit": 124000
+        },
+        {
+          "id": "L-9",
+          "accountCode": "2150",
+          "accountName": "Accrued Tax Liability",
+          "description": "Federal & state payroll tax withholding",
+          "debit": 0,
+          "credit": 18500
+        }
+      ]
+    },
+    {
+      "id": "JE-2026-0939",
+      "date": "2026-10-12",
+      "reference": "USG-BATCH-10",
+      "memo": "Metered API token overage billings — Tier-1 financial clients",
+      "source": "Agentic Auto-Draft",
+      "status": "Posted",
+      "confidence": 97.6,
+      "lines": [
+        {
+          "id": "L-10",
+          "accountCode": "1100",
+          "accountName": "Accounts Receivable — Enterprise",
+          "description": "Stripe Invoicing metered batch",
+          "debit": 96400,
+          "credit": 0
+        },
+        {
+          "id": "L-11",
+          "accountCode": "4020",
+          "accountName": "Usage & Compute Overages",
+          "description": "October metered API usage",
+          "debit": 0,
+          "credit": 96400
+        }
+      ]
+    },
+    {
+      "id": "JE-2026-0938",
+      "date": "2026-10-10",
+      "reference": "TAX-PROV-Q3",
+      "memo": "Quarterly corporate income & state nexus tax provision accrual",
+      "source": "System Accrual",
+      "status": "Posted",
+      "confidence": 99.1,
+      "lines": [
+        {
+          "id": "L-12",
+          "accountCode": "6800",
+          "accountName": "Corporate Tax Provision Expense",
+          "description": "Estimated Federal & DE/CA/NY provision",
+          "debit": 48900,
+          "credit": 0
+        },
+        {
+          "id": "L-13",
+          "accountCode": "2150",
+          "accountName": "Accrued Tax Liability",
+          "description": "Tax reserve liability accrual",
+          "debit": 0,
+          "credit": 48900
+        }
+      ]
+    }
+  ],
+  "bankItems": [
+    {
+      "id": "BF-901",
+      "date": "2026-10-16",
+      "counterparty": "VANECK GLOBAL CORP",
+      "description": "FEDWIRE INCOMING #88419022 SAAS ANNUAL",
+      "amount": 185000,
+      "bankReference": "FW-88419022",
+      "status": "Matched",
+      "matchedLedgerId": "LC-01",
+      "matchConfidence": 99.8
+    },
+    {
+      "id": "BF-902",
+      "date": "2026-10-15",
+      "counterparty": "AMAZON WEB SERVICES INC",
+      "description": "ACH DEBIT AWS CLOUD SERVICES OCT-26",
+      "amount": -40000,
+      "bankReference": "ACH-2940118",
+      "status": "Matched",
+      "matchedLedgerId": "LC-02",
+      "matchConfidence": 99.4
+    },
+    {
+      "id": "BF-903",
+      "date": "2026-10-15",
+      "counterparty": "STRIPE SETTLEMENT BATCH",
+      "description": "STRIPE TRANSFER INSTANT PAYOUT #ST-992",
+      "amount": 68450,
+      "bankReference": "STR-9920411",
+      "status": "Unmatched",
+      "suggestedLedgerId": "LC-04",
+      "matchConfidence": 96.5
+    },
+    {
+      "id": "BF-904",
+      "date": "2026-10-14",
+      "counterparty": "RIPPLING PAYROLL",
+      "description": "ACH BATCH DISBURSEMENT PAY-2026-20",
+      "amount": -124000,
+      "bankReference": "ACH-7731904",
+      "status": "Unmatched",
+      "suggestedLedgerId": "LC-03",
+      "matchConfidence": 99.9
+    },
+    {
+      "id": "BF-905",
+      "date": "2026-10-13",
+      "counterparty": "COOLEY LLP LEGAL",
+      "description": "WIRE OUTGOING SERIES B GOVERNANCE & IP",
+      "amount": -18750,
+      "bankReference": "FW-5520194",
+      "status": "Unmatched",
+      "suggestedLedgerId": "LC-05",
+      "matchConfidence": 94.2
+    },
+    {
+      "id": "BF-906",
+      "date": "2026-10-12",
+      "counterparty": "DELAWARE SECRETARY OF STATE",
+      "description": "FRANCHISE TAX AUTOPAY Q4 ESTIMATED",
+      "amount": -4200,
+      "bankReference": "ACH-1102940",
+      "status": "Exception",
+      "matchConfidence": 62
+    }
+  ],
+  "ledgerCashItems": [
+    {
+      "id": "LC-01",
+      "date": "2026-10-16",
+      "entryId": "JE-2026-0942",
+      "memo": "Vaneck Global Corp — Wire settlement #8841",
+      "amount": 185000,
+      "reconciled": true
+    },
+    {
+      "id": "LC-02",
+      "date": "2026-10-15",
+      "entryId": "JE-2026-0941",
+      "memo": "AWS net ACH settlement after prepaid drawdown",
+      "amount": -40000,
+      "reconciled": true
+    },
+    {
+      "id": "LC-03",
+      "date": "2026-10-14",
+      "entryId": "JE-2026-0940",
+      "memo": "Rippling bi-weekly engineering payroll disbursement",
+      "amount": -124000,
+      "reconciled": false
+    },
+    {
+      "id": "LC-04",
+      "date": "2026-10-14",
+      "entryId": "JE-2026-0936",
+      "memo": "Stripe enterprise AR collection batch #ST-992",
+      "amount": 68450,
+      "reconciled": false
+    },
+    {
+      "id": "LC-05",
+      "date": "2026-10-13",
+      "entryId": "JE-2026-0935",
+      "memo": "Cooley LLP — Corporate governance & IP counsel",
+      "amount": -18750,
+      "reconciled": false
+    }
+  ],
+  "taxSchedules": [
+    {
+      "id": "TAX-FED-1120",
+      "jurisdiction": "United States — Federal",
+      "taxType": "Federal Corporate Income",
+      "authority": "Internal Revenue Service (IRS)",
+      "period": "Q4 2026 Estimated",
+      "dueDate": "2026-12-15",
+      "taxableBase": 642000,
+      "statutoryRate": 21,
+      "creditsAndDeductions": 38400,
+      "status": "Ready to File",
+      "agentAuditNotes": "",
+      "formCode": "Form 1120-W"
+    },
+    {
+      "id": "TAX-NY-SALES",
+      "jurisdiction": "New York State",
+      "taxType": "State Sales & Use",
+      "authority": "NYS Dept. of Taxation & Finance",
+      "period": "Q3–Q4 2026",
+      "dueDate": "2026-11-20",
+      "taxableBase": 418000,
+      "statutoryRate": 8.875,
+      "creditsAndDeductions": 0,
+      "status": "Ready to File",
+      "agentAuditNotes": "",
+      "formCode": "Form ST-100"
+    },
+    {
+      "id": "TAX-CA-FRAN",
+      "jurisdiction": "California",
+      "taxType": "State Sales & Use",
+      "authority": "CA Franchise Tax Board (FTB)",
+      "period": "FY 2026 Apportioned",
+      "dueDate": "2026-11-15",
+      "taxableBase": 312000,
+      "statutoryRate": 8.84,
+      "creditsAndDeductions": 6200,
+      "status": "In Review",
+      "agentAuditNotes": "",
+      "formCode": "Form 100-ES"
+    },
+    {
+      "id": "TAX-EU-VAT",
+      "jurisdiction": "European Union (OSS)",
+      "taxType": "International VAT / GST",
+      "authority": "Irish Revenue / EU One-Stop-Shop",
+      "period": "Q3 2026 Return",
+      "dueDate": "2026-10-31",
+      "taxableBase": 194000,
+      "statutoryRate": 20,
+      "creditsAndDeductions": 4150,
+      "status": "Ready to File",
+      "agentAuditNotes": "",
+      "formCode": "VAT OSS-Q3"
+    }
+  ],
+  "agentTasks": [
+    {
+      "id": "AGT-101",
+      "code": "REV-01",
+      "title": "Citadel Quant — ASC 606 Split",
+      "impactAmount": 240000,
+      "confidence": 99.6,
+      "category": "Revenue Recognition",
+      "description": "",
+      "resolved": false,
+      "targetTab": "journal"
+    },
+    {
+      "id": "AGT-102",
+      "code": "REC-02",
+      "title": "Delaware Franchise Tax Autopay",
+      "impactAmount": 4200,
+      "confidence": 98.4,
+      "category": "Bank Reconciliation",
+      "description": "",
+      "resolved": false,
+      "targetTab": "reconciliation"
+    },
+    {
+      "id": "AGT-103",
+      "code": "TAX-03",
+      "title": "California Form 100-ES Provision",
+      "impactAmount": 21381,
+      "confidence": 97.9,
+      "category": "Tax Nexus",
+      "description": "",
+      "resolved": false,
+      "targetTab": "tax"
+    }
+  ],
+  "auditLogs": [
+    {
+      "id": "AUD-2026-1005",
+      "timestamp": "2026-10-16 14:22:18 UTC",
+      "actorType": "Agent",
+      "actorId": "Agent REV-01",
+      "category": "Bank Reconciliation",
+      "action": "Reconcile Match",
+      "targetId": "BF-901",
+      "targetReference": "FW-88419022",
+      "impactAmount": 185000,
+      "summary": "Matched incoming wire BF-901 ($185,000.00) to ledger cash item LC-01",
+      "details": "Auto-matched with 99.8% confidence against INV-ENT-8841 wire remittance for Vaneck Global Corp",
+      "hash": "sha256-d977511cf37e747c"
+    },
+    {
+      "id": "AUD-2026-1004",
+      "timestamp": "2026-10-16 11:05:40 UTC",
+      "actorType": "Agent",
+      "actorId": "Agent REV-01",
+      "category": "Journal Entry",
+      "action": "Auto-Draft Post",
+      "targetId": "JE-2026-0942",
+      "targetReference": "INV-ENT-8841",
+      "impactAmount": 185000,
+      "summary": "Posted enterprise SaaS contract recognition for Vaneck Global Corp",
+      "details": "Debits: $185,000.00 | Credits: $185,000.00. 1 attachment uploaded (Vaneck_MSA_Invoice_8841.pdf)",
+      "hash": "sha256-0963675e104e057e"
+    },
+    {
+      "id": "AUD-2026-1003",
+      "timestamp": "2026-10-15 16:30:12 UTC",
+      "actorType": "System",
+      "actorId": "Rule-Engine",
+      "category": "Bank Reconciliation",
+      "action": "Reconcile Match",
+      "targetId": "BF-902",
+      "targetReference": "ACH-2940118",
+      "impactAmount": -40000,
+      "summary": "Reconciled ACH debit BF-902 to ledger cash item LC-02 ($40,000.00)",
+      "details": "ACH reference matched AWS infrastructure recurring monthly settlement",
+      "hash": "sha256-96ac1fc7fe4cc757"
+    },
+    {
+      "id": "AUD-2026-1002",
+      "timestamp": "2026-10-15 14:10:05 UTC",
+      "actorType": "User",
+      "actorId": "auslifegriffin@gmail.com",
+      "category": "Journal Entry",
+      "action": "Create Entry",
+      "targetId": "JE-2026-0941",
+      "targetReference": "AWS-OCT-2026",
+      "impactAmount": 64200,
+      "summary": "Amortized production cluster GPU compute across prepaid infrastructure",
+      "details": "Debits: $64,200.00 | Credits: $64,200.00. 1 attachment uploaded (AWS_Oct2026_Settlement.pdf)",
+      "hash": "sha256-636249270d0c3387"
+    },
+    {
+      "id": "AUD-2026-1001",
+      "timestamp": "2026-10-14 09:15:30 UTC",
+      "actorType": "System",
+      "actorId": "System Accrual",
+      "category": "Journal Entry",
+      "action": "Create Entry",
+      "targetId": "JE-2026-0940",
+      "targetReference": "PAY-2026-20",
+      "impactAmount": 142500,
+      "summary": "Processed bi-weekly engineering & product payroll disbursement register",
+      "details": "Debits: $142,500.00 | Credits: $142,500.00. 1 attachment uploaded (Rippling_Batch_20_Register.csv)",
+      "hash": "sha256-9065959ac28f9672"
+    }
+  ],
+  "receivables": [
+    {
+      "id": "INV-9012",
+      "customer": "Citadel Quantitative Systems",
+      "issueDate": "2026-10-01",
+      "dueDate": "2026-10-31",
+      "agingBucket": "Current",
+      "revenueAccountCode": "4010",
+      "amount": 145000,
+      "paidAmount": 0,
+      "status": "Open"
+    },
+    {
+      "id": "INV-9015",
+      "customer": "Millennium Partners LP",
+      "issueDate": "2026-08-25",
+      "dueDate": "2026-09-24",
+      "agingBucket": "31-60d",
+      "revenueAccountCode": "4010",
+      "amount": 95000,
+      "paidAmount": 0,
+      "status": "Overdue"
+    },
+    {
+      "id": "INV-9018",
+      "customer": "Point72 Asset Management",
+      "issueDate": "2026-10-05",
+      "dueDate": "2026-11-04",
+      "agingBucket": "Current",
+      "revenueAccountCode": "4020",
+      "amount": 70000,
+      "paidAmount": 0,
+      "status": "Open"
+    },
+    {
+      "id": "INV-9021",
+      "customer": "Jane Street Capital",
+      "issueDate": "2026-07-30",
+      "dueDate": "2026-08-29",
+      "agingBucket": "61-90d",
+      "revenueAccountCode": "4030",
+      "amount": 65000,
+      "paidAmount": 0,
+      "status": "Overdue"
+    },
+    {
+      "id": "INV-9008",
+      "customer": "Vaneck Global Corp",
+      "issueDate": "2026-10-02",
+      "dueDate": "2026-10-16",
+      "agingBucket": "Current",
+      "revenueAccountCode": "4010",
+      "amount": 185000,
+      "paidAmount": 185000,
+      "status": "Paid"
+    }
+  ],
+  "payables": [
+    {
+      "id": "BILL-401",
+      "vendor": "Amazon Web Services",
+      "billDate": "2026-10-03",
+      "dueDate": "2026-10-28",
+      "expenseAccountCode": "5010",
+      "expenseAccountName": "Cloud & GPU Inference Hosting",
+      "amount": 48500,
+      "status": "Approved",
+      "reference": "AWS-INV-10992"
+    },
+    {
+      "id": "BILL-402",
+      "vendor": "CoreWeave GPU Cloud",
+      "billDate": "2026-10-06",
+      "dueDate": "2026-10-30",
+      "expenseAccountCode": "5010",
+      "expenseAccountName": "Cloud & GPU Inference Hosting",
+      "amount": 36000,
+      "status": "Approved",
+      "reference": "CW-H100-882"
+    },
+    {
+      "id": "BILL-403",
+      "vendor": "Cooley LLP",
+      "billDate": "2026-10-09",
+      "dueDate": "2026-11-08",
+      "expenseAccountCode": "6250",
+      "expenseAccountName": "General, Legal & Audit Advisory",
+      "amount": 18500,
+      "status": "Pending",
+      "reference": "CLY-88410"
+    },
+    {
+      "id": "BILL-404",
+      "vendor": "Snowflake Inc.",
+      "billDate": "2026-10-11",
+      "dueDate": "2026-11-10",
+      "expenseAccountCode": "6120",
+      "expenseAccountName": "Enterprise GTM & Growth Operations",
+      "amount": 9000,
+      "status": "Pending",
+      "reference": "SNW-44109"
+    },
+    {
+      "id": "BILL-400",
+      "vendor": "Datadog Monitoring Corp",
+      "billDate": "2026-09-28",
+      "dueDate": "2026-10-12",
+      "expenseAccountCode": "5010",
+      "expenseAccountName": "Cloud & GPU Inference Hosting",
+      "amount": 24000,
+      "status": "Paid",
+      "reference": "DD-90214"
+    }
+  ],
+  "fixedAssets": [
+    {
+      "id": "FA-101",
+      "name": "NVIDIA H100 8x Node Cluster",
+      "category": "Compute Cluster",
+      "inServiceDate": "2026-01-15",
+      "usefulLifeMonths": 36,
+      "costBasis": 360000,
+      "salvageValue": 36000,
+      "accumulatedDepreciation": 81000,
+      "lastDepreciatedPeriod": "2026-09",
+      "status": "Active"
+    },
+    {
+      "id": "FA-102",
+      "name": "Arista 7050X3 Spine Switches",
+      "category": "Networking",
+      "inServiceDate": "2026-02-01",
+      "usefulLifeMonths": 48,
+      "costBasis": 72000,
+      "salvageValue": 4800,
+      "accumulatedDepreciation": 11200,
+      "lastDepreciatedPeriod": "2026-09",
+      "status": "Active"
+    },
+    {
+      "id": "FA-103",
+      "name": "SF HQ Vault & Fiber Buildout",
+      "category": "Leasehold",
+      "inServiceDate": "2025-10-01",
+      "usefulLifeMonths": 60,
+      "costBasis": 120000,
+      "salvageValue": 0,
+      "accumulatedDepreciation": 24000,
+      "lastDepreciatedPeriod": "2026-09",
+      "status": "Active"
+    },
+    {
+      "id": "FA-104",
+      "name": "Mac Studio M3 Ultra Fleet",
+      "category": "Workstations",
+      "inServiceDate": "2026-03-01",
+      "usefulLifeMonths": 36,
+      "costBasis": 48000,
+      "salvageValue": 4800,
+      "accumulatedDepreciation": 8400,
+      "lastDepreciatedPeriod": "2026-09",
+      "status": "Active"
+    }
+  ],
+  "closeChecklist": [
+    {
+      "id": "CLS-01",
+      "code": "SUB-AR",
+      "task": "Reconcile AR Subledger to GL 1100",
+      "category": "Subledger",
+      "owner": "Controller",
+      "completed": true
+    },
+    {
+      "id": "CLS-02",
+      "code": "SUB-AP",
+      "task": "Cut off AP Vendor Bills & Accruals (GL 2010)",
+      "category": "Subledger",
+      "owner": "AP Lead",
+      "completed": true
+    },
+    {
+      "id": "CLS-03",
+      "code": "REC-CASH",
+      "task": "Complete Mercury SVB Bank Reconciliation (GL 1010)",
+      "category": "Reconciliation",
+      "owner": "Agent REC-02",
+      "completed": true
+    },
+    {
+      "id": "CLS-04",
+      "code": "ACR-REV",
+      "task": "Post ASC 606 Deferred Revenue Amortization (GL 2400)",
+      "category": "Accruals",
+      "owner": "Agent REV-01",
+      "completed": false
+    },
+    {
+      "id": "CLS-05",
+      "code": "ACR-DEP",
+      "task": "Run Monthly Fixed Asset Depreciation Schedule",
+      "category": "Accruals",
+      "owner": "Controller",
+      "completed": false
+    },
+    {
+      "id": "CLS-06",
+      "code": "RPT-LOCK",
+      "task": "Verify Trial Balance & Lock Fiscal Period 2026-10",
+      "category": "Reporting",
+      "owner": "CFO",
+      "completed": false
+    }
+  ],
+  "amortizationSchedules": [
+    {
+      "id": "SCH-DEF-01",
+      "type": "Deferred Revenue",
+      "counterparty": "Vaneck Global Corp",
+      "contractRef": "MSA-8841",
+      "balanceSheetAccount": "2400",
+      "pnlAccount": "4010",
+      "totalContractAmount": 240000,
+      "recognizedToDate": 100000,
+      "monthlyRecognition": 20000,
+      "remainingMonths": 7,
+      "status": "Scheduled"
+    },
+    {
+      "id": "SCH-DEF-02",
+      "type": "Deferred Revenue",
+      "counterparty": "Two Sigma Investments",
+      "contractRef": "MSA-8790",
+      "balanceSheetAccount": "2400",
+      "pnlAccount": "4010",
+      "totalContractAmount": 180000,
+      "recognizedToDate": 90000,
+      "monthlyRecognition": 15000,
+      "remainingMonths": 6,
+      "status": "Scheduled"
+    },
+    {
+      "id": "SCH-PRE-01",
+      "type": "Prepaid Expense",
+      "counterparty": "Amazon Web Services",
+      "contractRef": "RI-2026-ANNUAL",
+      "balanceSheetAccount": "1400",
+      "pnlAccount": "5010",
+      "totalContractAmount": 144000,
+      "recognizedToDate": 72000,
+      "monthlyRecognition": 12000,
+      "remainingMonths": 6,
+      "status": "Scheduled"
+    }
+  ],
+  "isPeriodLocked": false,
+  "preferences": {
+    "language": "en",
+    "fontSize": "md",
+    "theme": "light",
+    "fontFamily": "inter"
+  },
+  "budgetAllocations": [
+    {
+      "accountCode": "4010",
+      "accountName": "Enterprise SaaS Subscriptions",
+      "department": "Revenue",
+      "category": "Revenue",
+      "q4Budget": 800000
+    },
+    {
+      "accountCode": "4020",
+      "accountName": "Usage & API Overage Revenue",
+      "department": "Revenue",
+      "category": "Revenue",
+      "q4Budget": 320000
+    },
+    {
+      "accountCode": "4030",
+      "accountName": "Implementation & Advisory Services",
+      "department": "Revenue",
+      "category": "Revenue",
+      "q4Budget": 140000
+    },
+    {
+      "accountCode": "5010",
+      "accountName": "Cloud & GPU Inference Hosting",
+      "department": "Infrastructure",
+      "category": "Expense",
+      "q4Budget": 180000
+    },
+    {
+      "accountCode": "6010",
+      "accountName": "R&D & Core Engineering Payroll",
+      "department": "Engineering",
+      "category": "Expense",
+      "q4Budget": 360000
+    },
+    {
+      "accountCode": "6120",
+      "accountName": "Enterprise GTM & Performance Marketing",
+      "department": "GTM & Growth",
+      "category": "Expense",
+      "q4Budget": 90000
+    },
+    {
+      "accountCode": "6250",
+      "accountName": "Legal, Audit & Corporate Advisory",
+      "department": "G&A & Legal",
+      "category": "Expense",
+      "q4Budget": 60000
+    },
+    {
+      "accountCode": "6800",
+      "accountName": "Corporate Tax Provision Expense",
+      "department": "Tax",
+      "category": "Expense",
+      "q4Budget": 135000
+    }
+  ],
+  "forecastDrivers": {
+    "scenarioId": "base",
+    "scenarioName": "Base Operating Plan",
+    "quarterlyRevGrowthPct": 11.5,
+    "cloudCogsRatioPct": 14.5,
+    "quarterlyOpexGrowthPct": 5,
+    "effectiveTaxRatePct": 21
+  },
+  "forecastOverrides": {}
+}
