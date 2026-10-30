@@ -1,0 +1,1 @@
+{"case":"parse_39","input":{"a":"999999999999.9997","op":"string"},"module":"money","output":"999999999999.9997"}

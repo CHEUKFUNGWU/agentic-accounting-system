@@ -1,0 +1,1 @@
+{"case":"round_18","input":{"a":"-0.001","mode":"floor","op":"round","places":2},"module":"money","output":"-0.01"}

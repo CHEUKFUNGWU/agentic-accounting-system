@@ -1,0 +1,1 @@
+{"case":"add_20","input":{"a":"1E-7","b":"1E-7","op":"add"},"module":"money","output":"2E-7"}

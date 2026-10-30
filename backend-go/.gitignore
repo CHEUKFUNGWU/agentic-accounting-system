@@ -1,0 +1,2 @@
+# Go binary output from `go build ./cmd/aasd` in-tree.
+aasd

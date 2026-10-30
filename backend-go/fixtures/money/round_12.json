@@ -1,0 +1,1 @@
+{"case":"round_12","input":{"a":"-0.4","mode":"ceiling","op":"round","places":0},"module":"money","output":"-0"}

@@ -1,0 +1,17 @@
+# Expected divergences from Python golden outputs (REQ-0035, ADR-0002 D3).
+#
+# The registry is bounded: one entry per SRC-0026 business-logic finding ID,
+# each excluding only that finding's registered reproduction scenario —
+# never a whole module, never a control. Engineering-workflow §3 invariant
+# tests and control-matrix counterexamples are never divergence-eligible.
+# A registration is valid in CI only while its Go regression test passes.
+#
+# Schema (validated by internal/fixture):
+#   entries:
+#     - finding: BL-XX        # SRC-0026 finding ID
+#       module: <fixture module>
+#       scenario: <fixture case name — that finding's reproduction scenario>
+#       reason: >
+#         why the Go behaviour differs (the fix) and why excluding this one
+#         scenario from golden parity is valid.
+entries: []

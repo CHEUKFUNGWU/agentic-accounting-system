@@ -1,0 +1,1 @@
+{"case":"parse_31","input":{"a":".5_","op":"string"},"module":"money","output":"0.5"}
