@@ -78,6 +78,6 @@ func div28(a, b money.Money) (money.Money, error) {
 // notation, sign preserved ("-0.0%"). The f-string __format__ rendering is
 // unbounded by the arithmetic context — money.FormatFixed, not Round — so a
 // 28-digit margin renders where Round would refuse.
-func formatPct1(m money.Money) (string, error) {
-	return money.FormatFixed(m, 1) + "%", nil
+func formatPct1(m money.Money) string {
+	return money.FormatFixed(m, 1) + "%"
 }

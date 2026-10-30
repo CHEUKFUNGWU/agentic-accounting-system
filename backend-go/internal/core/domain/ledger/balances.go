@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/CHEUKFUNGUWU/agentic-accounting-system/backend-go/internal/core/domain/localization"
 	"github.com/CHEUKFUNGUWU/agentic-accounting-system/backend-go/internal/core/money"
 )
 
@@ -29,11 +30,11 @@ func mustParse(s string) money.Money {
 	return m
 }
 
-// q4 is the reference's q4 (localization.q4): ROUND_HALF_UP quantize to four
-// decimal places, mode explicit. It errors where Python's quantize raises
-// decimal.InvalidOperation (result beyond context precision).
+// q4 is the reference's q4, which localization.Q4 owns (ROUND_HALF_UP
+// quantize to four decimal places, mode explicit; errors where Python's
+// quantize raises decimal.InvalidOperation).
 func q4(m money.Money) (money.Money, error) {
-	return m.Round(4, money.RoundHalfUp)
+	return localization.Q4(m)
 }
 
 // Entry layers. A line belongs to the adjustment columns when its layer is a
@@ -486,10 +487,11 @@ type AccountLedgerReport struct {
 // balance. The account must exist on the chart (including inactive), or
 // COA_MISSING_ACCOUNT refuses.
 func AccountLedger(chart []Account, lines []Line, entityCode, accountCode, periodCode string) (AccountLedgerReport, error) {
+	coaMissing := fail(ErrCOAMissingAccount,
+		fmt.Sprintf("COA_MISSING_ACCOUNT: 科目 %s 不存在於科目表。", accountCode))
 	account := AccountByCode(chart, accountCode)
 	if account == nil {
-		return AccountLedgerReport{}, fail(ErrCOAMissingAccount,
-			fmt.Sprintf("COA_MISSING_ACCOUNT: 科目 %s 不存在於科目表。", accountCode))
+		return AccountLedgerReport{}, coaMissing
 	}
 	if _, err := PeriodBounds(periodCode); err != nil {
 		return AccountLedgerReport{}, err
@@ -500,8 +502,7 @@ func AccountLedger(chart []Account, lines []Line, entityCode, accountCode, perio
 	}
 	b, ok := BalancesByCode(balances)[accountCode]
 	if !ok {
-		return AccountLedgerReport{}, fail(ErrCOAMissingAccount,
-			fmt.Sprintf("COA_MISSING_ACCOUNT: 科目 %s 不存在於科目表。", accountCode))
+		return AccountLedgerReport{}, coaMissing
 	}
 	movements, err := FilterLines(lines, LineQuery{
 		EntityCode:  entityCode,

@@ -420,10 +420,7 @@ func IncomeStatement(f *WindowFigures, period, currency string) (*IncomeStatemen
 			return nil, err
 		}
 	}
-	gm, err := formatPct1(grossMargin)
-	if err != nil {
-		return nil, err
-	}
+	gm := formatPct1(grossMargin)
 	netMargin := zeroQ4
 	if f.TotalRevenue.Cmp(zeroNum) > 0 {
 		quotient, err := div28(f.WindowNetProfit, f.TotalRevenue)
@@ -434,10 +431,7 @@ func IncomeStatement(f *WindowFigures, period, currency string) (*IncomeStatemen
 			return nil, err
 		}
 	}
-	nm, err := formatPct1(netMargin)
-	if err != nil {
-		return nil, err
-	}
+	nm := formatPct1(netMargin)
 	items := []PLLineItem{
 		{Key: "REVENUE", StatementRef: "PL-10", Label: "Revenue / Turnover (主營業務收入)", Amount: f.TotalRevenue},
 		{Key: "COGS", StatementRef: "PL-20", Label: "Less: Direct Cloud & API Cost of Sales (營業成本)", Amount: negDisplay(f.TotalCOGS)},

@@ -99,8 +99,10 @@ func sodDecisionErr(reason string) error {
 	switch reason {
 	case positions.KindSODMakerCheckerViolation:
 		return fail(ErrSODMakerChecker, "SOD_MAKER_CHECKER_VIOLATION: Another authorized person must approve this bill.")
-	case "HUMAN_REVIEWER_REQUIRED":
+	case positions.KindHumanReviewerRequired:
 		return fail(ErrHumanReviewer, "HUMAN_REVIEWER_REQUIRED: Only a human may approve.")
 	}
-	return fail(ErrHumanReviewer, reason)
+	// A CheckSelfApproval reason without a mapping is a wiring bug: refuse
+	// loudly rather than masquerading as a human-reviewer requirement.
+	panic("workflow: unmapped CheckSelfApproval reason " + reason)
 }

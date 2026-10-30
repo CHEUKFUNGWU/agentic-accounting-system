@@ -112,6 +112,7 @@ const (
 	KindLineExclusivityViolation         = "LINE_EXCLUSIVITY_VIOLATION"
 	KindControlAccountIsolationViolation = "CONTROL_ACCOUNT_ISOLATION_VIOLATION"
 	KindUnbalancedEntryViolation         = "UNBALANCED_ENTRY_VIOLATION"
+	KindHumanReviewerRequired            = "HUMAN_REVIEWER_REQUIRED"
 	KindSODMakerCheckerViolation         = "SOD_MAKER_CHECKER_VIOLATION"
 	KindSODApprovalRoleViolation         = "SOD_APPROVAL_ROLE_VIOLATION"
 )
@@ -544,7 +545,7 @@ func CheckSelfApproval(solo, approverIsCreator, approverIsHuman bool) SelfApprov
 	if !approverIsHuman {
 		// reviewer.py's O2-g refusal: agents may pre-review and advise;
 		// approval requires a human reviewer.
-		return SelfApprovalDecision{Reason: "HUMAN_REVIEWER_REQUIRED"}
+		return SelfApprovalDecision{Reason: KindHumanReviewerRequired}
 	}
 	if approverIsCreator && !solo {
 		// sod_guard.py's self-approval refusal; reviewer.py raises the same
