@@ -1,0 +1,1 @@
+{"case":"can_save_rejected_to_posted","input":{"from":"REJECTED","op":"can_save_transition","to":"POSTED"},"module":"vouchers","output":false}

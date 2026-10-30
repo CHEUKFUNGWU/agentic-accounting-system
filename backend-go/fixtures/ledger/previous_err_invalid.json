@@ -1,0 +1,1 @@
+{"case":"previous_err_invalid","expected_error":"invalid_period","input":{"op":"previous_period","period_code":"2026"},"module":"ledger"}

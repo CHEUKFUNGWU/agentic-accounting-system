@@ -1,0 +1,1 @@
+{"case":"q4_negative_zero","input":{"op":"q4","value":"-0.00001"},"module":"vouchers","output":"-0.0000"}

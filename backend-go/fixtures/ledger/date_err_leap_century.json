@@ -1,0 +1,1 @@
+{"case":"date_err_leap_century","expected_error":"invalid_accounting_date","input":{"accounting_date":"1900-02-29","op":"validate_posting_date"},"module":"ledger"}

@@ -1,0 +1,1 @@
+{"case":"date_err_empty","expected_error":"invalid_accounting_date","input":{"accounting_date":"","op":"validate_posting_date"},"module":"ledger"}

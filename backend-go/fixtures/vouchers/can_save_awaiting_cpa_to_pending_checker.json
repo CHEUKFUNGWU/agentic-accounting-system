@@ -1,0 +1,1 @@
+{"case":"can_save_awaiting_cpa_to_pending_checker","input":{"from":"AWAITING_CPA","op":"can_save_transition","to":"PENDING_CHECKER"},"module":"vouchers","output":false}

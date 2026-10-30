@@ -1,0 +1,1 @@
+{"case":"finalized_save_posted_reversal","input":{"content_changed":false,"current":"POSTED","op":"finalized_save","proposed":"REVERSED"},"module":"vouchers","output":true}

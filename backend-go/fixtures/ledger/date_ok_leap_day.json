@@ -1,0 +1,1 @@
+{"case":"date_ok_leap_day","input":{"accounting_date":"2024-02-29","op":"validate_posting_date","period":"2024-02"},"module":"ledger","output":{"period":"2024-02"}}

@@ -1,0 +1,1 @@
+{"case":"format_number_quarterly_period","input":{"entity":"ACME","op":"format_voucher_number","period":"2026-Q3","sequence":12},"module":"vouchers","output":"JV-2026-0012"}

@@ -1,0 +1,1 @@
+{"case":"format_number_boundary_9999","input":{"entity":"ACME","op":"format_voucher_number","period":"2026-12","sequence":9999},"module":"vouchers","output":"JV-2026-9999"}

@@ -1,0 +1,1 @@
+{"case":"q4_over_precision","expected_error":"DECIMAL_INVALID_OPERATION","input":{"op":"q4","value":"1234567890123456789012345.67895"},"module":"vouchers"}

@@ -1,0 +1,1 @@
+{"case":"normal_balance_expense","input":{"account_type":"EXPENSE","fs_category":null,"op":"normal_balance"},"module":"vouchers","output":"DEBIT"}

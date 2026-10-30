@@ -1,0 +1,1 @@
+{"case":"date_ok_leap_century","input":{"accounting_date":"2000-02-29","op":"validate_posting_date","period":"2000-02"},"module":"ledger","output":{"period":"2000-02"}}

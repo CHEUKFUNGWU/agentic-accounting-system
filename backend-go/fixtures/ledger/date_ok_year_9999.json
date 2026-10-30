@@ -1,0 +1,1 @@
+{"case":"date_ok_year_9999","input":{"accounting_date":"9999-12-31","op":"validate_posting_date","period":"9999-12"},"module":"ledger","output":{"period":"9999-12"}}

@@ -1,0 +1,1 @@
+{"case":"previous_feb","input":{"op":"previous_period","period_code":"2026-02"},"module":"ledger","output":{"previous_period":"2026-01"}}

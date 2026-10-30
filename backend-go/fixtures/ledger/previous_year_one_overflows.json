@@ -1,0 +1,1 @@
+{"case":"previous_year_one_overflows","input":{"op":"previous_period","period_code":"0001-01"},"module":"ledger","output":{"previous_period":"0-12"}}

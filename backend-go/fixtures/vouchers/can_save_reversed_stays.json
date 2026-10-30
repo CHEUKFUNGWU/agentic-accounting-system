@@ -1,0 +1,1 @@
+{"case":"can_save_reversed_stays","input":{"from":"REVERSED","op":"can_save_transition","to":"REVERSED"},"module":"vouchers","output":true}

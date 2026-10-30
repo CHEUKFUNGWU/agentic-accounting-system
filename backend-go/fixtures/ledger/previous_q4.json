@@ -1,0 +1,1 @@
+{"case":"previous_q4","input":{"op":"previous_period","period_code":"2026-Q4"},"module":"ledger","output":{"previous_period":"2026-Q3"}}

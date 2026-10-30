@@ -1,0 +1,1 @@
+{"case":"next_quarter_9999","input":{"op":"next_period","period_code":"9999-Q4"},"module":"ledger","output":{"next_period":"10000-Q1"}}

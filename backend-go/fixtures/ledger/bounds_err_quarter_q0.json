@@ -1,0 +1,1 @@
+{"case":"bounds_err_quarter_q0","expected_error":"invalid_period","input":{"op":"period_bounds","period_code":"2026-Q0"},"module":"ledger"}

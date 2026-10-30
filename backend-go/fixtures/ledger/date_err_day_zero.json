@@ -1,0 +1,1 @@
+{"case":"date_err_day_zero","expected_error":"invalid_accounting_date","input":{"accounting_date":"2026-10-00","op":"validate_posting_date"},"module":"ledger"}
