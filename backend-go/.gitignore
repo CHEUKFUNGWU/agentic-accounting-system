@@ -1,2 +1,3 @@
-# Go binary output from `go build ./cmd/aasd` in-tree.
-aasd
+# Go binary output from `go build ./cmd/aasd` in-tree (anchored so the
+# cmd/aasd/ source directory itself is never ignored).
+/aasd

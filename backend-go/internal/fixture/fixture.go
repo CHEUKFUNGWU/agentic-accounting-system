@@ -34,7 +34,10 @@ type Error struct{ Kind string }
 
 func (e *Error) Error() string { return "fixture: " + e.Kind }
 
-// findingRe bounds the registry to business-logic finding IDs (SRC-0026).
+// findingRe bounds the registry to business-logic finding IDs. The 30
+// SRC-0026 findings are all BL-XX (business-logic audit BL-01..29 and the
+// AIS review BL-30..36); the AIS GAP-01..07 rows are capability gaps the
+// owner registered as requirement candidates, not migration findings.
 var findingRe = regexp.MustCompile(`^BL-\d+$`)
 
 // ErrorKind extracts the classified kind from a replay error.
@@ -115,12 +118,16 @@ func Run(t *testing.T, module string) {
 			if err != nil {
 				t.Fatalf("read fixture: %v", err)
 			}
-			problem, note := checkCase(root, module, replay, raw)
+			var c caseFile
+			if err := json.Unmarshal(raw, &c); err != nil {
+				t.Fatalf("parse fixture: %v", err)
+			}
+			problem, note := checkCase(root, module, replay, c)
 			// File name and case must match: divergence scenarios are keyed
 			// by case, and the registry validation checks the file exists
 			// under the scenario name.
-			if problem == "" && caseName(raw) != strings.TrimSuffix(name, ".json") {
-				problem = fmt.Sprintf("fixture file %q names case %q; file name and case must match", name, caseName(raw))
+			if problem == "" && c.Case != strings.TrimSuffix(name, ".json") {
+				problem = fmt.Sprintf("fixture file %q names case %q; file name and case must match", name, c.Case)
 			}
 			if note != "" {
 				t.Logf("%s", note)
@@ -132,25 +139,12 @@ func Run(t *testing.T, module string) {
 	}
 }
 
-// caseName extracts the case identifier from a fixture document ("" when
-// unparseable; Run reports the mismatch through the file-name check).
-func caseName(raw []byte) string {
-	var c caseFile
-	if err := json.Unmarshal(raw, &c); err != nil {
-		return ""
-	}
-	return c.Case
-}
-
-// checkCase replays one fixture document and returns a problem message, or
-// "" when the replay matches the recorded output. A match achieved through a
-// registered expected divergence is returned as a note for the caller to
-// log. Pure over its inputs, so tests can drive it directly.
-func checkCase(root, module string, replay Replay, raw []byte) (problem, note string) {
-	var c caseFile
-	if err := json.Unmarshal(raw, &c); err != nil {
-		return fmt.Sprintf("parse fixture: %v", err), ""
-	}
+// checkCase replays one parsed fixture document and returns a problem
+// message, or "" when the replay matches the recorded output. A match
+// achieved through a registered expected divergence is returned as a note
+// for the caller to log. Pure over its inputs, so tests can drive it
+// directly.
+func checkCase(root, module string, replay Replay, c caseFile) (problem, note string) {
 	if c.Module != module {
 		return fmt.Sprintf("fixture says module %q, run for %q", c.Module, module), ""
 	}
@@ -291,7 +285,24 @@ func goTestFunctions(t *testing.T, root string) map[string]bool {
 	t.Helper()
 	funcRe := regexp.MustCompile(`(?m)^func (Test\w+)\(`)
 	names := map[string]bool{}
-	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+	err := WalkGoSources(root, func(path string, src []byte) error {
+		for _, m := range funcRe.FindAllStringSubmatch(string(src), -1) {
+			names[m[1]] = true
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("scan test functions: %v", err)
+	}
+	return names
+}
+
+// WalkGoSources visits every Go source file under root, skipping
+// non-source directories (.git, vendor, fixtures, tools). fn receives each
+// file's path and contents. Shared by the divergence registry validation and
+// the money package's import lint, which walk for the same purpose.
+func WalkGoSources(root string, fn func(path string, src []byte) error) error {
+	return filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -309,15 +320,8 @@ func goTestFunctions(t *testing.T, root string) map[string]bool {
 		if err != nil {
 			return err
 		}
-		for _, m := range funcRe.FindAllStringSubmatch(string(src), -1) {
-			names[m[1]] = true
-		}
-		return nil
+		return fn(path, src)
 	})
-	if err != nil {
-		t.Fatalf("scan test functions: %v", err)
-	}
-	return names
 }
 
 // ModuleRoot walks up from the working directory to the directory holding

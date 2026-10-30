@@ -49,19 +49,14 @@ func writeSelfDivergences(t *testing.T, root string, entries []divergence) {
 	}
 }
 
-func selfCase(t *testing.T, c, op, a, output, expectedError string) []byte {
-	t.Helper()
-	doc := map[string]any{"module": "fixtureselftest", "case": c, "input": map[string]any{"op": op, "a": a}}
+func selfCase(module, c, input, output, expectedError string) caseFile {
+	cf := caseFile{Module: module, Case: c, Input: json.RawMessage(input)}
 	if expectedError != "" {
-		doc["expected_error"] = expectedError
+		cf.ExpectedError = expectedError
 	} else {
-		doc["output"] = output
+		cf.Output = json.RawMessage(output)
 	}
-	raw, err := json.Marshal(doc)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return raw
+	return cf
 }
 
 // TestHarnessMechanics drives checkCase directly: a matching case passes, a
@@ -74,13 +69,13 @@ func TestHarnessMechanics(t *testing.T) {
 	})
 
 	problem, note := checkCase(root, "fixtureselftest", selftestReplay,
-		selfCase(t, "echo_ok", "echo", "1.500", "1.500", ""))
+		selfCase("fixtureselftest", "echo_ok", `{"op":"echo","a":"1.500"}`, `"1.500"`, ""))
 	if problem != "" || note != "" {
 		t.Fatalf("matching case: problem=%q note=%q", problem, note)
 	}
 
 	problem, note = checkCase(root, "fixtureselftest", selftestReplay,
-		selfCase(t, "echo_divergent", "echo", "1.500", "1.50", ""))
+		selfCase("fixtureselftest", "echo_divergent", `{"op":"echo","a":"1.500"}`, `"1.50"`, ""))
 	if problem != "" {
 		t.Fatalf("registered divergence must pass, got problem=%q", problem)
 	}
@@ -89,25 +84,25 @@ func TestHarnessMechanics(t *testing.T) {
 	}
 
 	problem, _ = checkCase(root, "fixtureselftest", selftestReplay,
-		selfCase(t, "echo_unregistered", "echo", "1.500", "1.50", ""))
+		selfCase("fixtureselftest", "echo_unregistered", `{"op":"echo","a":"1.500"}`, `"1.50"`, ""))
 	if problem == "" {
 		t.Fatal("unregistered mismatch must fail")
 	}
 
 	problem, _ = checkCase(root, "fixtureselftest", selftestReplay,
-		selfCase(t, "reject_ok", "reject", "x", "", "invalid_input"))
+		selfCase("fixtureselftest", "reject_ok", `{"op":"reject","a":"x"}`, "", "invalid_input"))
 	if problem != "" {
 		t.Fatalf("classified error case must pass, got %q", problem)
 	}
 
 	problem, _ = checkCase(root, "fixtureselftest", selftestReplay,
-		selfCase(t, "reject_kind", "reject", "x", "", "other_kind"))
+		selfCase("fixtureselftest", "reject_kind", `{"op":"reject","a":"x"}`, "", "other_kind"))
 	if problem == "" {
 		t.Fatal("wrong error kind must fail")
 	}
 
 	problem, _ = checkCase(root, "othermodule", selftestReplay,
-		selfCase(t, "echo_ok", "echo", "1.500", "1.500", ""))
+		selfCase("fixtureselftest", "echo_ok", `{"op":"echo","a":"1.500"}`, `"1.500"`, ""))
 	if problem == "" {
 		t.Fatal("module mismatch must fail")
 	}

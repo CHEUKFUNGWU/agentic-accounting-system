@@ -8,6 +8,13 @@ import (
 	"github.com/CHEUKFUNGUWU/agentic-accounting-system/backend-go/internal/fixture"
 )
 
+// Fixture error kinds on the money replay wire — the same strings
+// tools/gen_fixtures.py writes into expected_error fields.
+const (
+	kindInvalidParse    = "invalid_parse"
+	kindInvalidQuantize = "invalid_quantize"
+)
+
 // moneyReplay executes one fixture case. The op names and mode names are the
 // wire forms written by backend-go/tools/gen_fixtures.py.
 func moneyReplay(input json.RawMessage) (any, error) {
@@ -23,7 +30,7 @@ func moneyReplay(input json.RawMessage) (any, error) {
 	}
 	a, err := Parse(in.A)
 	if err != nil {
-		return nil, &fixture.Error{Kind: "invalid_parse"}
+		return nil, &fixture.Error{Kind: kindInvalidParse}
 	}
 	switch in.Op {
 	case "string":
@@ -31,7 +38,7 @@ func moneyReplay(input json.RawMessage) (any, error) {
 	case "add":
 		b, err := Parse(in.B)
 		if err != nil {
-			return nil, &fixture.Error{Kind: "invalid_parse"}
+			return nil, &fixture.Error{Kind: kindInvalidParse}
 		}
 		return a.Add(b).String(), nil
 	case "round":
@@ -44,7 +51,7 @@ func moneyReplay(input json.RawMessage) (any, error) {
 		}
 		r, err := a.Round(*in.Places, mode)
 		if err != nil {
-			return nil, &fixture.Error{Kind: "invalid_quantize"}
+			return nil, &fixture.Error{Kind: kindInvalidQuantize}
 		}
 		return r.String(), nil
 	default:

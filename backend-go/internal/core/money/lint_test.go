@@ -1,7 +1,6 @@
 package money
 
 import (
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -17,26 +16,9 @@ func TestShopspringOnlyInsideMoney(t *testing.T) {
 	if err != nil {
 		t.Fatalf("find module root: %v", err)
 	}
-	err = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() {
-			name := d.Name()
-			if name == ".git" || name == "vendor" || name == "fixtures" || name == "tools" {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if !strings.HasSuffix(path, ".go") {
-			return nil
-		}
+	err = fixture.WalkGoSources(root, func(path string, src []byte) error {
 		if strings.Contains(filepath.ToSlash(path), "/internal/core/money/") {
 			return nil
-		}
-		src, err := os.ReadFile(path)
-		if err != nil {
-			return err
 		}
 		if strings.Contains(string(src), "shopspring/decimal") {
 			t.Errorf("%s imports shopspring/decimal directly; use internal/core/money", path)
