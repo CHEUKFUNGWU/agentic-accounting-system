@@ -1,0 +1,1 @@
+{"case":"amount_basic","input":{"op":"amount","positive":false,"signed":false,"value":"4200"},"module":"workflow","output":{"amount":"4200.0000"}}

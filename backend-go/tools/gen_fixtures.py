@@ -163,6 +163,46 @@ def gen_money_mul() -> int:
     return count
 
 
+def gen_money_div() -> int:
+    """Div parity (Python Decimal division under the reference context):
+    exact quotients keep the ideal exponent within precision, inexact
+    quotients round to 28 significant digits half-even on the true
+    remainder, 0/0 is InvalidOperation and nonzero/0 is DivisionByZero."""
+    cases = [
+        ("1200.0000", "12"),   # exact, ideal exponent kept: 100.0000
+        ("100", "4"),          # exact, ideal exponent reachable: 25
+        ("1E+2", "4"),         # exact, ideal exponent unreachable: 25
+        ("10", "4"),           # exact, fractional: 2.5
+        ("2.5", "0.5"),        # exact at the ideal exponent: 5
+        ("1.5e2", "3"),        # exact: 5E+1
+        ("0.000", "5"),        # zero keeps the ideal exponent: 0.000
+        ("-0", "5"),           # zero sign XOR: -0
+        ("1", "3"),            # inexact, rounds down
+        ("2", "3"),            # inexact, rounds up
+        ("100", "7"),          # inexact, true remainder decides (rounds up)
+        ("9999999999999999999999999999", "3"),  # exact at precision
+        ("1.0000000000000000000000000001", "1"),  # inexact 29-digit dividend
+        ("-6", "4"),
+        ("6", "-4"),
+        ("1", "0"),            # DivisionByZero
+        ("0", "0.0"),          # InvalidOperation (0/0)
+    ]
+    count = 0
+    for i, (a, b) in enumerate(cases):
+        name = f"div_{i:02d}"
+        da, db = Decimal(a), Decimal(b)
+        try:
+            out = str(da / db)
+        except ZeroDivisionError:
+            write("money", name, {"op": "div", "a": a, "b": b}, error="division_by_zero")
+        except InvalidOperation:
+            write("money", name, {"op": "div", "a": a, "b": b}, error="divide_invalid")
+        else:
+            write("money", name, {"op": "div", "a": a, "b": b}, output=out)
+        count += 1
+    return count
+
+
 def gen_money_round() -> int:
     """Round parity (Python quantize with an explicit rounding mode),
     including zero-sign results and the precision-limit rejection."""
@@ -217,7 +257,13 @@ def gen_money_round() -> int:
 
 
 def main() -> None:
-    total = gen_money_parse() + gen_money_add() + gen_money_mul() + gen_money_round()
+    total = (
+        gen_money_parse()
+        + gen_money_add()
+        + gen_money_mul()
+        + gen_money_div()
+        + gen_money_round()
+    )
     print(f"generated {total} money fixtures under {OUT / 'money'}")
 
 

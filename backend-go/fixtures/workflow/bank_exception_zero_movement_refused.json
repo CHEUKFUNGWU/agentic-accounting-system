@@ -1,0 +1,1 @@
+{"case":"bank_exception_zero_movement_refused","expected_error":"invalid_amount","input":{"bank":{"amount":"0.0000","id":"BF-900","status":"Unmatched"},"op":"bank_exception"},"module":"workflow"}

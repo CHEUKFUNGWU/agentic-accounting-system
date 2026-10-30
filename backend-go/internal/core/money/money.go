@@ -95,6 +95,11 @@ var (
 	// ErrQuantize mirrors decimal.InvalidOperation from quantize when the
 	// result coefficient would exceed the context precision.
 	ErrQuantize = errors.New("money: quantize result exceeds context precision")
+	// ErrDivisionByZero mirrors decimal.DivisionByZero (nonzero ÷ 0).
+	ErrDivisionByZero = errors.New("money: division by zero")
+	// ErrDivideInvalid mirrors decimal.InvalidOperation for 0 ÷ 0, which the
+	// decimal specification defines as undefined rather than a trap.
+	ErrDivideInvalid = errors.New("money: zero divided by zero")
 )
 
 // Money is an exact decimal value: a coefficient, a base-ten exponent and
@@ -446,6 +451,78 @@ func pow10(n int64) *big.Int {
 
 // IsZero reports whether the value is zero (either sign).
 func (m Money) IsZero() bool { return m.d.IsZero() }
+
+// Div returns m ÷ o under the reference context (Python's Decimal
+// division). The quotient is first rounded to 28 significant digits,
+// half-even, using the true remainder for the half decision; an exact
+// division then has trailing zeros stripped down to the ideal exponent (the
+// dividend's exponent minus the divisor's) and, when the coefficient has
+// room, padded back toward it — "1200.0000"/12 is "100.0000", 1E+2/4 is
+// "25", and a 29-digit exact quotient still rounds to 28. 0 ÷ 0 is
+// ErrDivideInvalid (the spec's InvalidOperation); nonzero ÷ 0 is
+// ErrDivisionByZero. A zero quotient carries the XOR of the operand signs
+// (Python: −0 ÷ 5 is −0).
+func (m Money) Div(o Money) (Money, error) {
+	if o.d.IsZero() {
+		if m.d.IsZero() {
+			return Money{}, ErrDivideInvalid
+		}
+		return Money{}, ErrDivisionByZero
+	}
+	a := new(big.Int).Abs(m.d.Coefficient())
+	b := new(big.Int).Abs(o.d.Coefficient())
+	neg := m.isNeg() != o.isNeg()
+	ideal := int64(m.d.Exponent()) - int64(o.d.Exponent())
+	// Scale for one guard digit beyond the precision, so the half decision
+	// sees the true remainder, not just a truncated digit.
+	da, db := int64(len(a.String())), int64(len(b.String()))
+	d := int64(precision) + 1 - da + db
+	if d < 1 {
+		d = 1
+	}
+	q, r := new(big.Int).QuoRem(new(big.Int).Mul(a, pow10(d)), b, new(big.Int))
+	ten := big.NewInt(10)
+	// Round q to precision significant digits.
+	shift := int64(len(q.String())) - precision
+	if shift < 0 {
+		shift = 0
+	}
+	coeff := new(big.Int).Quo(q, pow10(shift))
+	dropped := new(big.Int).Mod(q, pow10(shift))
+	// Removed fraction = (dropped*b + r) / (b*10^shift); compare doubled.
+	num := new(big.Int).Add(new(big.Int).Mul(dropped, b), r)
+	twice := new(big.Int).Lsh(num, 1)
+	den := new(big.Int).Mul(b, pow10(shift))
+	if twice.Cmp(den) > 0 || (twice.Cmp(den) == 0 && coeff.Bit(0) == 1) {
+		coeff.Add(coeff, big.NewInt(1))
+	}
+	exp := ideal - d + shift
+	// A rounding carry can add a digit; it cascades through exact zeros.
+	for len(coeff.String()) > precision {
+		coeff.Div(coeff, ten)
+		exp++
+	}
+	// Exact division: strip trailing zeros down to the ideal exponent, then
+	// pad back toward it while the coefficient fits the precision.
+	if r.Sign() == 0 {
+		for coeff.Sign() != 0 && new(big.Int).Mod(coeff, ten).Sign() == 0 && exp < ideal {
+			coeff.Div(coeff, ten)
+			exp++
+		}
+		if coeff.Sign() == 0 {
+			exp = ideal
+		} else {
+			for exp > ideal && int64(len(coeff.String())) < precision {
+				coeff.Mul(coeff, ten)
+				exp--
+			}
+		}
+	}
+	if exp < -1<<31 || exp > 1<<31-1 {
+		return Money{}, ErrQuantize
+	}
+	return fromParts(coeff, int32(exp), neg), nil
+}
 
 // Cmp compares numerically like Python Decimal comparison; the sign of zero
 // does not affect ordering.

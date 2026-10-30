@@ -1,0 +1,1 @@
+{"case":"review_invalid_verdict","expected_error":"INVALID_VERDICT","input":{"checked":["x"],"op":"review_verdict","reason":"","reviewed_at":"2026-10-31T00:00:00+00:00","reviewer_position":"GL_ACCOUNTANT","reviewer_principal_key":"controller-checker-01","status":"PENDING_CHECKER","verdict":"MAYBE","voucher_no":null},"module":"posting"}

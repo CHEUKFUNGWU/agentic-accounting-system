@@ -1,0 +1,1 @@
+{"case":"amount_negative_unsigned","expected_error":"invalid_amount","input":{"op":"amount","positive":false,"signed":false,"value":"-2"},"module":"workflow"}

@@ -1,0 +1,1 @@
+{"case":"text_blank","expected_error":"invalid_field","input":{"field":"reference","limit":500,"op":"text","value":"   "},"module":"workflow"}

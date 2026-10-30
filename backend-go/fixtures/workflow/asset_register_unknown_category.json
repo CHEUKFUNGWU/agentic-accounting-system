@@ -1,0 +1,1 @@
+{"case":"asset_register_unknown_category","expected_error":"invalid_asset_category","input":{"category":"Vehicles","cost_basis":"1200","in_service_date":"2026-10-01","name":"NVIDIA H100 Node","op":"register_asset","salvage_value":"0","useful_life_months":36},"module":"workflow"}
