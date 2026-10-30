@@ -3,7 +3,8 @@ package posting
 import (
 	"bytes"
 	"encoding/json"
-	"strings"
+	"fmt"
+	"sort"
 
 	"github.com/CHEUKFUNGUWU/agentic-accounting-system/backend-go/internal/core/domain/voucher"
 	"github.com/CHEUKFUNGUWU/agentic-accounting-system/backend-go/internal/core/money"
@@ -144,15 +145,20 @@ func ParseJournal(doc voucher.Snapshot) (Journal, error) {
 
 // parseLine reads one stored-line object. line_number and account_code are
 // required reads in the reference (int(line["line_number"]),
-// line["account_code"] — a KeyError, not an optional); the wire rows always
-// carry them.
+// line["account_code"] — a KeyError/ValueError, not an optional), so a
+// missing or non-integer line_number surfaces as a parse error instead of a
+// silent zero.
 func parseLine(raw json.RawMessage) (Line, error) {
 	var doc voucher.Snapshot
 	if err := json.Unmarshal(raw, &doc); err != nil {
 		return Line{}, err
 	}
 	var l Line
-	l.LineNumber = int64(docIntOr(doc, "line_number", 0))
+	n, err := docInt(doc, "line_number")
+	if err != nil {
+		return Line{}, err
+	}
+	l.LineNumber = n
 	l.AccountCode = docString(doc, "account_code")
 	l.Debit = docString(doc, "debit")
 	l.Credit = docString(doc, "credit")
@@ -259,7 +265,8 @@ func docOptString(doc voucher.Snapshot, field string) (string, bool) {
 	return s, true
 }
 
-// docIntOr reads an integer field with a fallback.
+// docIntOr reads an integer field with a fallback (revision defaults to
+// zero per the BL-02 additive-migration convention).
 func docIntOr(doc voucher.Snapshot, field string, fallback int64) int64 {
 	v, ok := docGet(doc, field)
 	if !ok {
@@ -274,6 +281,24 @@ func docIntOr(doc voucher.Snapshot, field string, fallback int64) int64 {
 		return fallback
 	}
 	return i
+}
+
+// docInt reads a required integer field, mirroring the reference's
+// int(doc[field]): absent, non-numeric or fractional values error.
+func docInt(doc voucher.Snapshot, field string) (int64, error) {
+	v, ok := docGet(doc, field)
+	if !ok {
+		return 0, fmt.Errorf("posting: journal line missing %s", field)
+	}
+	n, ok := v.(json.Number)
+	if !ok {
+		return 0, fmt.Errorf("posting: journal line %s is not an integer", field)
+	}
+	i, err := n.Int64()
+	if err != nil {
+		return 0, fmt.Errorf("posting: journal line %s is not an integer", field)
+	}
+	return i, nil
 }
 
 // docMoneyOr parses a money field, falling back when absent, null or empty
@@ -428,16 +453,8 @@ func sortedKeys(keys map[string]bool) []string {
 	// order; the wire keys are snake_case column names and the reference's
 	// vars(model) yields declaration order. The port sorts for determinism;
 	// the order only shows in refusal messages, which fixtures do not pin.
-	sortStrings(out)
+	sort.Strings(out)
 	return out
-}
-
-func sortStrings(s []string) {
-	for i := 1; i < len(s); i++ {
-		for j := i; j > 0 && s[j] < s[j-1]; j-- {
-			s[j], s[j-1] = s[j-1], s[j]
-		}
-	}
 }
 
 // pyVoucherNo renders voucher_no the way the reference's f-strings do:
@@ -447,10 +464,4 @@ func pyVoucherNo(v *string) string {
 		return "None"
 	}
 	return *v
-}
-
-// trimSpace mirrors Python str.strip(): unicode whitespace, both ends
-// (strings.TrimSpace's set matches str.isspace()).
-func trimSpace(s string) string {
-	return strings.TrimSpace(s)
 }

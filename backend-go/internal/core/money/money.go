@@ -49,6 +49,12 @@ const precision = 28
 // allocations in the exact-decimal core.
 const expLimit = 999999
 
+// expFloor is the smallest exponent a result may carry: Emin - (precision-1),
+// the reference's subnormal floor. Zero quotients clamp to it, and nonzero
+// results below it underflow silently to zero (Underflow is not trapped in
+// the reference's default context).
+const expFloor = -expLimit - (precision - 1)
+
 // quantizeLimit is the largest |places| the reference accepts: the quantize
 // exponent comes from Decimal(1).scaleb(-places), and scaleb traps when its
 // second operand exceeds 2*(Emax+precision) = 2000054.
@@ -100,6 +106,9 @@ var (
 	// ErrDivideInvalid mirrors decimal.InvalidOperation for 0 ÷ 0, which the
 	// decimal specification defines as undefined rather than a trap.
 	ErrDivideInvalid = errors.New("money: zero divided by zero")
+	// ErrOverflow mirrors decimal.Overflow: a nonzero result whose adjusted
+	// exponent exceeds the context Emax.
+	ErrOverflow = errors.New("money: result exceeds the context Emax")
 )
 
 // Money is an exact decimal value: a coefficient, a base-ten exponent and
@@ -454,11 +463,14 @@ func (m Money) IsZero() bool { return m.d.IsZero() }
 
 // Div returns m ÷ o under the reference context (Python's Decimal
 // division). The quotient is first rounded to 28 significant digits,
-// half-even, using the true remainder for the half decision; an exact
-// division then has trailing zeros stripped down to the ideal exponent (the
-// dividend's exponent minus the divisor's) and, when the coefficient has
-// room, padded back toward it — "1200.0000"/12 is "100.0000", 1E+2/4 is
-// "25", and a 29-digit exact quotient still rounds to 28. 0 ÷ 0 is
+// half-even, using the true remainder for the half decision; only a
+// genuinely exact division (no dropped digits at that rounding) then has
+// trailing zeros stripped down to the ideal exponent and, when the
+// coefficient has room, padded back toward it — "1200.0000"/12 is
+// "100.0000", 1E+2/4 is "25", and a 29-digit exact quotient still rounds to
+// 28. Results respect the context bounds: nonzero results beyond Emax raise
+// ErrOverflow, results below the subnormal floor underflow silently to
+// zero, and zero quotients clamp into [Emin−(precision−1), Emax]. 0 ÷ 0 is
 // ErrDivideInvalid (the spec's InvalidOperation); nonzero ÷ 0 is
 // ErrDivisionByZero. A zero quotient carries the XOR of the operand signs
 // (Python: −0 ÷ 5 is −0).
@@ -502,9 +514,10 @@ func (m Money) Div(o Money) (Money, error) {
 		coeff.Div(coeff, ten)
 		exp++
 	}
-	// Exact division: strip trailing zeros down to the ideal exponent, then
-	// pad back toward it while the coefficient fits the precision.
-	if r.Sign() == 0 {
+	// Genuinely exact division (the rounding dropped nothing): strip
+	// trailing zeros down to the ideal exponent, then pad back toward it
+	// while the coefficient fits the precision.
+	if r.Sign() == 0 && dropped.Sign() == 0 {
 		for coeff.Sign() != 0 && new(big.Int).Mod(coeff, ten).Sign() == 0 && exp < ideal {
 			coeff.Div(coeff, ten)
 			exp++
@@ -518,10 +531,90 @@ func (m Money) Div(o Money) (Money, error) {
 			}
 		}
 	}
+	// Context bounds: zero quotients clamp, nonzero results overflow above
+	// Emax and underflow silently below the subnormal floor.
+	if coeff.Sign() == 0 {
+		if exp < expFloor {
+			exp = expFloor
+		}
+		if exp > expLimit {
+			exp = expLimit
+		}
+	} else {
+		adjusted := exp + int64(len(coeff.String())) - 1
+		if adjusted > expLimit {
+			return Money{}, ErrOverflow
+		}
+		if adjusted < expFloor {
+			return fromParts(new(big.Int), expFloor, neg), nil
+		}
+	}
 	if exp < -1<<31 || exp > 1<<31-1 {
 		return Money{}, ErrQuantize
 	}
 	return fromParts(coeff, int32(exp), neg), nil
+}
+
+// FormatFixed renders the value like Python's format(Decimal, ".<n>f"):
+// exactly n fractional digits, ROUND_HALF_EVEN on the dropped digits, the
+// sign of zero preserved. Decimal.__format__ applies the format spec's
+// rounding WITHOUT the arithmetic context's precision bound (verified
+// against the reference: Decimal("1E+30") formats to its full expansion
+// while quantize raises), so this is not Round: use FormatFixed for display
+// strings and Round for quantize semantics.
+func FormatFixed(m Money, places int) string {
+	s := m.String()
+	mant := s
+	exp := int64(0)
+	if i := strings.IndexAny(s, "eE"); i >= 0 {
+		mant = s[:i]
+		e, err := strconv.ParseInt(s[i+1:], 10, 64)
+		if err != nil {
+			// Money.String always emits a parseable exponent.
+			panic("money: unparsable rendering " + s)
+		}
+		exp = e
+	}
+	neg := strings.HasPrefix(mant, "-")
+	mant = strings.TrimPrefix(mant, "-")
+	intPart, fracPart, _ := strings.Cut(mant, ".")
+	digits, _ := new(big.Int).SetString(intPart+fracPart, 10)
+	if digits == nil {
+		panic("money: unparsable rendering " + s)
+	}
+	// value = digits × 10^(exp − len(fracPart)); render n = round(value ×
+	// 10^places) at scale places.
+	shift := exp - int64(len(fracPart)) + int64(places)
+	var n *big.Int
+	if shift >= 0 {
+		n = new(big.Int).Mul(digits, pow10(shift))
+	} else {
+		p := pow10(-shift)
+		q, rem := new(big.Int).QuoRem(digits, p, new(big.Int))
+		if rem.Sign() != 0 {
+			twice := new(big.Int).Lsh(rem, 1)
+			if twice.Cmp(p) > 0 || (twice.Cmp(p) == 0 && q.Bit(0) == 1) {
+				q.Add(q, big.NewInt(1))
+			}
+		}
+		n = q
+	}
+	body := n.String()
+	for len(body) <= places {
+		body = "0" + body
+	}
+	var out strings.Builder
+	if neg {
+		out.WriteByte('-')
+	}
+	if places == 0 {
+		out.WriteString(body)
+		return out.String()
+	}
+	out.WriteString(body[:len(body)-places])
+	out.WriteByte('.')
+	out.WriteString(body[len(body)-places:])
+	return out.String()
 }
 
 // Cmp compares numerically like Python Decimal comparison; the sign of zero

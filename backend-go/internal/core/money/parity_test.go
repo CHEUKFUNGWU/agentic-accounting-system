@@ -15,6 +15,7 @@ const (
 	kindInvalidQuantize = "invalid_quantize"
 	kindDivisionByZero  = "division_by_zero"
 	kindDivideInvalid   = "divide_invalid"
+	kindOverflow        = "overflow"
 )
 
 // moneyReplay executes one fixture case. The op names and mode names are the
@@ -61,6 +62,9 @@ func moneyReplay(input json.RawMessage) (any, error) {
 			}
 			if errors.Is(err, ErrDivideInvalid) {
 				return nil, &fixture.Error{Kind: kindDivideInvalid}
+			}
+			if errors.Is(err, ErrOverflow) {
+				return nil, &fixture.Error{Kind: kindOverflow}
 			}
 			return nil, &fixture.Error{Kind: kindInvalidQuantize}
 		}

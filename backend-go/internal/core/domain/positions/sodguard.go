@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"math/big"
 	"sort"
 	"strconv"
 	"strings"
@@ -428,67 +427,13 @@ func ComputeEntrySHA256Hash(
 	return hex.EncodeToString(sum[:])
 }
 
-// formatFixed4 renders m like Python's f"{Decimal:.4f}": exactly four
-// fractional digits, ROUND_HALF_EVEN on the dropped digits, sign of zero
-// preserved ("-0.0000"). Decimal.__format__ applies the format spec's
-// rounding WITHOUT the arithmetic context's 28-digit bound (verified against
-// the reference: Decimal("1E+30") formats to its full expansion), so
-// money.Money.Round — whose context cap mirrors quantize — cannot be used
-// here. The rendering parses money.Money.String() (byte-identical to Python
-// str(Decimal)) and works on big.Int, so no float ever touches the value.
+// formatFixed4 renders m like Python's f"{Decimal:.4f}" — exactly four
+// fractional digits, ROUND_HALF_EVEN, sign of zero preserved. The
+// __format__ rendering is unbounded by the arithmetic context (unlike
+// quantize), so it lives in money.FormatFixed; the entry-hash format is the
+// one place the reference renders without a context cap.
 func formatFixed4(m money.Money) string {
-	s := m.String()
-	mant := s
-	exp := int64(0)
-	if i := strings.IndexAny(s, "eE"); i >= 0 {
-		mant = s[:i]
-		e, err := strconv.ParseInt(s[i+1:], 10, 64)
-		if err != nil {
-			// Money.String always emits a parseable exponent.
-			panic("positions: unparsable Decimal rendering " + s)
-		}
-		exp = e
-	}
-	neg := strings.HasPrefix(mant, "-")
-	mant = strings.TrimPrefix(mant, "-")
-	intPart, fracPart, _ := strings.Cut(mant, ".")
-	digits, _ := new(big.Int).SetString(intPart+fracPart, 10)
-	if digits == nil {
-		panic("positions: unparsable Decimal rendering " + s)
-	}
-	// value = digits * 10^(exp - len(fracPart)); we need n = round(value *
-	// 10^4) at scale 4.
-	shift := exp - int64(len(fracPart)) + 4
-	var n *big.Int
-	if shift >= 0 {
-		n = new(big.Int).Mul(digits, pow10(shift))
-	} else {
-		p := pow10(-shift)
-		q, rem := new(big.Int).QuoRem(digits, p, new(big.Int))
-		if rem.Sign() != 0 {
-			twice := new(big.Int).Lsh(rem, 1)
-			if twice.Cmp(p) > 0 || (twice.Cmp(p) == 0 && q.Bit(0) == 1) {
-				q.Add(q, big.NewInt(1))
-			}
-		}
-		n = q
-	}
-	body := n.String()
-	for len(body) <= 4 {
-		body = "0" + body
-	}
-	var out strings.Builder
-	if neg {
-		out.WriteByte('-')
-	}
-	out.WriteString(body[:len(body)-4])
-	out.WriteByte('.')
-	out.WriteString(body[len(body)-4:])
-	return out.String()
-}
-
-func pow10(n int64) *big.Int {
-	return new(big.Int).Exp(big.NewInt(10), big.NewInt(n), nil)
+	return money.FormatFixed(m, 4)
 }
 
 // JournalRecord is one journal as VerifyHashChain sees it

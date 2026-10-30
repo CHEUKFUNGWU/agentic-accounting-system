@@ -1,6 +1,8 @@
 package posting
 
 import (
+	"sort"
+
 	"github.com/CHEUKFUNGUWU/agentic-accounting-system/backend-go/internal/core/domain/ledger"
 	"github.com/CHEUKFUNGUWU/agentic-accounting-system/backend-go/internal/core/domain/positions"
 	"github.com/CHEUKFUNGUWU/agentic-accounting-system/backend-go/internal/core/domain/voucher"
@@ -303,7 +305,7 @@ func sortedDistinct(items []string) []string {
 			out = append(out, item)
 		}
 	}
-	sortStrings(out)
+	sort.Strings(out)
 	return out
 }
 

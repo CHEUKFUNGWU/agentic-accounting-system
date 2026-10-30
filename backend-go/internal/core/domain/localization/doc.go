@@ -11,8 +11,8 @@
 //	ParallelBookDelta                         → ParallelBookDelta, BookEntry
 //	GlobalLocalizationEngine.evaluate_…       → EvaluateIndirectAndWithholdingTax(TaxInput)
 //	GlobalLocalizationEngine.compute_lease_…  → ComputeLeaseIFRS16VsASC842Delta
-//	(none — Python inherits decimal-context   → decimals.go: mulDecimal and the 28-significant-digit
-//	  multiply rounding from the interpreter)   context cap
+//	(none — Python inherits decimal-context   → money.Mul / money.Div carry the 28-significant-digit
+//	  multiply rounding from the interpreter)   context arithmetic
 //	(none — the reference trusted identifier  → tax_identifier.go: validateTaxIdentifier, the BL-22
 //	  length as verification)                  fail-closed fix
 //

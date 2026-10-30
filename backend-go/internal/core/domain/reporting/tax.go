@@ -91,6 +91,7 @@ func StatutoryTaxSchedule(f *WindowFigures, jurisdiction string) (*StatutoryTaxR
 		return nil
 	}
 	inputPending := "INPUT_TAX_PENDING_TRANSACTION_DERIVATION: 進項稅額抵免須由交易稅額推導（REQ-0014）；申報表不從預付餘額按固定百分比虛構。"
+	outputPending := "OUTPUT_TAX_NOT_FILING_READY: 銷項稅額格位沿用參考實現的餘額推導，非申報等級；交易衍生稅額引擎依 REQ-0014 提供。"
 
 	switch jurisdiction {
 	case "AU":
@@ -188,5 +189,9 @@ func StatutoryTaxSchedule(f *WindowFigures, jurisdiction string) (*StatutoryTaxR
 		}
 		warnings = append(warnings, inputPending)
 	}
+	// The output-side boxes keep the reference's balance-derived derivations
+	// until REQ-0014 delivers the transaction-derived engine; say so in the
+	// payload the reader sees, not only in the package documentation.
+	warnings = append(warnings, outputPending)
 	return report, warnings, nil
 }

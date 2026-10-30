@@ -1,1 +1,1 @@
-{"case":"div_16","expected_error":"divide_invalid","input":{"a":"0","b":"0.0","op":"div"},"module":"money"}
+{"case":"div_16","input":{"a":"1E-999999","b":"1E+999999","op":"div"},"module":"money","output":"0E-1000026"}

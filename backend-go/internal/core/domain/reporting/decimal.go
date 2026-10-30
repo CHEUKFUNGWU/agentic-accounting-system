@@ -73,13 +73,11 @@ func div28(a, b money.Money) (money.Money, error) {
 	return q, nil
 }
 
-// formatPct1 renders the reference's f"{margin:.1f}%": quantize to one
-// decimal place with the context's ROUND_HALF_EVEN (a 12.25 tie renders
-// "12.2%", not "12.3%"), fixed notation, sign preserved ("-0.0%").
+// formatPct1 renders the reference's f"{margin:.1f}%": one decimal place,
+// ROUND_HALF_EVEN (a 12.25 tie renders "12.2%", not "12.3%"), fixed
+// notation, sign preserved ("-0.0%"). The f-string __format__ rendering is
+// unbounded by the arithmetic context — money.FormatFixed, not Round — so a
+// 28-digit margin renders where Round would refuse.
 func formatPct1(m money.Money) (string, error) {
-	r, err := m.Round(1, money.RoundHalfEven)
-	if err != nil {
-		return "", err
-	}
-	return r.String() + "%", nil
+	return money.FormatFixed(m, 1) + "%", nil
 }

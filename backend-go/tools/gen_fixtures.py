@@ -184,6 +184,18 @@ def gen_money_div() -> int:
         ("1.0000000000000000000000000001", "1"),  # inexact 29-digit dividend
         ("-6", "4"),
         ("6", "-4"),
+        # The exact/inexact boundary: the scaled division is exact but the
+        # 28-digit rounding dropped digits, so the result keeps its computed
+        # form (Python-review differential case):
+        ("6175295107414627927607.344389", "0.003750"),
+        # Context bounds at the parse-legal exponent extremes:
+        ("1E-999999", "1E+999999"),   # zero quotient clamps to the subnormal floor
+        ("0E+999999", "1E-999999"),   # zero upper clamp at Emax
+        ("1E+999999", "1E+999998"),   # exact at the ideal exponent
+        ("1E+999999", "1E+999980"),
+        ("1E+999999", "1E-999999"),   # Overflow trap
+        ("1E-999999", "1E+30"),       # silent underflow to zero
+        ("1E-999999", "1E+21"),       # subnormal band kept: 1E-1000020
         ("1", "0"),            # DivisionByZero
         ("0", "0.0"),          # InvalidOperation (0/0)
     ]
@@ -197,6 +209,9 @@ def gen_money_div() -> int:
             write("money", name, {"op": "div", "a": a, "b": b}, error="division_by_zero")
         except InvalidOperation:
             write("money", name, {"op": "div", "a": a, "b": b}, error="divide_invalid")
+        except ArithmeticError:
+            # decimal.Overflow — the only other ArithmeticError division raises.
+            write("money", name, {"op": "div", "a": a, "b": b}, error="overflow")
         else:
             write("money", name, {"op": "div", "a": a, "b": b}, output=out)
         count += 1

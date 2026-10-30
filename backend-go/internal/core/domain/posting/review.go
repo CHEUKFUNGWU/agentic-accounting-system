@@ -72,7 +72,7 @@ func ApplyReview(current Journal, d ReviewDecision) (ReviewOutcome, error) {
 			"核准必須在 checked 列出你實際核對過的項目"+
 				"（例如「金額與發票相符」「科目性質正確」「期間正確」）。沒有檢查清單的複核不算複核。")
 	}
-	if verdict != VerdictApprove && trimSpace(d.Reason) == "" {
+	if verdict != VerdictApprove && strings.TrimSpace(d.Reason) == "" {
 		return ReviewOutcome{}, refusal(KindReasonRequired,
 			"駁回或升級必須填寫理由。")
 	}
@@ -82,7 +82,7 @@ func ApplyReview(current Journal, d ReviewDecision) (ReviewOutcome, error) {
 	switch verdict {
 	case VerdictReject:
 		out.Status = voucher.StatusRejected
-		reason := trimSpace(d.Reason)
+		reason := strings.TrimSpace(d.Reason)
 		out.RejectReason = &reason
 	case VerdictEscalate:
 		out.Status = voucher.StatusAwaitingCPA
