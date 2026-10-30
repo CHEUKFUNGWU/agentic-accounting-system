@@ -25,7 +25,8 @@ The owner gave the direction ("放寬一點"); the concrete mechanism below is t
 - What never relaxes, in solo mode or not: balance, period locks, hash chain, audit trail, duplicate detection, and O2-g (agents never approve). The year-end audit pack (self-approval list, agent activity, chain verification) stays the transparency answer to external stakeholders.
 - Jurisdiction packs (REQ-0014 onward) may still add stricter requirements for specific entity types where law demands it (the Mainland one-person-company audit question remains To confirm in ADR-0001 D4); they cannot further relax solo mode.
 
-## To confirm
+## Resolution (owner, 2026-10-30)
 
-- The mechanism above (user-count axis, auto-disable on second principal).
-- Whether to keep calling it 一人公司模式 or rename to 單人作業模式 (solo mode) in UI copy.
+- Mechanism confirmed ("機制ok"): the qualifying axis is the count of active human principals, and solo mode ends automatically when a second human principal becomes active (return to maker-checker; historical self-approvals stay flagged).
+- Naming: keep 「一人公司模式」 as the UI name; "solo mode" remains the internal English shorthand in code and documents.
+- With this, the BL-31 prerequisite in [ADR-0002](../03-planning/adr-0002-backend-golang-migration.md) §3.1 is fully decided, and [ADR-0001](../03-planning/adr-0001-agent-first-mcp-architecture.md) D4's OPC qualification is settled on the user-count basis.
