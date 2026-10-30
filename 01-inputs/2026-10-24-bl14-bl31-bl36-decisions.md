@@ -33,7 +33,8 @@ One-person-company mode lets the boss self-approve their own entries with a flag
 - Uniqueness and gap reporting are system-level guarantees regardless of jurisdiction (the core of the finding).
 - The visible number format ships as a per-jurisdiction default in each jurisdiction pack (e.g. Mainland 記-XXX monthly-continuous styles vs JV-2026-0001 style elsewhere); until the packs exist, a neutral prefix-year-sequence default applies.
 
-## To confirm
+## Resolution
 
-- BL-14: the two conditions above (owner asked for opinion; answer pending).
-- BL-31: the qualifying entity types, or acceptance of the fail-closed-plus-pack-list recommendation.
+- BL-14 — fully decided. The owner confirmed both conditions on 2026-10-30 ("ok"): financial-report periods anchor to `fiscal_periods` state (a quarterly/annual report aggregates its underlying fiscal periods and reports their open/soft-closed/locked state), and "annually" means the entity's fiscal year, with quarterly and semi-annual split points following it. Management reports keep custom read-only periods.
+- BL-36 — direction recorded 2026-10-24 and standing: uniqueness and gap reporting are system-level guarantees; the visible number format ships per jurisdiction pack (REQ-0014 onward), with a neutral prefix-year-sequence default until then.
+- BL-31 — superseded by [SRC-0028](2026-10-24-solo-mode-relaxation.md): the owner widened the definition; the user-count solo-mode mechanism there is pending confirmation.

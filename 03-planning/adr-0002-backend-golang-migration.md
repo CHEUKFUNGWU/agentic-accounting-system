@@ -115,7 +115,7 @@ Inferred：換 Go 的實質利益集中在發布與資源（單一靜態 binary�
 
 | 落點 | 吸收的發現 | 前置 owner 決策 |
 | --- | --- | --- |
-| P1 純領域邏輯 | BL-09～14、17、18、20、21、22、27、30、32～36 | BL-14 已定向（[SRC-0027](../01-inputs/2026-10-24-bl14-bl31-bl36-decisions.md)）：management 自訂期間、financial 限 monthly／quarterly／semi-annually／annually；期間錨定與財年定義的細化建議待 owner 確認。BL-36 已定向（SRC-0027）：格式隨法域規則包（REQ-0014 起），唯一性與斷號報告為系統級保證，初期用中立預設格式 |
+| P1 純領域邏輯 | BL-09～14、17、18、20、21、22、27、30、32～36 | BL-14 已定案（[SRC-0027](../01-inputs/2026-10-24-bl14-bl31-bl36-decisions.md)，owner 2026-10-30 確認）：management 自訂期間、financial 限 monthly／quarterly／semi-annually／annually；財務報表期間錨定 fiscal_periods 狀態，「annually」按主體財年。BL-36 已定向（SRC-0027）：格式隨法域規則包（REQ-0014 起），唯一性與斷號報告為系統級保證，初期用中立預設格式 |
 | P2 儲存層 | BL-05（文件原子認領＋重複偵測）、23（備份含證據檔）、28（命令收據冪等） | — |
 | P4 MCP 層 | BL-06（單一覆核授權政策）、07（崗位範圍投影）、08（證據歸屬與有效性檢查）、31（職責分離） | BL-31 已放寬定向（[SRC-0028](../01-inputs/2026-10-24-solo-mode-relaxation.md)）：以人類 principal 人數取代法律主體類型（solo mode）；機制待 owner 確認；法域規則包可依法加嚴 |
 | P5 事件與 orchestrator | BL-24（投遞失敗重試狀態）、26（durable outbox，與 REQ-0008 對齊） | — |
