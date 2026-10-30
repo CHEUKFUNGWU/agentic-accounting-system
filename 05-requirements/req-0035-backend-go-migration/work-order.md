@@ -23,7 +23,7 @@
 3. **Golden 對拍**（D3）：Python 參考實現產生 fixtures，Go 重放須逐位元組一致；已知缺陷僅能作為 expected divergence 排除，且一一對應 SRC-0026 finding ID、限定該 finding 的重現場景；不變量測試與控制矩陣反例永遠不得豁免。
 4. **Python 後端凍結**：只接受安全修補；findings 不回修 Python。
 5. **會計不變量與硬邊界**：AGENTS.md Hard boundaries 全部適用——任何控制不得為了過閘門而弱化；agent 永不核准；金額全程精確 decimal（JSON 過河用 string/`json.Number`，永不 float64）；已過帳分錄不可修改；hash chain 若無法逐位元組重現，停下回報，**絕不重算歷史**。
-6. **每階段完成時**：執行三軸審查（spec/standards/controls，用互相獨立的 subagent），證據寫入 `07-reviews/` 並從本工作包連結；`go build`、`go test`、`go vet` 全綠；報告任何未驗證項。
+6. **每階段完成時**：執行三軸審查（spec/standards/controls，用互相獨立的 subagent），再執行 `/code-review`，**修復其回報的所有嚴重度 P0、P1 與 actionable P2 findings**（此處 P0/P1/P2 指 findings 嚴重度分級，非遷移階段；判定為不可行動的 P2 須記錄原因後才可關閉）；證據寫入 `07-reviews/` 並從本工作包連結；`go build`、`go test`、`go vet` 全綠；報告任何未驗證項。
 7. **需求池紀律**：狀態只在 requirement pool 維護；正式狀態轉換需 owner 確認。
 
 ## 必須停下問 owner 的時機
@@ -36,6 +36,7 @@
 
 ## Git 紀律
 
+- **在新 git worktree 上工作**，不佔用主 checkout：`git worktree add <path> -b <branch>`（例如 `../aas-req-0035 -b req-0035/p0-scaffold`）。主 checkout 留給其他工作；worktree 與主 checkout 不共享未提交狀態，切換前先提交或暫存。
 - 每個階段開 feature branch（建議 `req-0035/p<N>-<主題>`）；commit message 引用 REQ-0035 與相關 BL/SRC ID，列出驗證內容
 - push 權限：[owner 填寫——建議 A：可 push branch、merge 進 main 由 owner 核可；建議 B：沿用現行做法直接提交 main]
 - 不變更 repository settings；不發布任何內容
