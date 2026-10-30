@@ -1,0 +1,1 @@
+{"case":"pfa_single_ap","input":{"account_codes":["2110"],"op":"position_for_accounts"},"module":"positions","output":"AP_CLERK"}

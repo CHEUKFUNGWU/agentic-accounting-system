@@ -1,0 +1,1 @@
+{"case":"self_approval_nonsolo_other_human","input":{"approver_is_creator":false,"approver_is_human":true,"op":"self_approval","solo":false},"module":"positions","output":{"allowed":true,"reason":null,"self_approved":false}}

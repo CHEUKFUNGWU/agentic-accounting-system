@@ -304,6 +304,25 @@ func (m Money) Sub(o Money) Money {
 	return m.Add(o.Neg())
 }
 
+// Mul returns m × o under the reference context: exact coefficient product
+// at the summed exponent, capped to 28 significant digits half-even —
+// Python's context multiply. The sign follows the operands, including the
+// sign of a zero product (Python: −0 × 5 is −0, −0 × −5 is 0).
+func (m Money) Mul(o Money) Money {
+	prod := m.d.Mul(o.d)
+	coeff := prod.Coefficient()
+	exp := prod.Exponent()
+	neg := coeff.Sign() < 0
+	if neg {
+		coeff.Neg(coeff)
+	}
+	capToContext(coeff, &exp)
+	if coeff.Sign() == 0 {
+		neg = m.isNeg() != o.isNeg()
+	}
+	return fromParts(coeff, exp, neg)
+}
+
 // Neg flips the sign bit, including the sign of zero (Python -Decimal).
 func (m Money) Neg() Money {
 	if m.d.IsZero() {

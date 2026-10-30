@@ -41,6 +41,12 @@ func moneyReplay(input json.RawMessage) (any, error) {
 			return nil, &fixture.Error{Kind: kindInvalidParse}
 		}
 		return a.Add(b).String(), nil
+	case "mul":
+		b, err := Parse(in.B)
+		if err != nil {
+			return nil, &fixture.Error{Kind: kindInvalidParse}
+		}
+		return a.Mul(b).String(), nil
 	case "round":
 		if in.Places == nil {
 			return nil, errors.New("money replay: round needs places")

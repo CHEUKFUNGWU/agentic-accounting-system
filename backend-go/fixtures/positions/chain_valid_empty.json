@@ -1,0 +1,1 @@
+{"case":"chain_valid_empty","input":{"journals":[],"op":"verify_chain"},"module":"positions","output":{"valid":true,"verified_blocks_count":0}}

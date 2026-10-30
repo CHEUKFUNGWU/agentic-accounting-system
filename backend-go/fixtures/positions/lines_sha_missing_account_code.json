@@ -1,0 +1,1 @@
+{"case":"lines_sha_missing_account_code","input":{"lines":[{"credit":"0.0000","debit":"5.0000","line_number":1}],"op":"lines_sha256"},"module":"positions","output":"05eee804cbfef8b584c9ed9207f6ea01b1f96696a4f09c2d97b97a6aadcd7955"}

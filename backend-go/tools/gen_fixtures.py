@@ -138,6 +138,31 @@ def gen_money_add() -> int:
     return count
 
 
+def gen_money_mul() -> int:
+    """Mul parity under the reference context: exact coefficient product at
+    the summed exponent, 28-significant-digit half-even cap, Python's
+    zero-sign rules for products."""
+    pairs = [
+        ("1.500", "0.13"),
+        ("1000.0000", "0.13"),
+        ("999999999999999999999999.9999", "0.13"),  # 28-digit carry case
+        ("9999999999999999999999999999", "9.99"),   # cap applies
+        ("-0", "5"),
+        ("-0", "-5"),
+        ("0", "0"),
+        ("1.5e2", "1E-7"),
+        ("-1.5", "-2"),
+        ("0.0000001", "0.0000001"),
+    ]
+    count = 0
+    for i, (a, b) in enumerate(pairs):
+        name = f"mul_{i:02d}"
+        da, db = Decimal(a), Decimal(b)
+        write("money", name, {"op": "mul", "a": a, "b": b}, output=str(da * db))
+        count += 1
+    return count
+
+
 def gen_money_round() -> int:
     """Round parity (Python quantize with an explicit rounding mode),
     including zero-sign results and the precision-limit rejection."""
@@ -192,7 +217,7 @@ def gen_money_round() -> int:
 
 
 def main() -> None:
-    total = gen_money_parse() + gen_money_add() + gen_money_round()
+    total = gen_money_parse() + gen_money_add() + gen_money_mul() + gen_money_round()
     print(f"generated {total} money fixtures under {OUT / 'money'}")
 
 

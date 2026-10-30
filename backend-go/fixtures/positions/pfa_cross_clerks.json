@@ -1,0 +1,1 @@
+{"case":"pfa_cross_clerks","input":{"account_codes":["1210","2110"],"op":"position_for_accounts"},"module":"positions","output":"GL_ACCOUNTANT"}
