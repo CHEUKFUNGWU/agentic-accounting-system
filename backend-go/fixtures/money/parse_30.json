@@ -1,1 +1,1 @@
-{"case":"parse_30","input":{"a":"1.5_","op":"string"},"module":"money","output":"1.5"}
+{"case":"parse_30","input":{"a":"_.5","op":"string"},"module":"money","output":"0.5"}

@@ -1,1 +1,1 @@
-{"case":"parse_42","expected_error":"invalid_parse","input":{"a":"","op":"string"},"module":"money"}
+{"case":"parse_42","input":{"a":"12345678901234567890.123456789","op":"string"},"module":"money","output":"12345678901234567890.123456789"}

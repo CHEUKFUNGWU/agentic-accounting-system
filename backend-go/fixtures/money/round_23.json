@@ -1,0 +1,1 @@
+{"case":"round_23","input":{"a":"123","mode":"half_even","op":"round","places":-2},"module":"money","output":"1E+2"}

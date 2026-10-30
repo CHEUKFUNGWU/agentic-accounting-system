@@ -17,24 +17,21 @@ import (
 )
 
 // busyTimeoutMs keeps concurrent writers waiting instead of failing fast,
-// matching the reference discipline.
+// matching the reference discipline. It rides in the DSN so every pooled
+// connection gets it: pragmas set with Exec reach only the one connection
+// that ran them.
 const busyTimeoutMs = 5000
 
-// Open opens the database file and applies the reference pragmas:
-// busy_timeout, WAL journal mode, and integrity_check. P0 scope only —
-// migrations and the Store behaviour arrive in P2.
+// Open opens the database file and applies the reference pragmas on every
+// connection via DSN parameters (busy_timeout, WAL journal mode), then runs
+// integrity_check on open. P0 scope only — migrations and the Store
+// behaviour arrive in P2.
 func Open(path string) (*sql.DB, error) {
-	db, err := sql.Open("sqlite", path)
+	// _pragma parameters are a modernc driver feature applied per connection.
+	dsn := fmt.Sprintf("file:%s?_pragma=busy_timeout(%d)&_pragma=journal_mode(WAL)", path, busyTimeoutMs)
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("sqlite: open %s: %w", path, err)
-	}
-	if _, err := db.Exec("PRAGMA busy_timeout = " + fmt.Sprint(busyTimeoutMs)); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("sqlite: busy_timeout: %w", err)
-	}
-	if _, err := db.Exec("PRAGMA journal_mode = WAL"); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("sqlite: WAL: %w", err)
 	}
 	var integrity string
 	if err := db.QueryRow("PRAGMA integrity_check").Scan(&integrity); err != nil {

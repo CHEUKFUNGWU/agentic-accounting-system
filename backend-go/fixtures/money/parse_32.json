@@ -1,1 +1,1 @@
-{"case":"parse_32","input":{"a":"1_e2","op":"string"},"module":"money","output":"1E+2"}
+{"case":"parse_32","input":{"a":".5_","op":"string"},"module":"money","output":"0.5"}

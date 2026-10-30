@@ -1,1 +1,1 @@
-{"case":"round_21","expected_error":"invalid_quantize","input":{"a":"12345678901234567890123456789","mode":"half_even","op":"round","places":0},"module":"money"}
+{"case":"round_21","input":{"a":"0","mode":"half_even","op":"round","places":1000000},"module":"money","output":"0E-1000000"}

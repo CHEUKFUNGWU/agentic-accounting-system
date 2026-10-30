@@ -8,7 +8,6 @@
 package pgx
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
 
@@ -22,12 +21,4 @@ func Open(dsn string) (*sql.DB, error) {
 		return nil, fmt.Errorf("pgx: open: %w", err)
 	}
 	return db, nil
-}
-
-// Ping verifies connectivity with a context deadline.
-func Ping(ctx context.Context, db *sql.DB) error {
-	if err := db.PingContext(ctx); err != nil {
-		return fmt.Errorf("pgx: ping: %w", err)
-	}
-	return nil
 }

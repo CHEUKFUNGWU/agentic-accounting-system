@@ -43,12 +43,16 @@ internal/
 
 ## Golden fixtures
 
-The frozen Python reference generates fixtures; Go tests replay them
-byte-for-byte (`internal/fixture`). Known defects from SRC-0026 are never
-fixtures: they are expected divergences registered in `fixtures/divergences.yaml`,
-one entry per finding, scoped to that finding's reproduction scenario, each
-carrying a Go regression test. Accounting invariants and control-matrix
-counterexamples are never exempt.
+The frozen Python reference generates fixtures; Go tests replay them and must
+match the recorded outputs exactly (`internal/fixture`). Comparison runs over
+one canonical JSON form on both sides (sorted keys, number tokens preserved,
+no HTML escaping), so any value difference fails — `1.500` and `1.5` are
+different strings and neither is ever parsed as a float. Known defects from
+SRC-0026 are never fixtures: they are expected divergences registered in
+`fixtures/divergences.yaml` — one entry per finding, scoped to that finding's
+reproduction scenario, each naming a Go regression test, all mechanically
+validated. Accounting invariants and control-matrix counterexamples are never
+exempt.
 
 ## Dual-database matrix
 

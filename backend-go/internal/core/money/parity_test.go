@@ -38,7 +38,7 @@ func moneyReplay(input json.RawMessage) (any, error) {
 		if in.Places == nil {
 			return nil, errors.New("money replay: round needs places")
 		}
-		mode, err := ParseMode(in.Mode)
+		mode, err := parseMode(in.Mode)
 		if err != nil {
 			return nil, err
 		}

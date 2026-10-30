@@ -4,13 +4,17 @@
 # each excluding only that finding's registered reproduction scenario —
 # never a whole module, never a control. Engineering-workflow §3 invariant
 # tests and control-matrix counterexamples are never divergence-eligible.
-# A registration is valid in CI only while its Go regression test passes.
 #
-# Schema (validated by internal/fixture):
+# Schema (mechanically validated by internal/fixture.ValidateDivergences;
+# violations fail CI):
 #   entries:
-#     - finding: BL-XX        # SRC-0026 finding ID
+#     - finding: BL-XX        # SRC-0026 finding ID, unique per entry
 #       module: <fixture module>
-#       scenario: <fixture case name — that finding's reproduction scenario>
+#       scenario: <fixture case name; the file fixtures/<module>/<scenario>.json
+#                  must exist — that case is the finding's reproduction scenario>
+#       test: <Go test function name>  # must exist in source; a registration
+#                                      # without a passing Go regression test
+#                                      # fails CI
 #       reason: >
 #         why the Go behaviour differs (the fix) and why excluding this one
 #         scenario from golden parity is valid.

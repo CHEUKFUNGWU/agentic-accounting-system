@@ -37,6 +37,7 @@ func writeSelfDivergences(t *testing.T, root string, entries []divergence) {
 		b.WriteString("  - finding: " + d.Finding + "\n")
 		b.WriteString("    module: " + d.Module + "\n")
 		b.WriteString("    scenario: " + d.Scenario + "\n")
+		b.WriteString("    test: " + d.Test + "\n")
 		b.WriteString("    reason: " + d.Reason + "\n")
 	}
 	dir := filepath.Join(root, "fixtures")
@@ -69,7 +70,7 @@ func selfCase(t *testing.T, c, op, a, output, expectedError string) []byte {
 func TestHarnessMechanics(t *testing.T) {
 	root := t.TempDir()
 	writeSelfDivergences(t, root, []divergence{
-		{Finding: "BL-99", Module: "fixtureselftest", Scenario: "echo_divergent", Reason: "harness self-test"},
+		{Finding: "BL-99", Module: "fixtureselftest", Scenario: "echo_divergent", Test: "TestHarnessMechanics", Reason: "harness self-test"},
 	})
 
 	problem, note := checkCase(root, "fixtureselftest", selftestReplay,

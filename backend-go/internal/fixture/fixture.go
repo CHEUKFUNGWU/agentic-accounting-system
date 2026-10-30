@@ -71,11 +71,13 @@ type caseFile struct {
 }
 
 // divergence is one entry of fixtures/divergences.yaml. Bounded by design:
-// one per SRC-0026 finding, scoped to one scenario.
+// one per SRC-0026 finding, scoped to one scenario, and mechanically tied to
+// a named Go regression test.
 type divergence struct {
 	Finding  string `yaml:"finding"`
 	Module   string `yaml:"module"`
 	Scenario string `yaml:"scenario"`
+	Test     string `yaml:"test"`
 	Reason   string `yaml:"reason"`
 }
 
@@ -108,13 +110,18 @@ func Run(t *testing.T, module string) {
 	}
 	sort.Strings(files)
 	for _, name := range files {
-		name := name
 		t.Run(strings.TrimSuffix(name, ".json"), func(t *testing.T) {
 			raw, err := os.ReadFile(filepath.Join(dir, name))
 			if err != nil {
 				t.Fatalf("read fixture: %v", err)
 			}
 			problem, note := checkCase(root, module, replay, raw)
+			// File name and case must match: divergence scenarios are keyed
+			// by case, and the registry validation checks the file exists
+			// under the scenario name.
+			if problem == "" && caseName(raw) != strings.TrimSuffix(name, ".json") {
+				problem = fmt.Sprintf("fixture file %q names case %q; file name and case must match", name, caseName(raw))
+			}
 			if note != "" {
 				t.Logf("%s", note)
 			}
@@ -123,6 +130,16 @@ func Run(t *testing.T, module string) {
 			}
 		})
 	}
+}
+
+// caseName extracts the case identifier from a fixture document ("" when
+// unparseable; Run reports the mismatch through the file-name check).
+func caseName(raw []byte) string {
+	var c caseFile
+	if err := json.Unmarshal(raw, &c); err != nil {
+		return ""
+	}
+	return c.Case
 }
 
 // checkCase replays one fixture document and returns a problem message, or
@@ -229,9 +246,11 @@ func loadDivergences(root string) ([]divergence, error) {
 	return doc.Entries, nil
 }
 
-// ValidateDivergences fails when the registry exceeds its bound: entries
-// must be finding-scoped, scenario-scoped and reasoned. Called from tests so
-// an unbounded or uncommented entry cannot slip in.
+// ValidateDivergences enforces the registry's bound mechanically (design.md
+// §fixture): one entry per SRC-0026 finding, each scoped to one scenario
+// that exists as a fixture case file, each carrying a reason and the name of
+// a Go regression test that exists in the module's source. Called from
+// tests, so an entry that breaks any of these fails CI.
 func ValidateDivergences(t *testing.T) {
 	t.Helper()
 	root, err := ModuleRoot()
@@ -242,14 +261,63 @@ func ValidateDivergences(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read divergences.yaml: %v", err)
 	}
+	tests := goTestFunctions(t, root)
+	seen := map[string]string{}
 	for _, d := range divs {
 		if !findingRe.MatchString(d.Finding) {
 			t.Errorf("divergence finding %q is not a BL-XX finding ID", d.Finding)
 		}
-		if d.Module == "" || d.Scenario == "" || d.Reason == "" {
-			t.Errorf("divergence %s needs module, scenario and reason", d.Finding)
+		if d.Module == "" || d.Scenario == "" || d.Reason == "" || d.Test == "" {
+			t.Errorf("divergence %s needs module, scenario, test and reason", d.Finding)
+			continue
+		}
+		if prev, dup := seen[d.Finding]; dup {
+			t.Errorf("divergence finding %s registered twice (%s and %s); the bound is one entry per finding", d.Finding, prev, d.Scenario)
+		}
+		seen[d.Finding] = d.Scenario
+		caseFile := filepath.Join(root, "fixtures", d.Module, d.Scenario+".json")
+		if _, err := os.Stat(caseFile); err != nil {
+			t.Errorf("divergence %s scenario %q is not a fixture case of module %q (missing %s)", d.Finding, d.Scenario, d.Module, caseFile)
+		}
+		if _, ok := tests[d.Test]; !ok {
+			t.Errorf("divergence %s regression test %q not found in source; a registration without a passing Go regression test fails CI", d.Finding, d.Test)
 		}
 	}
+}
+
+// goTestFunctions collects the test function names declared in the module's
+// Go sources, keyed by name.
+func goTestFunctions(t *testing.T, root string) map[string]bool {
+	t.Helper()
+	funcRe := regexp.MustCompile(`(?m)^func (Test\w+)\(`)
+	names := map[string]bool{}
+	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			switch d.Name() {
+			case ".git", "vendor", "fixtures", "tools":
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(path, ".go") {
+			return nil
+		}
+		src, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		for _, m := range funcRe.FindAllStringSubmatch(string(src), -1) {
+			names[m[1]] = true
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("scan test functions: %v", err)
+	}
+	return names
 }
 
 // ModuleRoot walks up from the working directory to the directory holding

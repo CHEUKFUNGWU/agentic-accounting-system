@@ -16,6 +16,8 @@ Written with the codebase-design skill. Vocabulary: **module** (interface + impl
 backend-go/
 ├── cmd/aasd/             composition root: config, wiring, lifespan
 ├── migrations/           goose SQL migrations, embedded into the binary
+├── fixtures/             golden fixtures + divergences.yaml (harness data)
+├── tools/                gen_fixtures.py and other backend-go tooling
 └── internal/
     ├── core/             mirrors backend/app/core/
     │   ├── money/        exact-decimal value type + serialization parity
@@ -45,7 +47,7 @@ backend-go/
     └── fixture/          golden harness + expected-divergence registry
 ```
 
-Migrations are embedded; no SQL files are read from disk at runtime.
+Migrations are embedded; no SQL files are read from disk at runtime. (`fixtures/` and `tools/` were added to this map during P0 review: the work order's deliverable 2 — golden fixtures and divergences.yaml — needs a recorded home, and the generator with it.)
 
 ## Interfaces
 
@@ -56,10 +58,12 @@ type Money struct{ /* wrapped shopspring/decimal; zero floating-point paths */ }
 func Parse(s string) (Money, error)        // accepts Python Decimal str forms only
 func (m Money) String() string             // byte-identical to Python str(Decimal)
 func (m Money) Add(o Money) Money
-func (m Money) Round(places int32, mode RoundingMode) Money  // mode always explicit
+func (m Money) Round(places int32, mode RoundingMode) (Money, error)
+                                           // mode always explicit; the error mirrors
+                                           // decimal.InvalidOperation from quantize
 ```
 
-The interface is four methods; the implementation carries every parity rule (Python `Decimal.__str__` compatibility, SQLite TEXT round-trip, JSON serialization, rounding-mode mapping). Money crosses JSON as a string or `json.Number`, never `float64`. **Deletion test**: remove it and float drift plus format mismatches reappear at every one of the 345 decimal touchpoints — the deepest leverage in the codebase. Callers never import shopspring directly; a lint rule enforces it.
+The core is four methods (plus the value-type necessities the parity rules force: `Sub`, `Neg`, comparisons, JSON marshal/unmarshal as string or `json.Number`, never `float64`); the implementation carries every parity rule (Python `Decimal.__str__` compatibility, SQLite TEXT round-trip, JSON serialization, rounding-mode mapping). `Round` returns an error because Python's quantize raises `InvalidOperation` when the result exceeds context precision — a silent default would hide money corruption. **Deletion test**: remove it and float drift plus format mismatches reappear at every one of the 345 decimal touchpoints — the deepest leverage in the codebase. Callers never import shopspring directly; a lint rule enforces it.
 
 ### chain
 

@@ -71,7 +71,10 @@ def gen_money_parse() -> int:
         "0", "-0", "0.00", "-0.00", "0E+2", "-0E-2",
         "1", "1.5", "1.500", "-1.500", "100", "+0.5",
         "0.000001", "0.0000001", "-0.000001",
-        "1E+2", "1e2", "1.5E-3", "1.5e2", "1E+999999",
+        "1E+2", "1e2", "1.5E-3", "1.5e2", "1E+999999", "1E-999999",
+        # Exponents beyond the reference context's Emax/Emin are a documented
+        # grammar-scope exclusion (Python constructs them but its arithmetic
+        # traps; Go rejects at parse) — not fixture-eligible, like specials.
         "1.", ".5", "001.500", "1_000.50", "  12.5  ",
         # Underscores are free-floating separators in libmpdec (laxer than
         # PEP 515); the accepted/rejected edges are pinned here.
@@ -160,14 +163,23 @@ def gen_money_round() -> int:
         ("-0.001", 2, "floor"),
         ("1E+2", 0, "half_even"),
         ("1.5E-3", 6, "half_even"),
+        # Zero quantizes to any representable exponent (Python zero rule):
+        ("0", 1000000, "half_even"),
+        ("0", -2, "half_even"),
+        # Negative places: fewer significant digits, rounding applies:
+        ("123", -2, "half_even"),
+        ("125", -2, "half_even"),   # tie -> half-even -> 1E+2 (2 is even)
+        # Boundary rejections (both sides raise):
+        ("1.5", 999999, "half_even"),   # result would need 1e6 digits
+        ("1.5", 3000000, "half_even"),  # scaleb operand trap
         ("12345678901234567890123456789", 0, "half_even"),  # 29 digits -> InvalidOperation
         ("1E+30", 0, "half_even"),  # 31 digits after expansion -> InvalidOperation
     ]
     count = 0
     for i, (v, places, mode) in enumerate(cases):
         name = f"round_{i:02d}"
-        exp = Decimal(1).scaleb(-places)
         try:
+            exp = Decimal(1).scaleb(-places)  # traps beyond the scaleb limit
             d = Decimal(v).quantize(exp, rounding=MODES[mode])
         except InvalidOperation:
             write("money", name, {"op": "round", "a": v, "places": places, "mode": mode},

@@ -53,10 +53,65 @@ func TestParseStringParity(t *testing.T) {
 }
 
 func TestParseRejects(t *testing.T) {
-	for _, in := range []string{"", "abc", "12,5", "1.2.3", "1e", "--1", "e5", ".", "._", "_ _", "1_+", "Infinity", "NaN", "- 1", "1 e2", "1.5.5_"} {
+	for _, in := range []string{"", "abc", "12,5", "1.2.3", "1e", "--1", "e5", ".", "._", "_ _", "1_+", "Infinity", "NaN", "- 1", "1 e2", "1.5.5_", "1E+1000000", "1E-1000000"} {
 		if _, err := Parse(in); !errors.Is(err, ErrInvalidParse) {
 			t.Fatalf("Parse(%q) = %v, want ErrInvalidParse", in, err)
 		}
+	}
+	// Exponents at the context limit parse; beyond it the silent int32 wrap
+	// of the first draft produced a wrong positive value (review P1-1).
+	m, err := Parse("1E-999999")
+	if err != nil || m.String() != "1E-999999" {
+		t.Fatalf("Parse(1E-999999) = (%v, %v)", m.String(), err)
+	}
+}
+
+func TestZeroRoundBypassesDigitLimit(t *testing.T) {
+	// Python: Decimal("0").quantize(Decimal("1e-1000000")) = "0E-1000000".
+	m, err := Parse("0")
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	got, err := m.Round(1000000, RoundHalfEven)
+	if err != nil {
+		t.Fatalf("Round zero to 1e6 places: %v", err)
+	}
+	if got.String() != "0E-1000000" {
+		t.Fatalf("zero round = %q, want 0E-1000000", got.String())
+	}
+	// Negative places round like Python: 123 -> "1E+2", 0 -> "0E+2".
+	hundred, _ := Parse("123")
+	got, err = hundred.Round(-2, RoundHalfEven)
+	if err != nil || got.String() != "1E+2" {
+		t.Fatalf("Round(123, -2) = (%q, %v), want 1E+2", got.String(), err)
+	}
+	zero, _ := Parse("0")
+	got, err = zero.Round(-2, RoundHalfEven)
+	if err != nil || got.String() != "0E+2" {
+		t.Fatalf("Round(0, -2) = (%q, %v), want 0E+2", got.String(), err)
+	}
+	// Beyond the scaleb trap both implementations raise.
+	if _, err := m.Round(3000000, RoundHalfEven); !errors.Is(err, ErrQuantize) {
+		t.Fatalf("Round(places=3e6) = %v, want ErrQuantize", err)
+	}
+}
+
+func TestZeroAndSignAccessors(t *testing.T) {
+	negZero, _ := Parse("-0.00")
+	if !negZero.IsZero() {
+		t.Fatal("-0.00 must report IsZero")
+	}
+	zero, _ := Parse("0")
+	if !zero.Equal(negZero) || zero.Cmp(negZero) != 0 {
+		t.Fatal("0 and -0.00 must compare equal")
+	}
+	flip := zero.Neg()
+	if flip.String() != "-0" {
+		t.Fatalf("Neg(0) = %q, want -0", flip.String())
+	}
+	back := negZero.Neg()
+	if back.String() != "0.00" {
+		t.Fatalf("Neg(-0.00) = %q, want 0.00", back.String())
 	}
 }
 

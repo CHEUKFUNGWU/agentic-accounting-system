@@ -1,0 +1,1 @@
+{"case":"round_28","expected_error":"invalid_quantize","input":{"a":"1E+30","mode":"half_even","op":"round","places":0},"module":"money"}
