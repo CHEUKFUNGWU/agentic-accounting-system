@@ -1,41 +1,51 @@
 # REQ-0035 codebase design: backend-go
 
-Written with the codebase-design skill. Vocabulary: **module** (interface + implementation), **interface** (everything a caller must know), **seam** (where an interface lives), **adapter** (concrete thing satisfying an interface at a seam), **depth** (behaviour per unit of interface). Directory layout was fixed by [ADR-0002 D5](../../03-planning/adr-0002-backend-golang-migration.md); this document designs the interfaces inside it.
+Written with the codebase-design skill. Vocabulary: **module** (interface + implementation), **interface** (everything a caller must know), **seam** (where an interface lives), **adapter** (concrete thing satisfying an interface at a seam), **depth** (behaviour per unit of interface). The directory skeleton conforms to [ADR-0002 D5](../../03-planning/adr-0002-backend-golang-migration.md)'s mirror layout (`internal/core`, `internal/mcpserver`, `internal/mcproles`, `internal/api`, `internal/orchestrator`, top-level `migrations/`); `internal/fixture` and `cmd/aasd` are additions with no Python mirror (harness tooling and the binary entry). This document designs the interfaces inside that skeleton. Finding-fix phases cited per module are the §3.1 mapping of record.
 
 ## Design rules for this codebase
 
 1. **The frozen contracts are the external seams.** REST, MCP, schema, chain format (ADR-0002 D2). We add no new external seams; we inherit four.
 2. **Two adapters or no seam.** The only storage seam is real because two databases are mandated (ADR-0001 §6). Nowhere else do we speculate a second adapter.
-3. **Pure domain, deep store.** Accounting rules are pure functions (maximum leverage for the golden harness); everything with I/O hides behind the store interface.
+3. **Pure domain, deep store.** Accounting rules are pure functions (maximum leverage for the golden harness); everything with I/O hides behind the store seam.
 4. **The composition root knows everything; packages know their neighbours.** Wiring lives in one command; no package reaches across layers.
+5. **Only store adapters own transactions.** No layer outside `core/store` opens or holds a transaction; the outbox row is enlisted by the adapter inside the command transaction (single write path, ADR-0001 D1).
 
 ## Module map
 
 ```
 backend-go/
-├── cmd/aasd/            composition root: config, wiring, lifespan
-├── internal/
-│   ├── money/           exact-decimal value type + serialization parity
-│   ├── chain/           hash-chain canonicalization, append, verify
-│   ├── domain/          pure accounting rules, no I/O
-│   │   ├── voucher/     voucher state machine + validation (BL-08, 36)
-│   │   ├── posting/     posting transition + invariants (BL-01..04 already fixed in Python; ported)
-│   │   ├── ledger/      chart, fiscal periods, carry-forward (BL-14, 30)
-│   │   ├── positions/   positions, SoD, solo mode (SRC-0028)
-│   │   ├── workflow/    Monolith money workflows: bills, bank, assets, provisions (BL-09,10,11,21,32,33,34,35)
-│   │   ├── reporting/   three statements, period anchoring, cash classification (BL-12,13,17,18,20)
-│   │   └── taxid/       identifier validation (BL-22)
-│   ├── store/           Store seam
-│   │   ├── store.go     the interface (below)
-│   │   ├── pgx/         PostgreSQL adapter (RLS SET LOCAL, NUMERIC)
-│   │   ├── sqlite/      SQLite adapter (WAL, TEXT money)
-│   │   └── migrations/  goose SQL, embedded
-│   ├── mcpserver/       role servers, tool registry, per-call audit (BL-06,07,31)
-│   ├── api/             REST/SSE adapters over domain+store
-│   ├── events/          orchestrator, durable outbox, per-subscriber retry (BL-24,26,28)
-│   └── fixture/         golden harness + expected-divergence registry
-└── migrations are embedded; no runtime SQL files on disk
+├── cmd/aasd/             composition root: config, wiring, lifespan
+├── migrations/           goose SQL migrations, embedded into the binary
+└── internal/
+    ├── core/             mirrors backend/app/core/
+    │   ├── money/        exact-decimal value type + serialization parity
+    │   ├── chain/        hash-chain canonicalization, append, verify
+    │   ├── domain/       pure accounting rules, no I/O
+    │   │   ├── voucher/     voucher state machine + numbering (BL-36; P1)
+    │   │   ├── posting/     posting transition + invariants
+    │   │   │               (BL-01..04, 25 already fixed in Python; ported; P1)
+    │   │   ├── ledger/      chart, fiscal periods, carry-forward (BL-14, 30; P1)
+    │   │   ├── positions/   positions, SoD, solo mode (SRC-0028; P1 rules)
+    │   │   ├── workflow/    Monolith money workflows: bills, bank, assets,
+    │   │   │               provisions (BL-09,10,11,21,32,33,34,35; P1)
+    │   │   ├── reporting/   three statements, period anchoring, cash
+    │   │   │               classification, fail-closed tax (BL-12,13,17,18,20; P1)
+    │   │   └── localization/ locale + tax-identifier validation (BL-22; P1)
+    │   └── store/        the Store seam
+    │       ├── store.go  the interface (below)
+    │       ├── pgx/      PostgreSQL adapter (RLS SET LOCAL, NUMERIC)
+    │       ├── sqlite/   SQLite adapter (WAL, TEXT money, backup incl. -wal)
+    │       └── backup.go DB-and-evidence backup/restore (BL-23; P2)
+    ├── mcpserver/        tool implementations, mirrors mcp_server.py
+    ├── mcproles/         per-position servers, visibility, credentials,
+    │                     per-call audit (BL-06,07,08,31; P4)
+    ├── api/              REST/SSE adapters over core+store
+    ├── orchestrator/     durable outbox, dispatch, per-subscriber retry
+    │                     (BL-24,26; P5)
+    └── fixture/          golden harness + expected-divergence registry
 ```
+
+Migrations are embedded; no SQL files are read from disk at runtime.
 
 ## Interfaces
 
@@ -49,7 +59,7 @@ func (m Money) Add(o Money) Money
 func (m Money) Round(places int32, mode RoundingMode) Money  // mode always explicit
 ```
 
-The interface is five methods; the implementation carries every parity rule (Python `Decimal.__str__` compatibility, SQLite TEXT round-trip, JSON serialization, rounding-mode mapping). **Deletion test**: remove it and float drift plus format mismatches reappear at every one of the 345 decimal touchpoints — the deepest leverage in the codebase. Callers never import shopspring directly; a lint rule enforces it.
+The interface is four methods; the implementation carries every parity rule (Python `Decimal.__str__` compatibility, SQLite TEXT round-trip, JSON serialization, rounding-mode mapping). Money crosses JSON as a string or `json.Number`, never `float64`. **Deletion test**: remove it and float drift plus format mismatches reappear at every one of the 345 decimal touchpoints — the deepest leverage in the codebase. Callers never import shopspring directly; a lint rule enforces it.
 
 ### chain
 
@@ -62,7 +72,7 @@ Canonical serialization and hashing live entirely inside; the byte format is fro
 
 ### domain — pure functions
 
-Interface = exported functions over value types (`Voucher`, `Period`, `Chart`, `PostedEntry`…). No stores, no clocks, no randomness passed implicitly; time and sequencing arrive as arguments. This is what makes the golden harness one seam: fixtures are `(input values) → (output values)`. Each finding fix lands here as a failing fixture first (ADR-0002 D3), so the harness doubles as the findings checklist.
+Interface = exported functions over value types (`Voucher`, `Period`, `Chart`, `PostedEntry`…). No stores, no clocks, no randomness passed implicitly; time and sequencing arrive as arguments. This is what makes the golden harness one seam: fixtures are `(input values) → (output values)`. Each finding fix lands here (or at its enforcement layer, per the §3.1 phase) as a failing fixture first (ADR-0002 D3), so the harness doubles as the findings checklist.
 
 ### store — one real seam, two adapters
 
@@ -72,14 +82,17 @@ type Store interface {
     // approvals, sealing, chain append commit or roll back together.
     PostVoucher(ctx context.Context, cmd PostVoucher) (Posted, error)
     ReverseVoucher(ctx context.Context, cmd ReverseVoucher) (Voucher, error)
-    Review(ctx context.Context, cmd Review) (ReviewOutcome, error)  // BL-06 policy lives behind this
+    Review(ctx context.Context, cmd Review) (ReviewOutcome, error)
 
-    // Evidence — atomic claim + duplicate economic-event detection (BL-05)
+    // Evidence — atomic claim + duplicate economic-event detection (BL-05; P2)
     ClaimDocument(ctx context.Context, cmd ClaimDocument) (Claim, error)
 
     // Queries — projections only; every response is position-scoped (BL-07)
     VoucherView(ctx context.Context, q VoucherQuery) (VoucherView, error)
     LedgerView(ctx context.Context, q LedgerQuery) (LedgerView, error)
+
+    // Idempotency — same-key receipt lookup resolves timeouts (BL-28; P2)
+    Receipt(ctx context.Context, key ReceiptKey) (Receipt, error)
 
     // Chain & audit
     chain.ChainStore  // embedded: append/verify persistence
@@ -87,30 +100,32 @@ type Store interface {
 }
 ```
 
-Small on purpose: commands mirror the domain command service (ADR-0001 D1's single write path), so the interface the MCP and REST layers learn is the interface the invariants protect. The adapters own: transaction boundaries, Postgres `SET LOCAL app.tenant_id` + RLS role, SQLite WAL/busy-timeout/integrity pragmas, NUMERIC↔TEXT money encoding, migration application. **Internal seam**: SQL construction stays private per adapter; no query builder leaks into callers.
+Small on purpose: commands mirror the domain command service (ADR-0001 D1's single write path), so the interface the MCP and REST layers learn is the interface the invariants protect. The adapters own: transaction boundaries (and only they open transactions), Postgres `SET LOCAL app.tenant_id` + RLS role, SQLite WAL/busy-timeout/integrity pragmas, NUMERIC↔TEXT money encoding, migration application, and backup/restore with evidence files (BL-23). **Internal seam**: SQL construction stays private per adapter; no query builder leaks into callers.
 
-### mcpserver — per-position servers
+### mcpserver + mcproles — tools and their per-position wall
 
 ```go
+// mcpserver: one implementation per tool, shared by all positions.
+// mcproles:
 func Mount(mux *chi.Mux, deps Dependencies)  // one streamable-HTTP server per position at /mcp/<role>
 ```
 
-Everything an agent can touch hides behind this mount: tool visibility per position, `aas1.` credential resolution, the human-only tool wall (O2-g), audit write on every `tools/call`, structured error codes with next steps. The go-sdk handler is an adapter at the transport seam; the tool registry and policies are the implementation.
+Everything an agent can touch hides behind this mount: tool visibility per position, `aas1.` credential resolution, the human-only tool wall (O2-g), audit write on every `tools/call`, structured error codes with next steps. The unified reviewer-authorization policy (BL-06), scoped projections (BL-07), evidence ownership checks (BL-08) and non-solo segregation (BL-31) land here in P4. The go-sdk handler is an adapter at the transport seam; the tool registry and policies are the implementation.
 
 ### api — thin adapters, deliberately
 
 REST/SSE handlers translate HTTP ↔ domain+store and add nothing: no policy, no computation. Shallow is correct here — the depth belongs to the modules beneath. Contract tests at this seam keep the translation honest.
 
-### events — outbox first
+### orchestrator — outbox first
 
 ```go
 type Outbox interface {
-    Enqueue(ctx context.Context, within store.Tx, e Event) error  // committed with the command (BL-26)
-    Dispatch(ctx context.Context)                                 // per-subscriber retry state (BL-24)
+    Enqueue(cmdID CommandID, e Event) error  // enlisted by the store adapter inside the command transaction (BL-26)
+    Dispatch(ctx context.Context)            // per-subscriber retry state (BL-24)
 }
 ```
 
-Durable-then-dispatch; the in-process orchestrator becomes a dispatcher over the outbox rather than the source of truth.
+Durable-then-dispatch; the in-process orchestrator becomes a dispatcher over the outbox rather than the source of truth. Transaction ownership stays with the store adapters (design rule 5).
 
 ### fixture — the parity seam
 
@@ -118,14 +133,14 @@ Durable-then-dispatch; the in-process orchestrator becomes a dispatcher over the
 func Run(t *testing.T, module string)  // loads fixtures/<module>/*.json, replays, compares
 ```
 
-Owns the expected-divergence registry (`divergences.yaml`: finding ID → excluded case → tracking). A fixture that diverges without a registration fails; a registration without a passing Go regression test fails CI. This makes "fixed in Go, never double-fixed in Python" mechanical.
+Owns the expected-divergence registry (`divergences.yaml`). The registry is bounded: entries map one-to-one to SRC-0026 finding IDs, and each entry excludes only that finding's registered reproduction scenario — never a module, never a control. Engineering-workflow §3 invariant tests and control-matrix counterexamples are never divergence-eligible. A fixture that diverges without a registration fails; a registration without a passing Go regression test fails CI. This makes "fixed in Go, never double-fixed in Python" mechanical.
 
 ## Seam table
 
 | Seam | Interface lives at | Adapters | Real because |
 | --- | --- | --- | --- |
-| HTTP/MCP transport | `api` handlers, `mcpserver.Mount` | chi router, go-sdk streamable handler | Frozen external contract (D2); exercised by real clients and contract tests |
-| Storage | `store.Store` | pgx, sqlite | Two databases mandated (ADR-0001 §6) |
+| HTTP/MCP transport | `api` handlers, `mcproles.Mount` | chi router, go-sdk streamable handler | Frozen external contract (D2); exercised by real clients and contract tests |
+| Storage | `core/store.Store` | pgx, sqlite | Two databases mandated (ADR-0001 §6) |
 | Parity | `fixture.Run` | Python reference vs Go | The safety net ADR-0002 D3 requires |
 | Domain functions | exported pure functions | (none — no seam needed) | Purity is the point; the harness is their test surface |
 
@@ -135,11 +150,12 @@ Owns the expected-divergence registry (`divergences.yaml`: finding ID → exclud
 - **An ORM** — hides transaction boundaries and the NUMERIC/TEXT discipline; hand-written SQL per adapter instead (ADR-0002 D4).
 - **Per-layer interfaces everywhere** (repository-per-entity, service-per-verb) — the Python tree already shows that drift; the store interface above is the whole persistence surface.
 - **Wrapping the go-sdk or chi behind custom abstractions** — one adapter each; a wrapper would be a pass-through failing the deletion test.
+- **A directory layout of our own invention** — rejected in review: the first draft split `core/` into top-level `money/chain/domain/store` packages and renamed `mcproles`/`orchestrator`; it contradicted ADR-0002 D5's decided mirror. The design above conforms; the deep-module boundaries live as packages under `core/`.
 
 ## Depth checklist (review against this)
 
-- `money`: 5 methods, 345 touchpoints of leverage. Deepest.
-- `store.Store`: ~10 methods carrying all persistence semantics. Deep.
+- `money`: 4 methods, 345 touchpoints of leverage. Deepest.
+- `store.Store`: ~11 methods carrying all persistence semantics. Deep.
 - `chain`: 2 methods, frozen-format complexity hidden. Deep.
 - `domain`: pure functions; leverage comes from testability, not hiding.
 - `api`: intentionally shallow adapters. Correct shallow.

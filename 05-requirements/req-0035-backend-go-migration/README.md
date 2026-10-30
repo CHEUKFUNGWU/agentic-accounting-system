@@ -19,7 +19,7 @@ The backend is reimplemented in Go behind frozen external contracts: identical R
 Adoption and distribution
 
 1. As a one-person-company boss, I want to install the desktop app as a single file, so that I can start bookkeeping in minutes without installing Python or any runtime.
-2. As a desktop user, I want the backend to start instantly and use little memory, so that the app feels native on an old laptop.
+2. As a desktop user, I want the backend to run without any installed runtime and with a small memory footprint, so that the app works comfortably on modest hardware.
 3. As a desktop user, I want my existing ledger file to open in the Go version with the hash chain verifying, so that I trust the migration did not touch my books.
 4. As a self-hoster, I want a small single-binary container against standard PostgreSQL, so that hosting costs and attack surface stay low.
 5. As a self-hoster upgrading from a released version, I want schema migrations to run forward from my old database, so that upgrades never require rebuilding books.
@@ -35,9 +35,9 @@ Controls preserved, findings fixed
 
 10. As the product owner, I want every accounting invariant (balance, period locks, maker-checker, agent-never-approves) reimplemented and pinned by tests, so that the rewrite weakens nothing.
 11. As an agent, I want human-only tools to reject my credentials, so that the boundary the audit verified stays closed (O2-g).
-12. As the second human user of a company, I want maker-checker to return automatically the moment I become active, so that solo-mode self-approval cannot outlive its justification.
+12. As the second human user of a company, I want maker-checker to return automatically the moment I become active, with bill recording, approval and payment segregated for every non-solo company (BL-31), so that solo-mode self-approval cannot outlive its justification.
 13. As a boss in solo mode (一人公司模式), I want my self-approvals recorded and flagged, so that my year-end audit pack still explains them.
-14. As an accountant, I want management reports on custom periods and financial reports on monthly/quarterly/semi-annual/annual periods anchored to fiscal periods, with "annual" meaning the entity's fiscal year, so that statements reconcile with filings (BL-14).
+14. As an accountant, I want management reports on custom periods (read-only projections that never bypass period locks) and financial reports on monthly/quarterly/semi-annual/annual periods anchored to fiscal periods, with "annual" meaning the entity's fiscal year, so that statements reconcile with filings (BL-14).
 15. As an accountant, I want unmapped statement categories to block reporting instead of silently disappearing (BL-13), cash flows to classify only cash legs (BL-12, BL-18), and reversals to preserve both periods (BL-17).
 16. As an accountant, I want the voucher lifecycle to reject duplicate bills (BL-32), support voiding (BL-33), accept document dates (BL-34), recalculate AR aging (BL-35), guarantee unique voucher numbers with gap reporting (BL-36), and stop implicit counterparty creation (BL-30).
 17. As an accountant, I want bank exception handling to match instead of double-settle (BL-09), control-account postings to respect subledgers (BL-10), depreciation to require acquisition (BL-11), provision inputs to freeze after posting (BL-21), and tax-identifier checks to mean more than string length (BL-22).
@@ -64,11 +64,11 @@ Plan and process (from ADR-0002, accepted):
 
 - Phases P0–P6 with hard gates; the Python backend is frozen (security fixes only) and remains the golden-reference generator until P6 removal. P6 removal is destructive and needs owner confirmation at cutover.
 - External contracts are frozen: REST paths and response shapes, MCP endpoints/tools/schemas, database schema, hash-chain canonicalization. Golden parity is the safety net; the 27 open findings are expected divergences excluded from the golden baseline and fixed test-first in Go at their phase (ADR-0002 §3.1).
-- Prerequisite decisions applied: BL-14 period semantics (SRC-0027, confirmed 2026-10-30), solo mode by human-principal count with UI name 一人公司模式 (SRC-0028, confirmed 2026-10-30), BL-36 neutral numbering default until jurisdiction packs.
+- Prerequisite decisions applied: BL-14 period semantics (SRC-0027, confirmed 2026-10-30), solo mode by human-principal count with UI name 一人公司模式 — jurisdiction packs may only tighten its qualification, never relax it (SRC-0028, confirmed 2026-10-30), BL-36 neutral numbering default until jurisdiction packs.
 
 Technology (ADR-0002 D4):
 
-- Go 1.27, stdlib `net/http` with chi routing; MCP via the official `modelcontextprotocol/go-sdk`; storage via `database/sql` with pgx/v5 (PostgreSQL) and modernc.org/sqlite (pure Go, no cgo); goose migrations embedded; shopspring/decimal with an explicit rounding mode at every rounding site; argon2 from x/crypto; slog logging; struct tags plus hand-written validators instead of Pydantic.
+- Technology choices are recorded in [ADR-0002 D4](../../03-planning/adr-0002-backend-golang-migration.md). The spec's promises rest on three of them: exact decimals with an explicit rounding mode at every rounding site, no ORM (hand-written SQL per adapter, so transaction boundaries stay visible), and a pure-Go SQLite driver so the desktop binary cross-compiles without cgo.
 
 Structure (ADR-0002 D5; details in [design.md](design.md)):
 
@@ -79,6 +79,7 @@ Structure (ADR-0002 D5; details in [design.md](design.md)):
 Absorbed findings:
 
 - Each open finding maps to exactly one phase (ADR-0002 §3.1); its fix is verified by a Go regression test linked from the review checklist. BL-20 gets a fail-closed interim rule; the real tax engine stays with REQ-0014. Frontend findings BL-15/16/19 are explicitly outside this requirement.
+- Legacy pinned as-is: the principal-attached auto-approve depth thresholds and confidence gating in the current SoD guard survive the migration unchanged, with fixtures labelling them legacy pending REQ-0007 (which moves them to versioned policies per ADR-0001 D4). Golden parity is not control endorsement.
 
 ## Testing Decisions
 
@@ -86,16 +87,16 @@ Good tests assert only observable behaviour at a seam: outputs callers can see (
 
 Seams (the review point this spec most needs confirmed):
 
-1. **Golden-fixture harness** — the primary seam. The Python reference emits input/output fixtures per domain module; Go tests replay inputs and must match outputs byte-for-byte, except registered expected divergences. One seam covers all pure-domain parity.
+1. **Golden-fixture harness** — the primary seam. The Python reference emits input/output fixtures per domain module; Go tests replay inputs and must match outputs byte-for-byte, except registered expected divergences — which map one-to-one to SRC-0026 finding IDs, each scoped to that finding's reproduction scenario; invariant and counterexample tests are never exempt. One seam covers all pure-domain parity.
 2. **HTTP surface** — contract tests drive real REST/SSE handlers with real credentials; MCP tests use a go-sdk client against real mounted role servers, cross-checked against the Python server where feasible. The frozen contract is the seam, so no new seam is invented.
 3. **Store seam** — one repository interface with two adapters (pgx, sqlite); the identical suite runs against both. The dual-adapter mandate (ADR-0001 §6) is what makes this seam real rather than hypothetical.
 4. **Whole-app parity** — seeded scenarios run through both implementations; report packs and chain heads must match. Used at phase gates and P6 acceptance.
 
-Prior art: the Python suite (300 tests) is the behavioural baseline to port; the Monolith `node --test` suite shows the harness style; the control matrix counterexamples (split amounts, replay, privilege escalation, hidden instructions) are reused as invariant tests.
+Prior art: the Python suite (300 tests, verified 2026-10-30) is the behavioural baseline to port; the Monolith `node --test` suite shows the harness style; the control matrix counterexamples (split amounts, replay, privilege escalation, hidden instructions) are reused as invariant tests.
 
 ## Accounting Controls Affected
 
-All §3 invariants are reimplemented, not relaxed: balance in exact decimals, immutability of posted entries, period locks with document/accounting date separation, maker-checker with the solo-mode exception, agents never approve, idempotent commands, hash chain and audit trail continuity, agents reach only domain MCP tools. Control matrix IDs affected: the counterexample suites in [accounting-control-matrix.md](../../03-planning/accounting-control-matrix.md) rerun on the Go implementation at each phase gate.
+All invariants in [engineering-workflow §3](../../00-rules/engineering-workflow.md#3-accounting-invariants) are reimplemented, not relaxed: balance in exact decimals, immutability of posted entries, period locks with document/accounting date separation, maker-checker with the solo-mode exception, agents never approve, idempotent commands, hash chain and audit trail continuity, agents reach only domain MCP tools. Control matrix controls affected: C04 periods and dates (BL-14), C05 control accounts and subledgers (BL-10), C06 idempotency (BL-28), C07 atomicity including outbox (BL-24, BL-26), C08 authorization and human-only approval (BL-06, BL-31, solo mode), C09 evidence (BL-05, BL-08), C10 corrections (BL-17), C11 settlement (BL-09). The counterexample suites in [accounting-control-matrix.md](../../03-planning/accounting-control-matrix.md) rerun on the Go implementation at each phase gate.
 
 ## Out of Scope
 
@@ -104,7 +105,7 @@ All §3 invariants are reimplemented, not relaxed: balance in exact decimals, im
 - The moejs plugin system (REQ-0036), jurisdiction rule packs (REQ-0014 onward), marketplace distribution (REQ-0034).
 - Frontend findings BL-15, BL-16, BL-19.
 - Any new product feature; this requirement changes implementation language, not behaviour (except where a finding demands a fix).
-- Renaming `backend-go/` back to `backend/` and final AGENTS.md command switch: decided at P6 with the owner.
+- The `backend-go/` → `backend/` rename decision at P6 cutover. The AGENTS.md and docs command switch itself is P6 migration work (ADR-0002 §3), not deferred.
 
 ## Open Questions
 
