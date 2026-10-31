@@ -1,0 +1,1 @@
+{"case":"div_24","expected_error":"divide_invalid","input":{"a":"0","b":"0.0","op":"div"},"module":"money"}

@@ -1,0 +1,1 @@
+{"case":"visible_cashier_filtered","input":{"all_codes":["1110","1210","6100","1110"],"op":"visible_accounts","position_id":"CASHIER"},"module":"positions","output":["1110","1110"]}

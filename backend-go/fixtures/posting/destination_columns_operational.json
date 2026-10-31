@@ -1,0 +1,1 @@
+{"case":"destination_columns_operational","input":{"entry_layer":"OPERATIONAL","op":"destination_columns"},"module":"posting","output":"period_op"}

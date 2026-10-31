@@ -1,0 +1,1 @@
+{"case":"pfp_alias_close","input":{"dynamic":{},"op":"position_for_principal","principal_key":"workpaper-close-01"},"module":"positions","output":"GL_ACCOUNTANT"}

@@ -1,0 +1,1 @@
+{"case":"can_save_pending_checker_to_draft","input":{"from":"PENDING_CHECKER","op":"can_save_transition","to":"DRAFT"},"module":"vouchers","output":false}

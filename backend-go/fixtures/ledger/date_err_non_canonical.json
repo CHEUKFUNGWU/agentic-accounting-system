@@ -1,0 +1,1 @@
+{"case":"date_err_non_canonical","expected_error":"invalid_accounting_date","input":{"accounting_date":"2026-1-5","op":"validate_posting_date"},"module":"ledger"}

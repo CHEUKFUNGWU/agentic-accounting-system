@@ -1,0 +1,1 @@
+{"case":"can_post_draft","input":{"from":"DRAFT","op":"can_post"},"module":"vouchers","output":false}

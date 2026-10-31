@@ -1,0 +1,1 @@
+{"case":"date_ok_absent_period_derives_month","input":{"accounting_date":"2026-07-15","op":"validate_posting_date"},"module":"ledger","output":{"period":"2026-07"}}

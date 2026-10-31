@@ -1,0 +1,1 @@
+{"case":"date_err_not_leap_day","expected_error":"invalid_accounting_date","input":{"accounting_date":"2026-02-29","op":"validate_posting_date"},"module":"ledger"}

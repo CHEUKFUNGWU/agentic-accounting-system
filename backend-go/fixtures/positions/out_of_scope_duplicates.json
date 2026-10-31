@@ -1,0 +1,1 @@
+{"case":"out_of_scope_duplicates","input":{"account_codes":["1110","1110"],"op":"out_of_scope","position_id":"CASHIER"},"module":"positions","output":[]}

@@ -1,0 +1,1 @@
+{"case":"asset_register_salvage_over_cost","expected_error":"invalid_asset","input":{"category":"Compute Cluster","cost_basis":"1200","in_service_date":"2026-10-01","name":"NVIDIA H100 Node","op":"register_asset","salvage_value":"5000","useful_life_months":36},"module":"workflow"}

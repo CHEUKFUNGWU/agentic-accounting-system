@@ -1,0 +1,1 @@
+{"case":"payable_quantize_overflow_rejected","expected_error":"invalid_quantize","input":{"jurisdiction":"CN","net_amount":"999999999999999999999999.9999","op":"evaluate_tax","tax_code":"CN_VAT_13"},"module":"localization"}

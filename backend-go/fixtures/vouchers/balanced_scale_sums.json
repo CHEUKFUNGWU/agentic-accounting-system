@@ -1,0 +1,1 @@
+{"case":"balanced_scale_sums","input":{"lines":[{"credit":"0.0000","debit":"10.00"},{"credit":"0.0000","debit":"1.2555"},{"credit":"11.2555","debit":"0.0000"}],"op":"assert_balanced"},"module":"vouchers","output":{"total_credit":"11.2555","total_debit":"11.2555"}}

@@ -1,0 +1,1 @@
+{"case":"normal_balance_revenue","input":{"account_type":"REVENUE","fs_category":null,"op":"normal_balance"},"module":"vouchers","output":"CREDIT"}

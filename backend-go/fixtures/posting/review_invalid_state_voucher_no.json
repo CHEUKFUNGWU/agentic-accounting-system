@@ -1,0 +1,1 @@
+{"case":"review_invalid_state_voucher_no","expected_error":"INVALID_STATE","input":{"checked":[],"op":"review_verdict","reason":"late","reviewed_at":"2026-10-31T00:00:00+00:00","reviewer_position":"GL_ACCOUNTANT","reviewer_principal_key":"controller-checker-01","status":"REJECTED","verdict":"REJECT","voucher_no":"\u8a18-2026-10-0001"},"module":"posting"}

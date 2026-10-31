@@ -1,0 +1,1 @@
+{"case":"w_invalid_period","expected_error":"invalid_period","input":{"entity_code":"DEMO","op":"assert_writable","period_code":"2026-13","periods":[]},"module":"ledger"}

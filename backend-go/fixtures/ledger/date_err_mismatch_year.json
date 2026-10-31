@@ -1,0 +1,1 @@
+{"case":"date_err_mismatch_year","expected_error":"period_date_mismatch","input":{"accounting_date":"2025-10-15","op":"validate_posting_date","period":"2026-10"},"module":"ledger"}

@@ -1,0 +1,1 @@
+{"case":"lines_sha_single","input":{"lines":[{"account_code":"1610","credit":"0.0000","debit":"42.0000","line_number":7}],"op":"lines_sha256"},"module":"positions","output":"8f6ff88273db56a70698a599d99d16d5d48dd83c23823628a2a8259aa09a94ef"}

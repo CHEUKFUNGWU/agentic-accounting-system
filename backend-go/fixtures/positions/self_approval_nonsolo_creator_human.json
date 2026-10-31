@@ -1,0 +1,1 @@
+{"case":"self_approval_nonsolo_creator_human","input":{"approver_is_creator":true,"approver_is_human":true,"op":"self_approval","solo":false},"module":"positions","output":{"allowed":false,"reason":"SOD_MAKER_CHECKER_VIOLATION","self_approved":false}}

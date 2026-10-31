@@ -1,0 +1,1 @@
+{"case":"balanced_all_credit","expected_error":"UNBALANCED","input":{"lines":[{"credit":"5.0000","debit":"0.0000"},{"credit":"5.0000","debit":"0.0000"}],"op":"assert_balanced"},"module":"vouchers"}

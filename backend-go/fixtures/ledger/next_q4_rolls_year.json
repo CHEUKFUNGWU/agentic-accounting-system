@@ -1,0 +1,1 @@
+{"case":"next_q4_rolls_year","input":{"op":"next_period","period_code":"2026-Q4"},"module":"ledger","output":{"next_period":"2027-Q1"}}

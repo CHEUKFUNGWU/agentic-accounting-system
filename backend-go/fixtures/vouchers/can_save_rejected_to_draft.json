@@ -1,0 +1,1 @@
+{"case":"can_save_rejected_to_draft","input":{"from":"REJECTED","op":"can_save_transition","to":"DRAFT"},"module":"vouchers","output":true}

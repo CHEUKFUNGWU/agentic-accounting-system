@@ -1,0 +1,1 @@
+{"case":"can_post_pending_checker","input":{"from":"PENDING_CHECKER","op":"can_post"},"module":"vouchers","output":true}

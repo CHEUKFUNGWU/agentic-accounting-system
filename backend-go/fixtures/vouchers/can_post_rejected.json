@@ -1,0 +1,1 @@
+{"case":"can_post_rejected","input":{"from":"REJECTED","op":"can_post"},"module":"vouchers","output":false}

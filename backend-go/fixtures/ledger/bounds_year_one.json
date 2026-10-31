@@ -1,0 +1,1 @@
+{"case":"bounds_year_one","input":{"op":"period_bounds","period_code":"0001-01"},"module":"ledger","output":{"end":"0001-01-31","fiscal_year":1,"period_number":1,"start":"0001-01-01"}}

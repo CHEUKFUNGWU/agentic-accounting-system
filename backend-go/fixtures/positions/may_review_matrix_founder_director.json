@@ -1,0 +1,1 @@
+{"case":"may_review_matrix_founder_director","input":{"op":"may_review_matrix","reviewer_id":"FOUNDER_DIRECTOR"},"module":"positions","output":{"ADMIN":false,"AP_CLERK":false,"AR_CLERK":false,"AUDITOR_READONLY":false,"CASHIER":false,"CPA_ADVISOR":false,"FA_CLERK":false,"FINANCE_MANAGER":false,"FOUNDER_DIRECTOR":false,"GL_ACCOUNTANT":false,"TAX_CLERK":false}}

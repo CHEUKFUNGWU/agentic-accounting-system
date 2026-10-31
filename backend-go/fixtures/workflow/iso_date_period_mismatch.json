@@ -1,0 +1,1 @@
+{"case":"iso_date_period_mismatch","expected_error":"period_mismatch","input":{"op":"iso_date","period":"2026-10","value":"2026-09-30"},"module":"workflow"}

@@ -1,0 +1,1 @@
+{"case":"can_save_void_stays","input":{"from":"VOID","op":"can_save_transition","to":"VOID"},"module":"vouchers","output":true}

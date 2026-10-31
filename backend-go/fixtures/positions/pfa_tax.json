@@ -1,0 +1,1 @@
+{"case":"pfa_tax","input":{"account_codes":["2210","7500"],"op":"position_for_accounts"},"module":"positions","output":"TAX_CLERK"}

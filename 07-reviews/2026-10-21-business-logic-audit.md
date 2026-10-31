@@ -38,7 +38,7 @@ Every row is an Observed defect unless its qualification says otherwise. An unch
 - [x] **BL-02, high: posted vouchers can be overwritten.** `backend/app/api_vouchers.py:280–314`, `backend/app/core/repository.py:386–387`, `backend/app/mcp_server.py:781–812`. A stale edit left a DRAFT voucher for 99 against posted ledger amount 31; stale REST rejection cleared the hash of an MCP-posted voucher but retained its lines. Required: guarded persisted-state transitions and stale-write detection, never cache-authorized writes.
 - [x] **BL-03, high: duplicate reversal.** `backend/app/api_vouchers.py:373–378,439–500`. Two reversal drafts both posted; original debit 100 became net credit 100. Required: atomic reversal relationship and uniqueness enforcement.
 - [x] **BL-04, high: date/period cutoff bypass.** `backend/app/core/posting.py:74–95`, `backend/app/core/ledger.py:555–562`. September 15 dated transaction labeled November posted with September locked and changed October opening by 73. Required: consistent accounting-date/period validation and reporting cutoffs.
-- [ ] **BL-05, high: duplicate document accounting.** `backend/app/api_documents.py:100–113,140–143,228–229`. Identical uploads produced posted movements of 178 for one 89 invoice. Concurrent conversion of one NEW document created two vouchers but retained only one link. Required: atomic document claims plus duplicate economic-event detection; file hashes alone are insufficient.
+- [x] **BL-05, high: duplicate document accounting.** `backend/app/api_documents.py:100–113,140–143,228–229`. Identical uploads produced posted movements of 178 for one 89 invoice. Concurrent conversion of one NEW document created two vouchers but retained only one link. Required: atomic document claims plus duplicate economic-event detection; file hashes alone are insufficient.
 
 ### Authority and evidence
 
@@ -48,35 +48,35 @@ Every row is an Observed defect unless its qualification says otherwise. An unch
 
 ### Monolith accounting workflows
 
-- [ ] **BL-09, high: bank exception duplicates settlement.** `backend/app/core/monolith.py:221–232`. Paying a 4,200 bill then applying `bank.exception` produced 8,400 cash credits; the exception created another expense instead of matching. Required: separate matching from posting, classify explicitly, resolve existing candidates.
-- [ ] **BL-10, high: control-account journals bypass subledgers.** `backend/app/core/monolith.py:85–98,188–195,347–368`. Reviewed manual receipt left the invoice collectible; collection of the same 100 invoice then increased cash by 200. Required: validated subledger allocations or rejection of ordinary control-account postings.
-- [ ] **BL-11, high: depreciation without acquisition.** `backend/app/core/monolith.py:262–292`. Registering a 1,200 asset did not capitalize it, but a 12-month life allowed depreciation 100. Required: validated capitalization linkage and asset-register/GL reconciliation.
+- [x] **BL-09, high: bank exception duplicates settlement.** `backend/app/core/monolith.py:221–232`. Paying a 4,200 bill then applying `bank.exception` produced 8,400 cash credits; the exception created another expense instead of matching. Required: separate matching from posting, classify explicitly, resolve existing candidates.
+- [x] **BL-10, high: control-account journals bypass subledgers.** `backend/app/core/monolith.py:85–98,188–195,347–368`. Reviewed manual receipt left the invoice collectible; collection of the same 100 invoice then increased cash by 200. Required: validated subledger allocations or rejection of ordinary control-account postings.
+- [x] **BL-11, high: depreciation without acquisition.** `backend/app/core/monolith.py:262–292`. Registering a 1,200 asset did not capitalize it, but a 12-month life allowed depreciation 100. Required: validated capitalization linkage and asset-register/GL reconciliation.
 
 ### Reports and cash flow
 
-- [ ] **BL-12, high: noncash acquisitions create cash flows.** `backend/app/core/reporting.py:309–318`. Credit equipment purchase 5,000 reported operating inflow 5,000 and investing outflow -5,000, with consistency checks passing. Required: distinguish cash settlements and noncash movements.
-- [ ] **BL-13, high: unmapped categories disappear.** `backend/app/core/reporting.py:169–173,213–221`, `backend/app/core/ledger.py:247`. Inventory debit 500 against loan credit 500 reported zero assets and liabilities and passed checks. Required: validated/versioned mappings and blocking on unmapped balances.
-- [ ] **BL-14, high: inconsistent reporting periods and fiscal carry-forward.** `backend/app/core/reporting.py:175–190,302–307`, `backend/app/core/ledger.py:562–569`. Opening revenue 100 plus November revenue 20 yielded P&L profit 120 versus cash-flow starting profit 20. Revenue from December 2025 remained in January 2027 opening revenue. Required: explicit monthly/YTD definitions and fiscal close/open rules. Owner confirmation of intended period semantics remains necessary.
+- [x] **BL-12, high: noncash acquisitions create cash flows.** `backend/app/core/reporting.py:309–318`. Credit equipment purchase 5,000 reported operating inflow 5,000 and investing outflow -5,000, with consistency checks passing. Required: distinguish cash settlements and noncash movements.
+- [x] **BL-13, high: unmapped categories disappear.** `backend/app/core/reporting.py:169–173,213–221`, `backend/app/core/ledger.py:247`. Inventory debit 500 against loan credit 500 reported zero assets and liabilities and passed checks. Required: validated/versioned mappings and blocking on unmapped balances.
+- [x] **BL-14, high: inconsistent reporting periods and fiscal carry-forward.** `backend/app/core/reporting.py:175–190,302–307`, `backend/app/core/ledger.py:562–569`. Opening revenue 100 plus November revenue 20 yielded P&L profit 120 versus cash-flow starting profit 20. Revenue from December 2025 remained in January 2027 opening revenue. Required: explicit monthly/YTD definitions and fiscal close/open rules. Owner confirmation of intended period semantics remains necessary.
 - [ ] **BL-15, high: Monolith cash reconciliation offsets two errors.** `frontend/src/monolith/utils/accountingLogic.ts:1008–1023,1086–1106`. With no journal entries, operating cash generation was 466,200. Actual opening cash was 2,319,700, while hardcoded beginning cash 1,853,500 made reconciliation pass. Required: period activity and actual opening balances.
 - [ ] **BL-16, high: investing/financing cash classifications incomplete.** `frontend/src/monolith/utils/accountingLogic.ts:1089–1103`. Cash equipment purchase 5,000 yielded zero investing flow; noncash retained-earnings-to-capital transfer 100 yielded financing flow 100. Required: cash-linked transaction classifications.
-- [ ] **BL-17, high: MCP account ledger drops reversed originals.** `backend/app/core/vouchers.py:262–264`, `backend/app/mcp_roles.py:348–354,895–900`. Original cash debit 100 plus reversal credit 100 reported -100 instead of zero. Required: preserve original and reversing amounts in their respective periods.
-- [ ] **BL-18, high: compound entries overstate gross cash.** `backend/app/core/ledger.py:1055–1067`. Cash debit 100 and equipment debit 500 against loan credit 600 yielded cash inflow 600 and outflow 500, while tying net cash. Required: allocate only actual cash legs.
+- [x] **BL-17, high: MCP account ledger drops reversed originals.** `backend/app/core/vouchers.py:262–264`, `backend/app/mcp_roles.py:348–354,895–900`. Original cash debit 100 plus reversal credit 100 reported -100 instead of zero. Required: preserve original and reversing amounts in their respective periods.
+- [x] **BL-18, high: compound entries overstate gross cash.** `backend/app/core/ledger.py:1055–1067`. Cash debit 100 and equipment debit 500 against loan credit 600 yielded cash inflow 600 and outflow 500, while tying net cash. Required: allocate only actual cash legs.
 - [ ] **BL-19, medium: static financial diagram.** `frontend/src/monolith/components/FinancialStatementsModule.tsx:28–35`. Seeded Q4 diagram remains unchanged by posted transactions. Required: derive from live reporting data or label it explicitly as an illustration.
 
 ### Tax
 
-- [ ] **BL-20, high: unsupported filing calculations.** `backend/app/core/reporting.py:368–430`. A 1,000 prepayment with no GST yielded Australian GST credit 600; other regional input credits use similar fixed percentages. Unknown jurisdictions fall back to AU. Required: transaction-derived tax, effective-dated eligibility, and fail-closed unsupported regimes. Existing output is not filing-ready.
-- [ ] **BL-21, medium: provision inputs remain editable.** `backend/app/core/monolith.py:235–253`. After provision 210, editing inputs calculated 420 while the journal remained 210 and reposting was blocked. Required: freeze inputs or linked adjustment workflow.
+- [x] **BL-20, high: unsupported filing calculations.** `backend/app/core/reporting.py:368–430`. A 1,000 prepayment with no GST yielded Australian GST credit 600; other regional input credits use similar fixed percentages. Unknown jurisdictions fall back to AU. Required: transaction-derived tax, effective-dated eligibility, and fail-closed unsupported regimes. Existing output is not filing-ready.
+- [x] **BL-21, medium: provision inputs remain editable.** `backend/app/core/monolith.py:235–253`. After provision 210, editing inputs calculated 420 while the journal remained 210 and reposting was blocked. Required: freeze inputs or linked adjustment workflow.
 - [ ] **BL-22, medium, exposure unconfirmed: document length masquerades as tax verification.** `backend/app/core/localization.py:127–128`. Twenty arbitrary characters granted recoverable VAT 130 on a 1,000 purchase. No active evaluator caller was found. Required: verified eligibility, not string-length checks.
 
 ### Recovery and technical accounting controls
 
-- [ ] **BL-23, high: backups omit source files.** `backend/app/main.py:366`, `backend/app/core/vouchers.py:53`. Database snapshot preserved references but not separately stored attachments. Required: consistent DB-and-evidence backup and restoration verification.
+- [x] **BL-23, high: backups omit source files.** `backend/app/main.py:366`, `backend/app/core/vouchers.py:53`. Database snapshot preserved references but not separately stored attachments. Required: consistent DB-and-evidence backup and restoration verification.
 - [ ] **BL-24, high: failed delivery marked dispatched.** `backend/app/orchestrator/event_bus.py:178–183`. Simulated HTTP 500 became DISPATCHED without retry. Required: response validation and persistent per-subscriber retry state.
 - [x] **BL-25, medium: concurrent hash-chain fork.** `backend/app/core/posting.py:116–117`, `backend/app/core/repository.py:679–690`. Two approved vouchers received index 1 and the same parent. Required: serialized entity chain allocation, including sealed reversed entries. Hash chains are not external immutability guarantees.
 - [ ] **BL-26, high production gap: no durable transactional outbox.** `backend/app/orchestrator/event_bus.py`. Queue and recent-event history are process-local; a fresh orchestrator has no retained events. Required: durable events committed with the accounting command and replay-safe consumers. This is a confirmed limitation, not breach of an approved feature specification.
-- [ ] **BL-27, medium: monetary precision lost on persistence.** `backend/app/core/monolith.py:33–43,96,183–186`. Accepted `999999999999.9997` became `999999999999.9998` after conversion to float. Required: decimal strings or scaled integers end to end.
-- [ ] **BL-28, high production gap: regional ingress lacks idempotency.** Repeated regional expense webhook payload and identical `Idempotency-Key` created different independently postable journals. Required: principal/entity/payload-bound command receipts and business duplicate controls. This capability was deferred, not an approved production guarantee.
+- [x] **BL-27, medium: monetary precision lost on persistence.** `backend/app/core/monolith.py:33–43,96,183–186`. Accepted `999999999999.9997` became `999999999999.9998` after conversion to float. Required: decimal strings or scaled integers end to end.
+- [x] **BL-28, high production gap: regional ingress lacks idempotency.** Repeated regional expense webhook payload and identical `Idempotency-Key` created different independently postable journals. Required: principal/entity/payload-bound command receipts and business duplicate controls. This capability was deferred, not an approved production guarantee.
 - [x] **BL-29, medium: submitted timestamp cannot round-trip.** `backend/app/core/repository.py:128,379`. Rejecting a submitted voucher returned HTTP 500 and left it pending because an ISO string reached SQLAlchemy DateTime. Required: normalize at persistence boundaries and test transitions.
 
 ## Other capability boundaries
@@ -159,7 +159,41 @@ Explicit remaining control gap: period closing and posting are not yet fully ser
 
 ### Next sequential repair
 
-BL-05 duplicate document accounting remains open and is next in priority order. Six of the 29 findings now have verified repairs in the stated SQLite scope; 23 remain unchecked. Residual control gaps and product limitations above are not release approval. All other unchecked findings remain unresolved. No release or formal requirement transition has been approved.
+BL-05 duplicate document accounting now has a verified repair in the Go backend (below). The findings carry verified repairs in the stated scopes as ticked above and in the REQ-0035 sections; the remainder remain unchecked. Residual control gaps and product limitations above are not release approval. All other unchecked findings remain unresolved. No release or formal requirement transition has been approved.
+
+## REQ-0035 P1: findings absorbed by the Go migration (2026-10-31)
+
+Per [ADR-0002 §3.1](../03-planning/adr-0002-backend-golang-migration.md) and the [REQ-0035 work order](../05-requirements/req-0035-backend-go-migration/work-order.md), the findings above were fixed test-first in the Go backend (`backend-go/`, branch `req-0035/p0-scaffold`), not in the frozen Python reference. Each fix reproduces the audit scenario and asserts the corrected behaviour; phase evidence: [2026-10-31-req-0035-p1-phase-evidence.md](2026-10-31-req-0035-p1-phase-evidence.md).
+
+| Finding | Go fix (package) | Regression test | Commit |
+| --- | --- | --- | --- |
+| BL-09 | bank exceptions classify first and resolve existing candidates (workflow) | `TestBL09_bank_exception_matches_instead_of_doubling` | 778e226 |
+| BL-10 | control-account postings allocate or reject (workflow) | `TestBL10_control_account_postings_allocate_or_reject` | 778e226 |
+| BL-11 | depreciation requires a POSTED capitalization entry reconciling to cost (workflow) | `TestBL11_depreciation_requires_capitalization` | 778e226 |
+| BL-12 | cash flows classify only actual cash legs (reporting) | `TestBL12_noncash_acquisition_creates_no_cash_flow` | 778e226 |
+| BL-13 | versioned FS-category mapping; unmapped categories block every statement (reporting) | `TestBL13_unmapped_categories_block_reporting` | 778e226 |
+| BL-14 | owner-decided period semantics: financial reports anchored to fiscal_periods (monthly/quarterly/semi-annual/annual, annually = entity fiscal year), management custom periods read-only (ledger, reporting) | `TestBL14_*` (10 tests across ledger + reporting) | 3b6dac1, 778e226 |
+| BL-17 | account-ledger projection preserves original and reversing amounts in their periods (reporting) | `TestBL17_reversal_preserves_both_amounts` | 778e226 |
+| BL-18 | compound entries allocate only actual cash legs (reporting) | `TestBL18_compound_entry_allocates_actual_cash_legs` | 778e226 |
+| BL-20 | fail-closed jurisdictions: no AU fallback, no fabricated credits, output boxes carry the not-filing-ready disclosure (reporting) | `TestBL20_unsupported_jurisdictions_rejected`, `TestBL20_no_fabricated_input_credits` | 778e226, 6aedec8 |
+| BL-21 | provision inputs freeze after posting (workflow) | `TestBL21_provision_inputs_freeze_after_posting` | 778e226 |
+| BL-27 | exact decimal end to end; no float conversion exists (workflow, money) | `TestBL27_exact_decimal_round_trip` | 778e226 |
+
+Scope notes: BL-14 implemented per SRC-0027 (owner, confirmed 2026-10-30); BL-20 is the interim fail-closed rule until REQ-0014. Historical observations above are unchanged.
+
+## REQ-0035 P2: storage-layer findings absorbed by the Go migration (2026-10-31)
+
+Same discipline as the P1 section: fixed test-first in `backend-go/`, not in the frozen reference; each fix reproduces the audit scenario and asserts the corrected behaviour. Phase evidence: [2026-10-31-req-0035-p2-phase-evidence.md](2026-10-31-req-0035-p2-phase-evidence.md).
+
+| Finding | Go fix (package) | Regression test | Commit |
+| --- | --- | --- | --- |
+| BL-05 | atomic document claims: `ClaimDocument` and `ClaimDocumentForVoucher` (require-unused + insert-draft + link-source) run inside one entity-locked transaction backed by the `PRIMARY KEY (entity_code, sha256)` on document_sources; duplicate economic events are DETECTED (same normalized counterparty + amount + doc date, different sha256) and reported, never blocked by an invented rule (store, both adapters) | `TestSQLiteStoreSuite/ClaimDocumentForVoucherAtomic` (two concurrent conversions → exactly one voucher + one link, loser `DOCUMENT_ALREADY_USED`), `DuplicateEconomicsDetected` | 636bb2a |
+| BL-23 | DB-and-evidence backup together (VACUUM INTO snapshot + attachments tree) and restore verification that opens the restored DB and checks every document's evidence exists AND matches its recorded sha256 (store/sqlite; PostgreSQL backup is the operator's `pg_dump` plus the evidence tree — recorded limitation) | `TestSQLiteStoreSuite/BackupRestoreRoundTrip` (round trip + a backup missing its evidence fails restoration) | 636bb2a, 0840c46 |
+| BL-28 | principal/entity/payload-hash-bound command receipts: migration 0007 `command_receipts` (NEW behaviour), insert-if-absent put (`INSERT OR IGNORE` / `ON CONFLICT DO NOTHING`) returning the first stored outcome, so a timed-out command resolves by its key instead of executing twice (store, both adapters) | `TestSQLiteStoreSuite/ReceiptsIdempotent` + PG twin (put/get/exists flag, concurrent same-key puts resolve to the first receipt), migrations `TestCommandReceiptsMigration` | 636bb2a |
+| BL-36 | voucher numbers allocated at posting inside the entity-locked transaction (max sequence + 1 per entity and period — the application-level uniqueness the owner decision names, no new index on the frozen schema), stamped with the seal; refused/rolled-back postings roll their number back, so no gap is consumed (store, both adapters; format per voucher/numbering.go) | `PostVoucherHappyPath` (JV-2026-0001), `ChainProgression` (0001→0002 continuity), `ConcurrentPostingSerializes` (distinct numbers under the race) | 0840c46 |
+| BL-25 (reinforced) | the entity lock now also serializes BL-36 numbering; concurrent postings take blocks 1/2 with distinct numbers and the linear chain (store) | `ConcurrentPostingSerializes` | 0840c46 |
+
+Scope notes: BL-23's PostgreSQL half is the operator's `pg_dump` plus the evidence tree — the adapter returns `ErrBackupUnsupported` by design; BL-28's business duplicate controls for journal ingress (regional webhooks) have no caller before P5 and are mapped there; the duplicate-economics detection is detection-only and fail-open (two concurrent claims of *different* documents with identical economics can both report no duplicate) — the atomic claim itself is race-free.
 
 ## Required acceptance direction
 

@@ -1,0 +1,1 @@
+{"case":"upsert_err_blank_code","expected_error":"account_code_required","input":{"accounts":[],"entity_code":"DEMO","op":"upsert_account","payload":{"account_code":"   "}},"module":"ledger"}

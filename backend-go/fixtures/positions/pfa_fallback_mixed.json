@@ -1,0 +1,1 @@
+{"case":"pfa_fallback_mixed","input":{"account_codes":["1110","4100"],"op":"position_for_accounts"},"module":"positions","output":"GL_ACCOUNTANT"}

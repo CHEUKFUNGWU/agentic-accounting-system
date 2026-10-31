@@ -1,0 +1,1 @@
+{"case":"iso_date_impossible_day","expected_error":"invalid_date","input":{"op":"iso_date","period":"2026-10","value":"2026-02-30"},"module":"workflow"}

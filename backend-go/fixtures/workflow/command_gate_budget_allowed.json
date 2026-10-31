@@ -1,0 +1,1 @@
+{"case":"command_gate_budget_allowed","input":{"action":"budget.save","locked":true,"op":"command_gate"},"module":"workflow","output":{"allowed":true}}

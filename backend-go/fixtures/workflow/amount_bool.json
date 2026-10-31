@@ -1,0 +1,1 @@
+{"case":"amount_bool","expected_error":"invalid_amount","input":{"op":"amount","positive":false,"signed":false,"value":true},"module":"workflow"}

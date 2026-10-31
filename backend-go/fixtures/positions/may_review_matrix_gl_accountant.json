@@ -1,0 +1,1 @@
+{"case":"may_review_matrix_gl_accountant","input":{"op":"may_review_matrix","reviewer_id":"GL_ACCOUNTANT"},"module":"positions","output":{"ADMIN":true,"AP_CLERK":true,"AR_CLERK":true,"AUDITOR_READONLY":true,"CASHIER":true,"CPA_ADVISOR":true,"FA_CLERK":true,"FINANCE_MANAGER":false,"FOUNDER_DIRECTOR":true,"GL_ACCOUNTANT":false,"TAX_CLERK":true}}

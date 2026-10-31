@@ -1,0 +1,1 @@
+{"case":"command_gate_unlock_allowed","input":{"action":"period.unlock","locked":true,"op":"command_gate"},"module":"workflow","output":{"allowed":true}}

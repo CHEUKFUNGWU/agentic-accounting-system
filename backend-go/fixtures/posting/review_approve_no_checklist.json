@@ -1,0 +1,1 @@
+{"case":"review_approve_no_checklist","expected_error":"REVIEW_CHECKLIST_REQUIRED","input":{"checked":[],"op":"review_verdict","reason":"","reviewed_at":"2026-10-31T00:00:00+00:00","reviewer_position":"GL_ACCOUNTANT","reviewer_principal_key":"controller-checker-01","status":"PENDING_CHECKER","verdict":"APPROVE","voucher_no":null},"module":"posting"}

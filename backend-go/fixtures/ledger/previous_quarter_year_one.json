@@ -1,0 +1,1 @@
+{"case":"previous_quarter_year_one","input":{"op":"previous_period","period_code":"0001-Q1"},"module":"ledger","output":{"previous_period":"0-Q4"}}

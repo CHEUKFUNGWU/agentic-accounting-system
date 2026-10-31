@@ -1,0 +1,1 @@
+{"case":"solo_human_plus_agents","input":{"op":"solo_mode","principals":[{"active":true,"is_human":true,"key":"boss-01"},{"active":true,"is_human":false,"key":"ap-bot-01"},{"active":true,"is_human":false,"key":"gl-bot-01"}]},"module":"positions","output":{"human_count":1,"solo":true}}

@@ -1,0 +1,1 @@
+{"case":"normal_balance_contra_asset","input":{"account_type":"ASSET","fs_category":"CONTRA_ASSET","op":"normal_balance"},"module":"vouchers","output":"CREDIT"}

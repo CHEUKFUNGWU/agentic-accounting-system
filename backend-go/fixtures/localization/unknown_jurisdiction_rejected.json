@@ -1,0 +1,1 @@
+{"case":"unknown_jurisdiction_rejected","expected_error":"invalid_jurisdiction","input":{"jurisdiction":"JP","net_amount":"1000","op":"evaluate_tax","tax_code":"X"},"module":"localization"}

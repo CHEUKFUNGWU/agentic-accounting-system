@@ -46,6 +46,9 @@ pnpm-debug.log*
 *.sqlite3
 *.db
 data/
+# Exception: the committed golden-oracle ledger the parity and migration
+# tests replay against (an unanchored *.db silently excluded it once).
+!backend-go/fixtures/chainparity/python_ledger.db
 
 # Environment
 .env

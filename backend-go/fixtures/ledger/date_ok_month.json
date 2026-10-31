@@ -1,0 +1,1 @@
+{"case":"date_ok_month","input":{"accounting_date":"2026-10-15","op":"validate_posting_date","period":"2026-10"},"module":"ledger","output":{"period":"2026-10"}}

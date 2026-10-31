@@ -1,0 +1,1 @@
+{"case":"w_invalid_date","expected_error":"invalid_accounting_date","input":{"accounting_date":"2026-02-30","entity_code":"DEMO","op":"assert_writable","period_code":"2026-09","periods":[]},"module":"ledger"}

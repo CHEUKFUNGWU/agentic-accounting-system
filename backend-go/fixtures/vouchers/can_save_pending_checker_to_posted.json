@@ -1,0 +1,1 @@
+{"case":"can_save_pending_checker_to_posted","input":{"from":"PENDING_CHECKER","op":"can_save_transition","to":"POSTED"},"module":"vouchers","output":false}

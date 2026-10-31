@@ -1,0 +1,1 @@
+{"case":"date_err_month_13","expected_error":"invalid_accounting_date","input":{"accounting_date":"2026-13-01","op":"validate_posting_date"},"module":"ledger"}

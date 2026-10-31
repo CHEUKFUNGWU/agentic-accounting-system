@@ -1,0 +1,1 @@
+{"case":"format_number_yearless_period","expected_error":"VOUCHER_NUMBER_INVALID","input":{"entity":"ACME","op":"format_voucher_number","period":"20261","sequence":1},"module":"vouchers"}

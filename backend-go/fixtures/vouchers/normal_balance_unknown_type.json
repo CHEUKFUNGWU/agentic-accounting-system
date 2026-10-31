@@ -1,0 +1,1 @@
+{"case":"normal_balance_unknown_type","input":{"account_type":"BANK","fs_category":null,"op":"normal_balance"},"module":"vouchers","output":"CREDIT"}

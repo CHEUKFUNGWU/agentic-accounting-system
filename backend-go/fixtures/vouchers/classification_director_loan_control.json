@@ -1,0 +1,1 @@
+{"case":"classification_director_loan_control","input":{"account_type":"EQUITY","fs_category":"DIRECTOR_LOAN","op":"account_classification"},"module":"vouchers","output":{"is_control_account":true,"normal_balance":"CREDIT"}}

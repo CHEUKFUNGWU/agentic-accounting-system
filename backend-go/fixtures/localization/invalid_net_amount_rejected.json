@@ -1,0 +1,1 @@
+{"case":"invalid_net_amount_rejected","expected_error":"invalid_parse","input":{"jurisdiction":"AU","net_amount":"abc","op":"evaluate_tax","tax_code":"AU_GST_10"},"module":"localization"}
