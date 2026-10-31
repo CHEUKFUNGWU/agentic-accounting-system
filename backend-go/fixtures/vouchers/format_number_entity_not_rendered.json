@@ -1,0 +1,1 @@
+{"case":"format_number_entity_not_rendered","input":{"entity":"OTHER","op":"format_voucher_number","period":"2026-10","sequence":1},"module":"vouchers","output":"JV-2026-0001"}

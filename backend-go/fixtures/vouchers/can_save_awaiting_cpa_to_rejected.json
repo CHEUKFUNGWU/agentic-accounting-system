@@ -1,0 +1,1 @@
+{"case":"can_save_awaiting_cpa_to_rejected","input":{"from":"AWAITING_CPA","op":"can_save_transition","to":"REJECTED"},"module":"vouchers","output":true}

@@ -1,0 +1,1 @@
+{"case":"chain_empty","input":{"entries":[],"op":"chain_head"},"module":"posting","output":{"next_block_index":1,"prev_entry_hash":"GENESIS_BLOCK_0000000000000000000000000000000000000000000000000000000000"}}

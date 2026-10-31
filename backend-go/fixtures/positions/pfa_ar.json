@@ -1,0 +1,1 @@
+{"case":"pfa_ar","input":{"account_codes":["1210","4100"],"op":"position_for_accounts"},"module":"positions","output":"AR_CLERK"}

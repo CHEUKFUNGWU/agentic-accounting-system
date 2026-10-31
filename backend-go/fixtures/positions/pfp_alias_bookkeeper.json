@@ -1,0 +1,1 @@
+{"case":"pfp_alias_bookkeeper","input":{"dynamic":{},"op":"position_for_principal","principal_key":"bookkeeper-maker-01"},"module":"positions","output":"AP_CLERK"}

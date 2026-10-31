@@ -1,0 +1,1 @@
+{"case":"text_strips_whitespace","input":{"field":"reference","limit":500,"op":"text","value":"  AWS-INV-10992  "},"module":"workflow","output":{"text":"AWS-INV-10992"}}

@@ -1,0 +1,1 @@
+{"case":"format_number_beyond_pad","input":{"entity":"ACME","op":"format_voucher_number","period":"2026-12","sequence":10000},"module":"vouchers","output":"JV-2026-10000"}

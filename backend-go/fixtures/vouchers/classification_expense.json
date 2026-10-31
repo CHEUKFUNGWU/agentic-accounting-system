@@ -1,0 +1,1 @@
+{"case":"classification_expense","input":{"account_type":"EXPENSE","fs_category":null,"op":"account_classification"},"module":"vouchers","output":{"is_control_account":false,"normal_balance":"DEBIT"}}

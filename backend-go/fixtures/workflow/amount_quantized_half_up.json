@@ -1,0 +1,1 @@
+{"case":"amount_quantized_half_up","input":{"op":"amount","positive":false,"signed":false,"value":"0.00005"},"module":"workflow","output":{"amount":"0.0001"}}

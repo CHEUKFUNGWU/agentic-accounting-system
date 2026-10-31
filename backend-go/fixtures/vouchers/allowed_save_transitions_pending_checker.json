@@ -1,0 +1,1 @@
+{"case":"allowed_save_transitions_pending_checker","input":{"from":"PENDING_CHECKER","op":"allowed_save_transitions"},"module":"vouchers","output":["AWAITING_CPA","PENDING_CHECKER","REJECTED"]}

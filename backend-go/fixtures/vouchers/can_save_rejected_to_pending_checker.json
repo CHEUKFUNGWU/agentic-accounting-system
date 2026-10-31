@@ -1,0 +1,1 @@
+{"case":"can_save_rejected_to_pending_checker","input":{"from":"REJECTED","op":"can_save_transition","to":"PENDING_CHECKER"},"module":"vouchers","output":true}

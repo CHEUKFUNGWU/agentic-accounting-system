@@ -1,0 +1,1 @@
+{"case":"allowed_save_transitions_draft","input":{"from":"DRAFT","op":"allowed_save_transitions"},"module":"vouchers","output":["DRAFT","PENDING_CHECKER","VOID"]}

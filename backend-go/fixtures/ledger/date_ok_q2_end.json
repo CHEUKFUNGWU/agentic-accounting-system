@@ -1,0 +1,1 @@
+{"case":"date_ok_q2_end","input":{"accounting_date":"2026-06-30","op":"validate_posting_date","period":"2026-Q2"},"module":"ledger","output":{"period":"2026-Q2"}}

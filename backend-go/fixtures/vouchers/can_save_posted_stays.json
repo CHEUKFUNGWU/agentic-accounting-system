@@ -1,0 +1,1 @@
+{"case":"can_save_posted_stays","input":{"from":"POSTED","op":"can_save_transition","to":"POSTED"},"module":"vouchers","output":true}

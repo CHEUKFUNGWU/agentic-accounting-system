@@ -1,0 +1,1 @@
+{"case":"classification_ap_control","input":{"account_type":"LIABILITY","fs_category":"AP_ACCRUAL","op":"account_classification"},"module":"vouchers","output":{"is_control_account":true,"normal_balance":"CREDIT"}}

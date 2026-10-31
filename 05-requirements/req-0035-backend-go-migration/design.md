@@ -63,7 +63,7 @@ func (m Money) Round(places int32, mode RoundingMode) (Money, error)
                                            // decimal.InvalidOperation from quantize
 ```
 
-The core is four methods (plus the value-type necessities the parity rules force: `Sub`, `Neg`, comparisons, JSON marshal/unmarshal as string or `json.Number`, never `float64`); the implementation carries every parity rule (Python `Decimal.__str__` compatibility, SQLite TEXT round-trip, JSON serialization, rounding-mode mapping). `Round` returns an error because Python's quantize raises `InvalidOperation` when the result exceeds context precision — a silent default would hide money corruption. **Deletion test**: remove it and float drift plus format mismatches reappear at every one of the 345 decimal touchpoints — the deepest leverage in the codebase. Callers never import shopspring directly; a lint rule enforces it.
+The core is four methods (plus the value-type necessities the parity rules force: `Sub`, `Neg`, `Mul`, `Div`, `IsZero`, comparisons, `FormatFixed` for Python `__format__` semantics, JSON marshal/unmarshal as string or `json.Number`, never `float64`); the implementation carries every parity rule (Python `Decimal.__str__` compatibility, SQLite TEXT round-trip, JSON serialization, rounding-mode mapping). `Round` returns an error because Python's quantize raises `InvalidOperation` when the result exceeds context precision — a silent default would hide money corruption. **Deletion test**: remove it and float drift plus format mismatches reappear at every one of the 345 decimal touchpoints — the deepest leverage in the codebase. Callers never import shopspring directly; a lint rule enforces it.
 
 ### chain
 
@@ -158,7 +158,7 @@ Owns the expected-divergence registry (`divergences.yaml`). The registry is boun
 
 ## Depth checklist (review against this)
 
-- `money`: 4 methods, 345 touchpoints of leverage. Deepest.
+- `money`: 4 core methods plus parity-forced value ops, 345 touchpoints of leverage. Deepest.
 - `store.Store`: ~11 methods carrying all persistence semantics. Deep.
 - `chain`: 2 methods, frozen-format complexity hidden. Deep.
 - `domain`: pure functions; leverage comes from testability, not hiding.

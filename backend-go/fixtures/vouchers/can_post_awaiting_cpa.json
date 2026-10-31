@@ -1,0 +1,1 @@
+{"case":"can_post_awaiting_cpa","input":{"from":"AWAITING_CPA","op":"can_post"},"module":"vouchers","output":true}

@@ -1,0 +1,1 @@
+{"case":"classification_fixed_asset_control","input":{"account_type":"ASSET","fs_category":"FIXED_ASSET","op":"account_classification"},"module":"vouchers","output":{"is_control_account":true,"normal_balance":"DEBIT"}}

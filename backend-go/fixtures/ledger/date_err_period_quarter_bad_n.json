@@ -1,0 +1,1 @@
+{"case":"date_err_period_quarter_bad_n","expected_error":"invalid_period","input":{"accounting_date":"2026-07-15","op":"validate_posting_date","period":"2026-Q5"},"module":"ledger"}

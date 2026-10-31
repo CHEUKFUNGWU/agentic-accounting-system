@@ -1,0 +1,1 @@
+{"case":"next_err_trailing_junk","expected_error":"invalid_period","input":{"op":"next_period","period_code":"2026-10-junk"},"module":"ledger"}

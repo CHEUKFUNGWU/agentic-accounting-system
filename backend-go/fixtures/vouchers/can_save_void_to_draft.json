@@ -1,0 +1,1 @@
+{"case":"can_save_void_to_draft","input":{"from":"VOID","op":"can_save_transition","to":"DRAFT"},"module":"vouchers","output":false}

@@ -1,0 +1,1 @@
+{"case":"command_gate_locked_refused","expected_error":"period_locked","input":{"action":"bill.create","locked":true,"op":"command_gate"},"module":"workflow"}

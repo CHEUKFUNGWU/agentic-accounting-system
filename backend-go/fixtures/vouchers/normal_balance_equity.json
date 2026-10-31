@@ -1,0 +1,1 @@
+{"case":"normal_balance_equity","input":{"account_type":"EQUITY","fs_category":null,"op":"normal_balance"},"module":"vouchers","output":"CREDIT"}

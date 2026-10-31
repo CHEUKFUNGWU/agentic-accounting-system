@@ -1,0 +1,1 @@
+{"case":"allowed_save_transitions_awaiting_cpa","input":{"from":"AWAITING_CPA","op":"allowed_save_transitions"},"module":"vouchers","output":["AWAITING_CPA","REJECTED"]}

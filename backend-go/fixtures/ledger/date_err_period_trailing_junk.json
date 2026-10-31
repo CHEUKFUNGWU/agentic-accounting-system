@@ -1,0 +1,1 @@
+{"case":"date_err_period_trailing_junk","expected_error":"invalid_period","input":{"accounting_date":"2026-10-15","op":"validate_posting_date","period":"2026-10x"},"module":"ledger"}

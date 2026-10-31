@@ -1,0 +1,1 @@
+{"case":"allowed_save_transitions_reversed","input":{"from":"REVERSED","op":"allowed_save_transitions"},"module":"vouchers","output":["REVERSED"]}

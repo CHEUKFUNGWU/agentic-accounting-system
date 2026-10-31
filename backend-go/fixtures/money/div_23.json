@@ -1,0 +1,1 @@
+{"case":"div_23","expected_error":"division_by_zero","input":{"a":"1","b":"0","op":"div"},"module":"money"}

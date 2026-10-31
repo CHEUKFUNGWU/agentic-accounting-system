@@ -1,0 +1,1 @@
+{"case":"classification_tax_control","input":{"account_type":"LIABILITY","fs_category":"TAX_PAYABLE","op":"account_classification"},"module":"vouchers","output":{"is_control_account":true,"normal_balance":"CREDIT"}}

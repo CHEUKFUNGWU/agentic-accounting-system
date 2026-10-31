@@ -1,0 +1,1 @@
+{"case":"solo_second_human_inactive","input":{"op":"solo_mode","principals":[{"active":true,"is_human":true,"key":"boss-01"},{"active":false,"is_human":true,"key":"bookkeeper-01"}]},"module":"positions","output":{"human_count":1,"solo":true}}

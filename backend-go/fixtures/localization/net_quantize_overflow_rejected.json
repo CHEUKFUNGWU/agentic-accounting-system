@@ -1,0 +1,1 @@
+{"case":"net_quantize_overflow_rejected","expected_error":"invalid_quantize","input":{"jurisdiction":"HK","net_amount":"99999999999999999999999999999","op":"evaluate_tax","tax_code":""},"module":"localization"}

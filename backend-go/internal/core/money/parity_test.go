@@ -13,6 +13,9 @@ import (
 const (
 	kindInvalidParse    = "invalid_parse"
 	kindInvalidQuantize = "invalid_quantize"
+	kindDivisionByZero  = "division_by_zero"
+	kindDivideInvalid   = "divide_invalid"
+	kindOverflow        = "overflow"
 )
 
 // moneyReplay executes one fixture case. The op names and mode names are the
@@ -41,6 +44,31 @@ func moneyReplay(input json.RawMessage) (any, error) {
 			return nil, &fixture.Error{Kind: kindInvalidParse}
 		}
 		return a.Add(b).String(), nil
+	case "mul":
+		b, err := Parse(in.B)
+		if err != nil {
+			return nil, &fixture.Error{Kind: kindInvalidParse}
+		}
+		return a.Mul(b).String(), nil
+	case "div":
+		b, err := Parse(in.B)
+		if err != nil {
+			return nil, &fixture.Error{Kind: kindInvalidParse}
+		}
+		q, err := a.Div(b)
+		if err != nil {
+			if errors.Is(err, ErrDivisionByZero) {
+				return nil, &fixture.Error{Kind: kindDivisionByZero}
+			}
+			if errors.Is(err, ErrDivideInvalid) {
+				return nil, &fixture.Error{Kind: kindDivideInvalid}
+			}
+			if errors.Is(err, ErrOverflow) {
+				return nil, &fixture.Error{Kind: kindOverflow}
+			}
+			return nil, &fixture.Error{Kind: kindInvalidQuantize}
+		}
+		return q.String(), nil
 	case "round":
 		if in.Places == nil {
 			return nil, errors.New("money replay: round needs places")

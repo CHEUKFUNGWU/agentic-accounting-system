@@ -1,0 +1,1 @@
+{"case":"finalized_save_void_stays","input":{"content_changed":false,"current":"VOID","op":"finalized_save","proposed":"VOID"},"module":"vouchers","output":true}

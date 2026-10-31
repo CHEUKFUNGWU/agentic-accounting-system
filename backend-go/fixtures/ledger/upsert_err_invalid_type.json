@@ -1,0 +1,1 @@
+{"case":"upsert_err_invalid_type","expected_error":"invalid_account_type","input":{"accounts":[],"entity_code":"DEMO","op":"upsert_account","payload":{"account_code":"X1","account_type":"BANK"}},"module":"ledger"}

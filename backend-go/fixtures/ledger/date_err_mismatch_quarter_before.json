@@ -1,0 +1,1 @@
+{"case":"date_err_mismatch_quarter_before","expected_error":"period_date_mismatch","input":{"accounting_date":"2026-09-30","op":"validate_posting_date","period":"2026-Q4"},"module":"ledger"}

@@ -1,0 +1,1 @@
+{"case":"gaps_negative","expected_error":"VOUCHER_GAP_REPORT_INVALID","input":{"op":"report_gaps","posted":[-1]},"module":"vouchers"}

@@ -1,0 +1,1 @@
+{"case":"may_review_matrix_cpa_advisor","input":{"op":"may_review_matrix","reviewer_id":"CPA_ADVISOR"},"module":"positions","output":{"ADMIN":true,"AP_CLERK":true,"AR_CLERK":true,"AUDITOR_READONLY":true,"CASHIER":true,"CPA_ADVISOR":true,"FA_CLERK":true,"FINANCE_MANAGER":true,"FOUNDER_DIRECTOR":true,"GL_ACCOUNTANT":true,"TAX_CLERK":true}}

@@ -1,0 +1,1 @@
+{"case":"bounds_month_feb_leap","input":{"op":"period_bounds","period_code":"2024-02"},"module":"ledger","output":{"end":"2024-02-29","fiscal_year":2024,"period_number":2,"start":"2024-02-01"}}

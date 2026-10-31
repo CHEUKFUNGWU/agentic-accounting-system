@@ -1,0 +1,1 @@
+{"case":"can_post_void","input":{"from":"VOID","op":"can_post"},"module":"vouchers","output":false}

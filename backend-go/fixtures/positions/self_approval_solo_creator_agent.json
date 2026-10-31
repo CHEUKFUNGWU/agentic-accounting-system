@@ -1,0 +1,1 @@
+{"case":"self_approval_solo_creator_agent","input":{"approver_is_creator":true,"approver_is_human":false,"op":"self_approval","solo":true},"module":"positions","output":{"allowed":false,"reason":"HUMAN_REVIEWER_REQUIRED","self_approved":false}}

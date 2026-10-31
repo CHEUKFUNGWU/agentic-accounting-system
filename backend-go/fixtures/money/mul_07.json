@@ -1,0 +1,1 @@
+{"case":"mul_07","input":{"a":"1.5e2","b":"1E-7","op":"mul"},"module":"money","output":"0.000015"}

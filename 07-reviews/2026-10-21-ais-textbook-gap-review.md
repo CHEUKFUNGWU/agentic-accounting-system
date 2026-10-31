@@ -31,7 +31,7 @@ Each row is an Observed defect unless its text says otherwise. An unchecked box 
 
 ### Master data
 
-- [ ] **BL-30, high: counterparties are created implicitly, and name variants crash.** `backend/app/core/ledger.py:335` (`resolve_counterparty`), called from `backend/app/api_documents.py:99`.
+- [x] **BL-30, high: counterparties are created implicitly, and name variants crash.** `backend/app/core/ledger.py:335` (`resolve_counterparty`), called from `backend/app/api_documents.py:99`.
   - A document upload creates a vendor master record from the counterparty name, with no approval and no change record. Whoever submits a document, including an agent, can add a supplier.
   - Reproduced: after "Acme Pty Ltd" was created, resolving "ACME Pty Ltd." raised `IntegrityError` on `counterparties.counterparty_id`. Lookup is by exact name, but the key is a lowercase slug of the name, so variants collide instead of matching.
   - Book reference: 13-2 controls 1.2, 1.3, 10.1, 21.9 and 21.10. The book singles out the default that lets the person recording payables also create new suppliers as a segregation-of-duties failure.
@@ -39,42 +39,56 @@ Each row is an Observed defect unless its text says otherwise. An unchecked box 
 
 ### Expenditure cycle (Monolith)
 
-- [ ] **BL-31, high: bill recording, approval, payment and bank reconciliation are not segregated.** `backend/app/core/monolith.py:196–214`, `backend/app/core/positions.py:325`.
+- [x] **BL-31, high: bill recording, approval, payment and bank reconciliation are not segregated.** `backend/app/core/monolith.py:196–214`, `backend/app/core/positions.py:325`.
   - The finance manager position holds `bill.create`, `bill.approve`, `bill.pay`, `bank.reconcile` and `bank.batch`.
   - Bills do not record who created them, and approval does not check that the approver differs from the creator. One person can record, approve and pay a fictitious bill, then reconcile the bank account that would reveal it.
   - Book reference: 13-2 controls 21.6 and 21.8; 12-1 control 17.1.
   - Required: record the creator and approver on each bill; reject approval by the creator; and keep payment recording and bank reconciliation independent of payables recording.
   - Owner decision 2026-10-21 ([SRC-0017](../01-inputs/2026-10-21-agent-first-mcp-architecture-request.md#owner-decision-2026-10-21-one-person-company-profile), [ADR-0001 one-person company profile](../03-planning/adr-0001-agent-first-mcp-architecture.md#一人公司模式owner-已於-2026-10-21-決定)): in a one-person company the owner may record, approve and pay their own bills. Such approvals must be flagged as self-approved and listed in the year-end audit pack. No external accountant review is required, and agents still cannot approve. For one-person companies, the finding is narrowed to recording the creator and approver and flagging self-approval. The full segregation requirement still applies to all other entities.
-- [ ] **BL-32, high: duplicate bills are accepted.** `backend/app/core/monolith.py:196`.
+- [x] **BL-32, high: duplicate bills are accepted.** `backend/app/core/monolith.py:196`.
   - `bill.create` does not check the vendor, supplier invoice reference, amount or date against existing bills. The same supplier invoice can be recorded and paid twice.
   - BL-05 covers duplicate document uploads in the regional ledger; it does not cover this path.
   - Book reference: 13-2 threat 20 and controls 20.1 to 20.3.
   - Required: business duplicate detection on supplier and invoice reference, with an explicit override that is recorded and reviewed.
-- [ ] **BL-33, medium: bills cannot be rejected or voided.** `backend/app/core/monolith.py:196–214`.
+- [x] **BL-33, medium: bills cannot be rejected or voided.** `backend/app/core/monolith.py:196–214`.
   - A bill posts expense and payables when created in `Pending`, but the only transitions are approve and pay. A disputed, wrong or fictitious bill stays in the ledger unless someone writes a manual correcting journal, which leaves no link to the bill.
   - Book reference: 13-2 controls 16.1 and 20.1.
   - Required: a reject or void transition that reverses the original entry through the correction workflow and keeps the audit link.
 
 ### Cutoff and receivables (Monolith)
 
-- [ ] **BL-34, medium: invoice and bill dates cannot be supplied.** `backend/app/core/monolith.py:80–83`, used at lines 183 and 200.
+- [x] **BL-34, medium: invoice and bill dates cannot be supplied.** `backend/app/core/monolith.py:80–83`, used at lines 183 and 200.
   - The date is today when today falls in the workspace period, and otherwise the first day of the period. A supplier invoice dated in a prior period is recognized in the current one.
   - This contradicts control C04 in the [accounting control matrix](../03-planning/accounting-control-matrix.md), which forbids defaulting to the first day of a month. BL-04 covered the regional ledger only.
   - Required: separate document date and accounting date, validated against open periods, with late documents routed to the correction process.
-- [ ] **BL-35, medium: receivable aging is never recalculated.** `backend/app/core/monolith.py:183,194`.
+- [x] **BL-35, medium: receivable aging is never recalculated.** `backend/app/core/monolith.py:183,194`.
   - New invoices are stored with aging bucket "Current", and collection resets it to "Current". No code recomputes the bucket from the due date, so overdue receivables stay "Current". Only seed data shows other buckets.
   - Book reference: 12-1 control 7.3.
   - Required: derive aging from due date and an as-of date at query time, not store it as a static field.
 
 ### Audit trail
 
-- [ ] **BL-36, medium: voucher numbers are not guaranteed unique and gaps are not reported.** `backend/app/core/vouchers.py:129`, `backend/app/core/db.py:149`.
+- [x] **BL-36, medium: voucher numbers are not guaranteed unique and gaps are not reported.** `backend/app/core/vouchers.py:129`, `backend/app/core/db.py:149`.
   - `voucher_no` has an index but no unique constraint. `next_voucher_no` picks the lowest unused number before anything is saved.
   - Reproduced: three concurrent calls for the same entity and period all returned `記-2026-10-0001`. A complete duplicate save was not run end to end, so persisted duplicates are inferred, not observed.
   - Numbers are allocated at draft creation, so rejected drafts leave gaps in the posted sequence, and no report shows gaps.
   - Book reference: chapter 2 prenumbering and audit trail; chapter 10 sequence checks.
   - Required: a unique constraint per entity and period, allocation inside the posting transaction or an explicit reservation, and a gap report.
   - Owner decision 2026-10-21 ([SRC-0017](../01-inputs/2026-10-21-agent-first-mcp-architecture-request.md#owner-decision-2026-10-21-remaining-recommendations)): drafts use a separate draft ID. The voucher number is allocated only at posting, under a unique constraint per entity and period, so posted vouchers are numbered continuously in every jurisdiction. This meets the strictest requirement, Mainland voucher practice, and costs nothing elsewhere. The number format is still to confirm with an accounting lead.
+
+## REQ-0035 P1: findings absorbed by the Go migration (2026-10-31)
+
+Per [ADR-0002 §3.1](../03-planning/adr-0002-backend-golang-migration.md), the findings above were fixed test-first in the Go backend (`backend-go/`, branch `req-0035/p0-scaffold`); phase evidence: [2026-10-31-req-0035-p1-phase-evidence.md](2026-10-31-req-0035-p1-phase-evidence.md).
+
+| Finding | Go fix (package) | Regression test | Commit |
+| --- | --- | --- | --- |
+| BL-30 | counterparty resolution is lookup-only (no implicit creation, no slug collisions) (ledger) | `TestBL30_no_implicit_counterparty_creation` | 3b6dac1 |
+| BL-31 | bills record creator and approver; non-solo creator self-approval refused; solo-mode (一人公司模式, SRC-0028 human-principal rule) self-approval allowed and flagged for the audit pack (positions, workflow). Scope note: this ticks the narrowed one-person-company scope — the full enforcement wall lands with the MCP layer at P4 | `TestBL31_*` (5 tests), `TestSoloModeFollowsHumanPrincipalCount` | 778e226 |
+| BL-32 | duplicate bills refused on vendor + invoice reference with a recorded, reviewable override (workflow) | `TestBL32_duplicate_bills_rejected_with_recorded_override` | 778e226 |
+| BL-33 | void/reject reverses through the correction workflow and keeps the audit link (workflow) | `TestBL33_void_reverses_through_correction_and_keeps_audit_link` | 778e226 |
+| BL-34 | document date and accounting date separate and validated; late documents route to correction (workflow) | `TestBL34_dates_supplied_and_late_documents_route_to_correction` | 778e226 |
+| BL-35 | aging derived from due date at query time; no stored bucket (workflow) | `TestBL35_aging_derived_from_due_date_at_query_time` | 778e226 |
+| BL-36 | drafts carry a separate draft ID; voucher number allocated at posting; neutral default format; gap report (voucher). Scope note: the per-entity-and-period unique constraint and in-transaction allocation arrive with the P2 store adapter per the ADR mapping | `TestBL36_DraftIDVoucherNumberSeparation`, `TestBL36_ReportGaps` | 3b6dac1 |
 
 ## Capability gaps
 
@@ -101,4 +115,4 @@ At review time, no requirement candidate covered the following. On 2026-10-21 th
 
 ## Not covered
 
-Inventory, production and payroll controls; IT general controls beyond those already in ADR-0001 and BL-23; XBRL; live PostgreSQL behaviour; and jurisdiction-specific statutory requirements. Findings BL-30 to BL-36 have no remediation evidence yet. The owner set the one-person company policy for BL-31 on 2026-10-21; which entity types qualify is still to confirm. The owner set the BL-36 numbering rule on 2026-10-21; the number format is still to confirm. GAP-01 to GAP-07 were registered as requirement candidates REQ-0024 to REQ-0030 on 2026-10-21.
+Inventory, production and payroll controls; IT general controls beyond those already in ADR-0001 and BL-23; XBRL; live PostgreSQL behaviour; and jurisdiction-specific statutory requirements. Findings BL-30 to BL-36: remediation evidence recorded 2026-10-31 in the [REQ-0035 P1 phase evidence](2026-10-31-req-0035-p1-phase-evidence.md) (BL-31 at domain level; transport enforcement in P4). The one-person-company qualification was decided 2026-10-30 by active human-principal count ([SRC-0028](../01-inputs/2026-10-24-solo-mode-relaxation.md)). The BL-36 numbering default (neutral prefix-year-sequence) was set 2026-10-24 ([SRC-0027](../01-inputs/2026-10-24-bl14-bl31-bl36-decisions.md)). GAP-01 to GAP-07 were registered as requirement candidates REQ-0024 to REQ-0030 on 2026-10-21.

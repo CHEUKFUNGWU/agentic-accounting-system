@@ -1,0 +1,1 @@
+{"case":"solo_no_humans","input":{"op":"solo_mode","principals":[{"active":true,"is_human":false,"key":"ap-bot-01"},{"active":true,"is_human":false,"key":"gl-bot-01"}]},"module":"positions","output":{"human_count":0,"solo":false}}
