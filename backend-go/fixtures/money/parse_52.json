@@ -1,0 +1,1 @@
+{"case":"parse_52","expected_error":"invalid_parse","input":{"a":"1 e2","op":"string"},"module":"money"}

@@ -1,0 +1,1 @@
+{"case":"round_01","input":{"a":"2.5","mode":"half_even","op":"round","places":0},"module":"money","output":"2"}
