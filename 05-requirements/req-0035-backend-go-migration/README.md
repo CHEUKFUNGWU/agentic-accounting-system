@@ -1,7 +1,7 @@
 # REQ-0035: Backend Go migration with golden-file parity
 
 - Requirement: REQ-0035 ([pool entry](../../04-requirement-pool/requirement-pool.md))
-- Status: work package drafted 2026-10-30; development authorized by the [work order](work-order.md) (owner), pool status `developing` per its authorization clause. Phase progress: [P0 complete 2026-10-31](../../07-reviews/2026-10-31-req-0035-p0-phase-evidence.md) on branch `req-0035/p0-scaffold` — gate green, three-axis review + `/code-review` findings fixed.
+- Status: work package drafted 2026-10-30; development authorized by the [work order](work-order.md) (owner), pool status `developing` per its authorization clause. Phase progress: [P0 complete 2026-10-31](../../07-reviews/2026-10-31-req-0035-p0-phase-evidence.md), PR #1 branch `req-0035/p0` — gate green, three-axis review + `/code-review` findings fixed.
 - Sources: [SRC-0024](../../01-inputs/2026-10-24-backend-golang-migration-decision.md) (decision), [SRC-0026](../../01-inputs/2026-10-24-open-findings-fold-into-golang-migration.md) (findings fold-in), [SRC-0027](../../01-inputs/2026-10-24-bl14-bl31-bl36-decisions.md), [SRC-0028](../../01-inputs/2026-10-24-solo-mode-relaxation.md) (prerequisite decisions)
 - Plan of record: [ADR-0002](../../03-planning/adr-0002-backend-golang-migration.md); architecture constraints: [ADR-0001](../../03-planning/adr-0001-agent-first-mcp-architecture.md) D1–D6
 - Design: [design.md](design.md) (codebase design, written with the codebase-design skill)

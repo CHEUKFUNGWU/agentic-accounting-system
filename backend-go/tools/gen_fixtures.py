@@ -22,14 +22,14 @@ from __future__ import annotations
 
 import json
 from decimal import (
-    Decimal,
-    InvalidOperation,
     ROUND_CEILING,
     ROUND_DOWN,
     ROUND_FLOOR,
     ROUND_HALF_EVEN,
     ROUND_HALF_UP,
     ROUND_UP,
+    Decimal,
+    InvalidOperation,
 )
 from pathlib import Path
 
