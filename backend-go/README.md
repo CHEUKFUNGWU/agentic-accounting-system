@@ -58,5 +58,7 @@ exempt.
 
 The same suite runs against SQLite and PostgreSQL (ADR-0001 §6). SQLite runs
 everywhere; PostgreSQL needs `AAS_TEST_PG_DSN` pointing at a disposable
-database. Money is TEXT on SQLite and NUMERIC on PostgreSQL, exact decimal
-at the store boundary; floats never appear in a money path.
+database. Money is TEXT/VARCHAR on BOTH databases — the effective schema
+(`backend/app/core/db.py`) stores exact decimal strings, so they cross the
+store byte-identical and parse only at the domain boundary; floats never
+appear in a money path.

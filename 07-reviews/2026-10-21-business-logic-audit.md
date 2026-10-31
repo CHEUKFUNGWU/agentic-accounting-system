@@ -38,7 +38,7 @@ Every row is an Observed defect unless its qualification says otherwise. An unch
 - [x] **BL-02, high: posted vouchers can be overwritten.** `backend/app/api_vouchers.py:280–314`, `backend/app/core/repository.py:386–387`, `backend/app/mcp_server.py:781–812`. A stale edit left a DRAFT voucher for 99 against posted ledger amount 31; stale REST rejection cleared the hash of an MCP-posted voucher but retained its lines. Required: guarded persisted-state transitions and stale-write detection, never cache-authorized writes.
 - [x] **BL-03, high: duplicate reversal.** `backend/app/api_vouchers.py:373–378,439–500`. Two reversal drafts both posted; original debit 100 became net credit 100. Required: atomic reversal relationship and uniqueness enforcement.
 - [x] **BL-04, high: date/period cutoff bypass.** `backend/app/core/posting.py:74–95`, `backend/app/core/ledger.py:555–562`. September 15 dated transaction labeled November posted with September locked and changed October opening by 73. Required: consistent accounting-date/period validation and reporting cutoffs.
-- [ ] **BL-05, high: duplicate document accounting.** `backend/app/api_documents.py:100–113,140–143,228–229`. Identical uploads produced posted movements of 178 for one 89 invoice. Concurrent conversion of one NEW document created two vouchers but retained only one link. Required: atomic document claims plus duplicate economic-event detection; file hashes alone are insufficient.
+- [x] **BL-05, high: duplicate document accounting.** `backend/app/api_documents.py:100–113,140–143,228–229`. Identical uploads produced posted movements of 178 for one 89 invoice. Concurrent conversion of one NEW document created two vouchers but retained only one link. Required: atomic document claims plus duplicate economic-event detection; file hashes alone are insufficient.
 
 ### Authority and evidence
 
@@ -71,12 +71,12 @@ Every row is an Observed defect unless its qualification says otherwise. An unch
 
 ### Recovery and technical accounting controls
 
-- [ ] **BL-23, high: backups omit source files.** `backend/app/main.py:366`, `backend/app/core/vouchers.py:53`. Database snapshot preserved references but not separately stored attachments. Required: consistent DB-and-evidence backup and restoration verification.
+- [x] **BL-23, high: backups omit source files.** `backend/app/main.py:366`, `backend/app/core/vouchers.py:53`. Database snapshot preserved references but not separately stored attachments. Required: consistent DB-and-evidence backup and restoration verification.
 - [ ] **BL-24, high: failed delivery marked dispatched.** `backend/app/orchestrator/event_bus.py:178–183`. Simulated HTTP 500 became DISPATCHED without retry. Required: response validation and persistent per-subscriber retry state.
 - [x] **BL-25, medium: concurrent hash-chain fork.** `backend/app/core/posting.py:116–117`, `backend/app/core/repository.py:679–690`. Two approved vouchers received index 1 and the same parent. Required: serialized entity chain allocation, including sealed reversed entries. Hash chains are not external immutability guarantees.
 - [ ] **BL-26, high production gap: no durable transactional outbox.** `backend/app/orchestrator/event_bus.py`. Queue and recent-event history are process-local; a fresh orchestrator has no retained events. Required: durable events committed with the accounting command and replay-safe consumers. This is a confirmed limitation, not breach of an approved feature specification.
 - [x] **BL-27, medium: monetary precision lost on persistence.** `backend/app/core/monolith.py:33–43,96,183–186`. Accepted `999999999999.9997` became `999999999999.9998` after conversion to float. Required: decimal strings or scaled integers end to end.
-- [ ] **BL-28, high production gap: regional ingress lacks idempotency.** Repeated regional expense webhook payload and identical `Idempotency-Key` created different independently postable journals. Required: principal/entity/payload-bound command receipts and business duplicate controls. This capability was deferred, not an approved production guarantee.
+- [x] **BL-28, high production gap: regional ingress lacks idempotency.** Repeated regional expense webhook payload and identical `Idempotency-Key` created different independently postable journals. Required: principal/entity/payload-bound command receipts and business duplicate controls. This capability was deferred, not an approved production guarantee.
 - [x] **BL-29, medium: submitted timestamp cannot round-trip.** `backend/app/core/repository.py:128,379`. Rejecting a submitted voucher returned HTTP 500 and left it pending because an ISO string reached SQLAlchemy DateTime. Required: normalize at persistence boundaries and test transitions.
 
 ## Other capability boundaries
@@ -159,7 +159,7 @@ Explicit remaining control gap: period closing and posting are not yet fully ser
 
 ### Next sequential repair
 
-BL-05 duplicate document accounting remains open and is next in priority order. Six of the 29 findings now have verified repairs in the stated SQLite scope; 23 remain unchecked. Residual control gaps and product limitations above are not release approval. All other unchecked findings remain unresolved. No release or formal requirement transition has been approved.
+BL-05 duplicate document accounting now has a verified repair in the Go backend (below). The findings carry verified repairs in the stated scopes as ticked above and in the REQ-0035 sections; the remainder remain unchecked. Residual control gaps and product limitations above are not release approval. All other unchecked findings remain unresolved. No release or formal requirement transition has been approved.
 
 ## REQ-0035 P1: findings absorbed by the Go migration (2026-10-31)
 
@@ -180,6 +180,20 @@ Per [ADR-0002 §3.1](../03-planning/adr-0002-backend-golang-migration.md) and th
 | BL-27 | exact decimal end to end; no float conversion exists (workflow, money) | `TestBL27_exact_decimal_round_trip` | 778e226 |
 
 Scope notes: BL-14 implemented per SRC-0027 (owner, confirmed 2026-10-30); BL-20 is the interim fail-closed rule until REQ-0014. Historical observations above are unchanged.
+
+## REQ-0035 P2: storage-layer findings absorbed by the Go migration (2026-10-31)
+
+Same discipline as the P1 section: fixed test-first in `backend-go/`, not in the frozen reference; each fix reproduces the audit scenario and asserts the corrected behaviour. Phase evidence: [2026-10-31-req-0035-p2-phase-evidence.md](2026-10-31-req-0035-p2-phase-evidence.md).
+
+| Finding | Go fix (package) | Regression test | Commit |
+| --- | --- | --- | --- |
+| BL-05 | atomic document claims: `ClaimDocument` and `ClaimDocumentForVoucher` (require-unused + insert-draft + link-source) run inside one entity-locked transaction backed by the `PRIMARY KEY (entity_code, sha256)` on document_sources; duplicate economic events are DETECTED (same normalized counterparty + amount + doc date, different sha256) and reported, never blocked by an invented rule (store, both adapters) | `TestSQLiteStoreSuite/ClaimDocumentForVoucherAtomic` (two concurrent conversions → exactly one voucher + one link, loser `DOCUMENT_ALREADY_USED`), `DuplicateEconomicsDetected` | 636bb2a |
+| BL-23 | DB-and-evidence backup together (VACUUM INTO snapshot + attachments tree) and restore verification that opens the restored DB and checks every document's evidence exists AND matches its recorded sha256 (store/sqlite; PostgreSQL backup is the operator's `pg_dump` plus the evidence tree — recorded limitation) | `TestSQLiteStoreSuite/BackupRestoreRoundTrip` (round trip + a backup missing its evidence fails restoration) | 636bb2a, 0840c46 |
+| BL-28 | principal/entity/payload-hash-bound command receipts: migration 0007 `command_receipts` (NEW behaviour), insert-if-absent put (`INSERT OR IGNORE` / `ON CONFLICT DO NOTHING`) returning the first stored outcome, so a timed-out command resolves by its key instead of executing twice (store, both adapters) | `TestSQLiteStoreSuite/ReceiptsIdempotent` + PG twin (put/get/exists flag, concurrent same-key puts resolve to the first receipt), migrations `TestCommandReceiptsMigration` | 636bb2a |
+| BL-36 | voucher numbers allocated at posting inside the entity-locked transaction (max sequence + 1 per entity and period — the application-level uniqueness the owner decision names, no new index on the frozen schema), stamped with the seal; refused/rolled-back postings roll their number back, so no gap is consumed (store, both adapters; format per voucher/numbering.go) | `PostVoucherHappyPath` (JV-2026-0001), `ChainProgression` (0001→0002 continuity), `ConcurrentPostingSerializes` (distinct numbers under the race) | 0840c46 |
+| BL-25 (reinforced) | the entity lock now also serializes BL-36 numbering; concurrent postings take blocks 1/2 with distinct numbers and the linear chain (store) | `ConcurrentPostingSerializes` | 0840c46 |
+
+Scope notes: BL-23's PostgreSQL half is the operator's `pg_dump` plus the evidence tree — the adapter returns `ErrBackupUnsupported` by design; BL-28's business duplicate controls for journal ingress (regional webhooks) have no caller before P5 and are mapped there; the duplicate-economics detection is detection-only and fail-open (two concurrent claims of *different* documents with identical economics can both report no duplicate) — the atomic claim itself is race-free.
 
 ## Required acceptance direction
 

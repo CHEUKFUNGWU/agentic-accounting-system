@@ -556,7 +556,11 @@ func snapshotString(snap voucher.Snapshot, field string) string {
 		return ""
 	}
 	var s string
-	_ = json.Unmarshal(raw, &s)
+	// A malformed value reads as absent — the reference's falsy `or ""`
+	// semantics — never a partial decode (same shape as the sqlite adapter).
+	if err := json.Unmarshal(raw, &s); err != nil {
+		return ""
+	}
 	return s
 }
 

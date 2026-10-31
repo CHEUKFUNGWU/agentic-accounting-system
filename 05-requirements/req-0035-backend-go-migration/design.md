@@ -80,31 +80,69 @@ Interface = exported functions over value types (`Voucher`, `Period`, `Chart`, `
 
 ### store — one real seam, two adapters
 
+Delivered at P2 (commit 636bb2a); this section is the record of the as-built
+interface, reshaped from the P0 sketch below with reasons.
+
 ```go
 type Store interface {
-    // Accounting commands — one transaction each: status, lines,
-    // approvals, sealing, chain append commit or roll back together.
-    PostVoucher(ctx context.Context, cmd PostVoucher) (Posted, error)
-    ReverseVoucher(ctx context.Context, cmd ReverseVoucher) (Voucher, error)
-    Review(ctx context.Context, cmd Review) (ReviewOutcome, error)
+    Migrate(ctx context.Context) error            // goose set + adoption
+    Close() error
 
-    // Evidence — atomic claim + duplicate economic-event detection (BL-05; P2)
-    ClaimDocument(ctx context.Context, cmd ClaimDocument) (Claim, error)
+    Entity(ctx, code) (Entity, error)             // with the RLS tenant hook
+    Chart(ctx, entityCode) ([]ledger.Account, error)
+    Periods(ctx, entityCode) ([]ledger.Period, error)
 
-    // Queries — projections only; every response is position-scoped (BL-07)
-    VoucherView(ctx context.Context, q VoucherQuery) (VoucherView, error)
-    LedgerView(ctx context.Context, q LedgerQuery) (LedgerView, error)
+    SaveJournal(ctx, SaveJournalCommand) (SaveJournalResult, error)  // revision-guarded upsert
+    PostVoucher(ctx, PostVoucherCommand) (PostResult, error)         // the 15-step sequence in one tx
+    Journal(ctx, journalID) (voucher.Snapshot, error)
+    Journals(ctx, JournalsQuery) ([]voucher.Snapshot, error)
+    LedgerLines(ctx, LedgerLinesQuery) ([]voucher.LedgerLine, error)
 
-    // Idempotency — same-key receipt lookup resolves timeouts (BL-28; P2)
-    Receipt(ctx context.Context, key ReceiptKey) (Receipt, error)
+    ClaimDocument(ctx, ClaimDocumentCommand) (Document, error)       // BL-05 atomic
+    ClaimDocumentForVoucher(ctx, ClaimDocumentForVoucherCommand) (Document, error)  // BL-05: claim+draft+link in one tx
+    Documents(ctx, DocumentsQuery) ([]Document, error)
+    Document(ctx, documentID) (Document, error)
+    VoidDocument(ctx, VoidDocumentCommand) error
 
-    // Chain & audit
-    chain.ChainStore  // embedded: append/verify persistence
-    Audit
+    PutReceipt(ctx, PutReceiptCommand) (Receipt, bool, error)        // BL-28 insert-if-absent
+    Receipt(ctx, ReceiptKey) (Receipt, error)
+
+    AppendAudit(ctx, AuditRecord) error            // append-only trail
+    AuditLogs(ctx, AuditQuery) ([]AuditRecord, error)
+    VerifyChain(ctx, entityCode) (positions.ChainReport, error)      // read-only recompute
+    Backup(ctx, targetDir) (BackupReport, error)  // BL-23 (sqlite; PG = operator pg_dump)
+    Restore(ctx, BackupRef, RestoreTarget) (RestoreReport, error)
 }
 ```
 
-Small on purpose: commands mirror the domain command service (ADR-0001 D1's single write path), so the interface the MCP and REST layers learn is the interface the invariants protect. The adapters own: transaction boundaries (and only they open transactions), Postgres `SET LOCAL app.tenant_id` + RLS role, SQLite WAL/busy-timeout/integrity pragmas, NUMERIC↔TEXT money encoding, migration application, and backup/restore with evidence files (BL-23). **Internal seam**: SQL construction stays private per adapter; no query builder leaks into callers.
+Why it moved from the sketch (recorded here because design.md is the
+interface authority, per the work order):
+
+- **Reversal and review are not store commands.** Both are the pure posting
+  sequence's outputs (a reversal posting builds reversal lines and marks the
+  original via `plan.Original`; review states are plain SaveJournal
+  transitions the reference's save_journal already performs). Inventing
+  ReverseVoucher/Review commands would have duplicated the domain's decision
+  logic inside the adapters — the opposite of rule 3.
+- **VoucherView/LedgerView became the wire forms.** The MCP/REST layers need
+  the reference's journal-dict and ledger-line shapes, not projections of
+  them; `voucher.Snapshot` and `voucher.LedgerLine` ARE the frozen wire
+  forms, so queries return those and no second shape exists to keep in sync.
+- **chain.ChainStore dissolved into VerifyChain.** The chain is never
+  appended by a separate command — the seal writes the hash fields inside
+  the posting transaction — so the embedded sub-interface had one real
+  method left, verification, which reads the persisted bytes and recomputes.
+
+Small on purpose still holds: every command is one transaction, so the
+interface the MCP and REST layers learn is the interface the invariants
+protect. The adapters own: transaction boundaries (and only they open
+transactions), Postgres `SELECT ... FOR UPDATE` entity locks + the
+`set_config('app.tenant_id', ..., true)` RLS hook, SQLite
+WAL/busy-timeout/integrity pragmas + BEGIN IMMEDIATE, TEXT/VARCHAR money
+crossing byte-identical (the effective schema stores decimal strings on both
+dialects), migration application and adoption, and backup/restore with
+evidence files (BL-23). **Internal seam**: SQL construction stays private
+per adapter; no query builder leaks into callers.
 
 ### mcpserver + mcproles — tools and their per-position wall
 
