@@ -188,7 +188,7 @@ CREATE TABLE journal_entries (
 	evidence_uris TEXT NOT NULL, 
 	entry_hash VARCHAR(64),
 	-- The reference's own genesis marker (sod_guard.py:228 /
-	-- repository.py:780) is 65 characters — one wider than the model's
+	-- repository.py:780) is 72 characters — 8 wider than the model's
 	-- String(64) declares. Latent in the reference because SQLite enforces
 	-- no width and it never posted on PostgreSQL; the first block of an
 	-- entity chain needs the full marker (README, reconciliation note 4).

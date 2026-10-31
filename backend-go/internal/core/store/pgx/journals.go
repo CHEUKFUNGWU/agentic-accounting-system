@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/CHEUKFUNGUWU/agentic-accounting-system/backend-go/internal/core/domain/ledger"
@@ -141,6 +142,9 @@ func scanJournalDoc(row *sql.Row) (store.JournalDoc, bool, error) {
 }
 
 func (s *Store) Journal(ctx context.Context, journalID string) (voucher.Snapshot, error) {
+	// FOR UPDATE mirrors the reference's get_journal. In autocommit the lock
+	// releases at statement end, so this only ever waits behind an in-flight
+	// posting on the same row — a brief serialization point, not a hold.
 	row := s.db.QueryRowContext(ctx, `SELECT `+journalSelect()+`
 		FROM journal_entries WHERE journal_id = $1 FOR UPDATE`, journalID)
 	doc, ok, err := scanJournalDoc(row)
@@ -496,7 +500,14 @@ func (s *Store) PostVoucher(ctx context.Context, cmd store.PostVoucherCommand) (
 		}
 
 		// 6. Apply: ledger lines, seal, the original's reversal — commit or
-		// roll back together (BL-01/BL-03).
+		// roll back together (BL-01/BL-03). The BL-36 number is allocated
+		// first, inside the entity lock: a refused or rolled-back posting
+		// rolls its number back with it, so no gap is ever consumed.
+		voucherNo, err := allocateVoucherNo(tx, journal, plan.PeriodCode)
+		if err != nil {
+			return err
+		}
+		plan.Voucher.VoucherNo = &voucherNo
 		if err := writeLines(tx, journal.JournalID, plan.Rows, cmd.PostedAt); err != nil {
 			return err
 		}
@@ -723,10 +734,11 @@ func sealVoucher(tx *writeTx, journal posting.Journal, plan posting.PostingPlan)
 	}
 	res, err := tx.exec(`UPDATE journal_entries SET status = 'POSTED', revision = ?,
 		entry_hash = ?, prev_entry_hash = ?, block_index = ?, posted_at = ?,
-		approved_by_principal_key = ?, approved_by_principal_id = ?, review_notes = ?
+		approved_by_principal_key = ?, approved_by_principal_id = ?, review_notes = ?,
+		voucher_no = ?
 		WHERE journal_id = ? AND revision = ? AND status IN ('PENDING_CHECKER', 'AWAITING_CPA')`,
 		seal.Revision, seal.EntryHash, seal.PrevEntryHash, seal.BlockIndex,
-		postedAt, seal.ApproverKey, seal.ApproverID, reviewNotes,
+		postedAt, seal.ApproverKey, seal.ApproverID, reviewNotes, seal.VoucherNo,
 		journal.JournalID, journal.Revision)
 	if err != nil {
 		return fmt.Errorf("pgx: seal: %w", err)
@@ -740,6 +752,65 @@ func sealVoucher(tx *writeTx, journal posting.Journal, plan posting.PostingPlan)
 			Message: fmt.Sprintf("憑證 '%s' 目前狀態已變更，不可重複過賬或過賬已結案的分錄。", journal.JournalID)}
 	}
 	return nil
+}
+
+// allocateVoucherNo assigns the next continuous BL-36 sequence for
+// (entity, period): the highest sequence already stamped on a POSTED voucher
+// of that entity and period, plus one. Every posting runs under the entity
+// row lock, so two transactions can never draw the same number — the
+// application-level per-entity-and-period uniqueness the owner decision
+// names, without altering the frozen schema with a new index (a UNIQUE on
+// voucher_no would also be wrong: the neutral format renders only the year,
+// so the same number legitimately recurs across periods). Numbers exist only
+// on posted vouchers, so refused drafts and voids leave no gaps, and the
+// allocation rolls back with its posting.
+func allocateVoucherNo(tx *writeTx, journal posting.Journal, period string) (string, error) {
+	if journal.VoucherNo != nil {
+		return "", &voucher.NumberError{Kind: voucher.KindVoucherNumberAlreadyAllocated,
+			Message: fmt.Sprintf("voucher '%s' already carries voucher number %s", journal.JournalID, *journal.VoucherNo)}
+	}
+	rows, err := tx.tx.QueryContext(tx.ctx, pgq(`SELECT j.voucher_no FROM journal_entries j
+		JOIN journal_lines l ON l.journal_id = j.journal_id
+		WHERE j.entity_code = ? AND l.period_code = ? AND j.status = 'POSTED'
+		AND j.voucher_no IS NOT NULL`), journal.EntityCode, period)
+	if err != nil {
+		return "", fmt.Errorf("pgx: voucher numbers: %w", err)
+	}
+	defer rows.Close()
+	max := int64(0)
+	for rows.Next() {
+		var no sql.NullString
+		if err := rows.Scan(&no); err != nil {
+			return "", fmt.Errorf("pgx: voucher numbers: %w", err)
+		}
+		if seq, ok := voucherSequenceOf(no.String); ok && seq > max {
+			max = seq
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return "", fmt.Errorf("pgx: voucher numbers: %w", err)
+	}
+	no, err := voucher.FormatVoucherNumber(journal.EntityCode, period, max+1)
+	if err != nil {
+		return "", err
+	}
+	return no, nil
+}
+
+// voucherSequenceOf extracts the sequence of a stamped number
+// ("JV-2026-0001" → 1). A number the neutral format did not produce
+// (per-jurisdiction rule packs may replace the format later) contributes
+// nothing to the maximum.
+func voucherSequenceOf(no string) (int64, bool) {
+	i := strings.LastIndexByte(no, '-')
+	if i < 0 || i == len(no)-1 {
+		return 0, false
+	}
+	seq, err := strconv.ParseInt(no[i+1:], 10, 64)
+	if err != nil || seq < 1 {
+		return 0, false
+	}
+	return seq, true
 }
 
 // markOriginalReversed applies _mark_original_reversed's conditional UPDATE.

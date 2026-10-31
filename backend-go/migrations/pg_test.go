@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -13,23 +14,24 @@ import (
 	"github.com/pressly/goose/v3"
 )
 
-// TestPostgresMigrationsLegacyUpgrade mirrors the SQLite legacy upgrade on
-// PostgreSQL (the other half of the dual-DB matrix, ADR-0001 §6). Gated on
-// AAS_TEST_PG_DSN like internal/core/store/pgx/pgx_test.go; skipped when
-// unset. All objects are created inside a dedicated temp schema and dropped
-// afterwards, so the target database itself is never touched.
-func TestPostgresMigrationsLegacyUpgrade(t *testing.T) {
+// openPGTestSchema gives one test its own disposable PostgreSQL playground:
+// a temp schema routed via search_path (everything, including
+// goose_db_version, lives inside it) that is dropped on cleanup, plus a
+// goose provider over the embedded PG dialect. Gated on AAS_TEST_PG_DSN
+// like the store's PG tests; skipped when unset.
+func openPGTestSchema(t *testing.T) (*sql.DB, context.Context, string, *goose.Provider) {
+	t.Helper()
 	dsn := os.Getenv("AAS_TEST_PG_DSN")
 	if dsn == "" {
 		t.Skip("AAS_TEST_PG_DSN not set; PostgreSQL half of the dual-DB matrix skipped")
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	defer cancel()
+	t.Cleanup(cancel)
 
 	// Isolation: everything (including goose_db_version) lives in a temp
 	// schema routed via search_path, dropped on cleanup.
-	schema := fmt.Sprintf("goose_p2_test_%d", time.Now().UnixNano())
+	schema := fmt.Sprintf("goose_p2_test_%d_%d", time.Now().UnixNano(), atomic.AddUint64(&pgTestSchemaSeq, 1))
 	cfg, err := pgx.ParseConfig(dsn)
 	if err != nil {
 		t.Fatalf("pgx.ParseConfig: %v", err)
@@ -63,6 +65,18 @@ func TestPostgresMigrationsLegacyUpgrade(t *testing.T) {
 	if err != nil {
 		t.Fatalf("goose.NewProvider(postgres): %v", err)
 	}
+	return db, ctx, schema, p
+}
+
+// pgTestSchemaSeq disambiguates same-nanosecond schema names across tests.
+var pgTestSchemaSeq uint64
+
+// TestPostgresMigrationsLegacyUpgrade mirrors the SQLite legacy upgrade on
+// PostgreSQL (the other half of the dual-DB matrix, ADR-0001 §6). All
+// objects are created inside a dedicated temp schema and dropped afterwards,
+// so the target database itself is never touched.
+func TestPostgresMigrationsLegacyUpgrade(t *testing.T) {
+	db, ctx, schema, p := openPGTestSchema(t)
 
 	// Legacy shape, then legacy-vocabulary rows, then forward.
 	if _, err := p.UpTo(ctx, 1); err != nil {
@@ -128,6 +142,47 @@ func TestPostgresMigrationsLegacyUpgrade(t *testing.T) {
 	}
 	if _, err := p.Up(ctx); err != nil {
 		t.Fatalf("re-Up: %v", err)
+	}
+	assertPGFinalShape(t, db, schema)
+
+	// The debit-xor-credit CHECK must FIRE, not merely exist: an unbalanced
+	// line is refused by the database (the behavioral mirror of the SQLite
+	// test's insert, against the seeded legacy journal and chart row).
+	if _, err := db.ExecContext(ctx, `INSERT INTO journal_lines (line_id, journal_id, entity_code,
+		line_number, account_id, account_code, account_name, period_code, entry_layer,
+		accounting_date, tx_currency, exchange_rate, tx_debit, tx_credit, func_debit, func_credit,
+		counterparty_name, func_tax_amount, business_use_pct, statement_ref, memo, created_at)
+		VALUES ('AU-OPC-01:JV-BAD', 'AU-OPC-01:JV-0001', 'AU-OPC-01', 2, 'AU-OPC-01:1000', '1000',
+		'Cash at bank', '2026-01', 'OPERATIONAL', '2026-01-01', 'AUD', '1.00000000',
+		'0.0000', '0.0000', '0.0000', '0.0000', '', '0.0000', '1.0000', 'BS', 'unbalanced',
+		'2026-01-01T00:00:00Z')`); err == nil {
+		t.Error("unbalanced journal line accepted on PG; ck_journal_line_debit_xor_credit did not survive the migration chain")
+	}
+}
+
+// TestPostgresMigrationsDownAndReUp mirrors the SQLite direction sanity on
+// PostgreSQL: a full down to zero leaves no schema objects behind, and the
+// re-up reproduces the final shape. The PG Down sections of 0001..0004 were
+// never exercised by any other test.
+func TestPostgresMigrationsDownAndReUp(t *testing.T) {
+	db, ctx, schema, p := openPGTestSchema(t)
+
+	if _, err := p.Up(ctx); err != nil {
+		t.Fatalf("Up: %v", err)
+	}
+	if _, err := p.DownTo(ctx, 0); err != nil {
+		t.Fatalf("DownTo(0): %v", err)
+	}
+	var objects int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM information_schema.tables
+		WHERE table_schema = $1 AND table_name <> 'goose_db_version'`, schema).Scan(&objects); err != nil {
+		t.Fatalf("count remaining objects: %v", err)
+	}
+	if objects != 0 {
+		t.Errorf("%d schema objects remain after DownTo(0), want 0", objects)
+	}
+	if _, err := p.Up(ctx); err != nil {
+		t.Fatalf("re-Up after full down: %v", err)
 	}
 	assertPGFinalShape(t, db, schema)
 }

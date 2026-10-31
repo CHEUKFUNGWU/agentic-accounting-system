@@ -65,14 +65,16 @@ surface:
    set ports the same rename steps to PostgreSQL so both dialects share one
    history and legacy PG shapes upgrade in place.
 4. **`prev_entry_hash` width on PostgreSQL: 80, not the model's 64.** The
-   reference's genesis marker (`GENESIS_BLOCK_` + zeros,
-   `sod_guard.py:228` / `repository.py:780`) is 65 characters — one wider
+   reference's genesis marker (`GENESIS_BLOCK_` + 58 zeros,
+   `sod_guard.py:228` / `repository.py:780`) is 72 characters — 8 wider
    than `db.py`'s `String(64)`. Latent in the reference: SQLite enforces no
    column width and the reference never ran its posting path on PostgreSQL.
    The SQLite dialect keeps `VARCHAR(64)` byte-identical to the fixture
    (SQLite enforces nothing); the PostgreSQL dialect widens the column so
    the first block of an entity chain — the reference's own frozen chain
-   bytes — fits. Owner ratification noted in the P2 evidence record.
+   bytes — fits (80 gives headroom over the exact 72). Owner ratification
+   noted in the P2 evidence record. (An earlier draft of this note said 65;
+   the measured constant is 72 in both codebases.)
 
 ### Fresh-path note
 
@@ -90,12 +92,20 @@ procedure for the store layer on first open:
 1. If the database has NO `entities` table, it is a fresh file — just run
    `provider.Up` (applies 0001..0007).
 2. If `entities` exists but `goose_db_version` does not, the file predates
-   goose. Determine its shape from the same checks `_ensure_columns` uses:
-   - `etb_accounts` present (and `trial_balance_accounts` absent) → run `UpTo(1)` then `Up`.
-   - `trial_balance_accounts.wp_ref` present → run `UpTo(2)` then `Up`.
-   - `entities.pack_status` present → run `UpTo(3)` then `Up`.
-   - `journal_entries.revision` missing → run `UpTo(5)` then `Up`.
-   - none of the above (already at the current Python shape) → stamp.
+   goose. Determine its shape from the same checks `_ensure_columns` uses,
+   then **stamp the matching version N as applied (per step 3) and run `Up`**
+   — running `UpTo(N)` instead would re-run 0001's bare `CREATE TABLE`s over
+   the existing tables, which fails. The store adapters implement exactly
+   this (internal/core/store/*/migrate.go):
+   - `journal_entries.voucher_no` present but `revision` absent → no clean
+     checkpoint matches (the b7d198c era, 2026-10-17..21): refuse with the
+     "shape matches no known checkpoint" message; this shape must be brought
+     forward by the frozen Python backend first, per the note below.
+   - `etb_accounts` present (and `trial_balance_accounts` absent) → stamp 1.
+   - `trial_balance_accounts.wp_ref` present → stamp 2.
+   - `entities.pack_status` present → stamp 3.
+   - `journal_entries.revision` missing → stamp 5.
+   - none of the above (already at the current Python shape) → stamp 6.
 3. **Stamping**: create the version table exactly as goose does and insert
    version 0 (goose's own baseline marker — it inserts `(0, 1)` when it
    creates the table, and the SQLite dialect's table-existence fallback

@@ -66,6 +66,26 @@ func (s *Store) Migrate(ctx context.Context) error {
 // detectShape maps the database's shape to the goose version it is at, per
 // the README's checkpoints (oldest shape first).
 func (s *Store) detectShape(ctx context.Context) (version int, ok bool, err error) {
+	// The 0006 columns probe FIRST: a database that carries the voucher
+	// fields but not revision (the b7d198c era, 2026-10-17..21 —
+	// _ensure_columns' wanted list added voucher_no..proposal_json before
+	// revision existed) matches NO clean checkpoint, whichever older shape it
+	// also resembles. Stamping it at any version ≤ 5 makes 0006's bare ADD
+	// COLUMN fail on the duplicates, and the stamp wedges every later open on
+	// that goose error. Refuse per the README instead.
+	hasRevision, err := s.columnExists(ctx, "journal_entries", "revision")
+	if err != nil {
+		return 0, false, err
+	}
+	if !hasRevision {
+		hasVoucherNo, err := s.columnExists(ctx, "journal_entries", "voucher_no")
+		if err != nil {
+			return 0, false, err
+		}
+		if hasVoucherNo {
+			return 0, false, nil
+		}
+	}
 	hasETB, err := s.tableExists(ctx, "etb_accounts")
 	if err != nil {
 		return 0, false, err
@@ -92,10 +112,6 @@ func (s *Store) detectShape(ctx context.Context) (version int, ok bool, err erro
 	}
 	if hasPackStatus {
 		return 3, true, nil
-	}
-	hasRevision, err := s.columnExists(ctx, "journal_entries", "revision")
-	if err != nil {
-		return 0, false, err
 	}
 	if !hasRevision {
 		return 5, true, nil

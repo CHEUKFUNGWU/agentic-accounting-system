@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/CHEUKFUNGUWU/agentic-accounting-system/backend-go/internal/core/store"
 	"github.com/CHEUKFUNGUWU/agentic-accounting-system/backend-go/internal/core/store/storetest"
 )
 
@@ -71,5 +70,3 @@ func (s *Store) TamperChain(ctx context.Context) error {
 	}
 	return nil
 }
-
-var _ store.Store = (*Store)(nil)

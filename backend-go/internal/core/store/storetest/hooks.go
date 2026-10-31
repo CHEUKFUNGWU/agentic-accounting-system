@@ -54,6 +54,7 @@ func RunSuite(t *testing.T, newStore func(t *testing.T) store.Store) {
 	t.Run("ConcurrentPostingSerializes", func(t *testing.T) { testConcurrentPosting(t, newStore) })
 	t.Run("ClaimDocumentCapture", func(t *testing.T) { testClaimDocument(t, newStore) })
 	t.Run("ClaimDocumentForVoucherAtomic", func(t *testing.T) { testConversionAtomicity(t, newStore) })
+	t.Run("ConvertRoundingParity", func(t *testing.T) { testConvertRoundingParity(t, newStore) })
 	t.Run("DuplicateEconomicsDetected", func(t *testing.T) { testDuplicateEconomics(t, newStore) })
 	t.Run("ReceiptsIdempotent", func(t *testing.T) { testReceipts(t, newStore) })
 	t.Run("AuditAppendQuery", func(t *testing.T) { testAudit(t, newStore) })

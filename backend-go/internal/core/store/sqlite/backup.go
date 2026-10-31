@@ -2,7 +2,9 @@ package sqlite
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
@@ -66,30 +68,37 @@ func (s *Store) Restore(ctx context.Context, backup store.BackupRef, target stor
 	}
 	report := store.RestoreReport{EvidenceFiles: files}
 	// 3. The verification: every document's stored evidence must exist in
-	// the restored set.
+	// the restored set AND match its recorded sha256 — a corrupted evidence
+	// file must fail the restoration, not restore a ledger whose documents
+	// point at silent garbage.
 	restored, err := Open(target.DBFile)
 	if err != nil {
 		return report, fmt.Errorf("sqlite: restore verify open: %w", err)
 	}
 	defer restored.Close()
-	rows, err := restored.QueryContext(ctx, `SELECT entity_code, stored_name FROM documents
+	rows, err := restored.QueryContext(ctx, `SELECT entity_code, stored_name, sha256 FROM documents
 		WHERE stored_name <> ''`)
 	if err != nil {
 		return report, fmt.Errorf("sqlite: restore verify: %w", err)
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var entityCode, storedName string
-		if err := rows.Scan(&entityCode, &storedName); err != nil {
+		var entityCode, storedName, wantSHA string
+		if err := rows.Scan(&entityCode, &storedName, &wantSHA); err != nil {
 			return report, fmt.Errorf("sqlite: restore verify: %w", err)
 		}
 		if strings.ContainsAny(storedName, "/\\") || strings.HasPrefix(storedName, ".") {
 			return report, fmt.Errorf("sqlite: restore verify: document evidence %q escapes the evidence root", storedName)
 		}
 		path := filepath.Join(target.EvidenceDir, entityCode, storedName)
-		if _, err := os.Stat(path); err != nil {
-			return report, fmt.Errorf("sqlite: restore verify: evidence missing for document %s: %s",
-				entityCode, storedName)
+		gotSHA, err := fileSHA256(path)
+		if err != nil {
+			return report, fmt.Errorf("sqlite: restore verify: evidence missing for document %s: %w",
+				entityCode, err)
+		}
+		if gotSHA != wantSHA {
+			return report, fmt.Errorf("sqlite: restore verify: evidence content mismatch for document %s (%s): sha256 %s, recorded %s",
+				entityCode, storedName, gotSHA, wantSHA)
 		}
 		report.DocumentsVerified++
 	}
@@ -180,4 +189,19 @@ func copyFile(src, dst string) error {
 		return err
 	}
 	return os.Rename(tmpName, dst)
+}
+
+// fileSHA256 hashes a file's bytes — the restore verification compares the
+// restored evidence content against the documents table's recorded digest.
+func fileSHA256(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
 }

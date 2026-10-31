@@ -78,6 +78,14 @@ type Seal struct {
 	// (mark_posted's `if review_notes is not None`); nil keeps the stored
 	// value.
 	ReviewNotes *string `json:"review_notes"`
+	// VoucherNo is the BL-36 number stamped at posting: the store assigns
+	// the next continuous sequence for (entity, period) inside the posting
+	// transaction and the seal writes it — the owner decision that replaces
+	// the reference's draft-time next_voucher_no (numbering.go). It is not
+	// part of the hash payload (compute_entry_sha256_hash hashes the totals,
+	// lines hash, creator and approver only), so stamping it alongside the
+	// seal fields changes no chain bytes.
+	VoucherNo *string `json:"voucher_no,omitempty"`
 }
 
 // OriginalSeal is the patch _mark_original_reversed writes for the

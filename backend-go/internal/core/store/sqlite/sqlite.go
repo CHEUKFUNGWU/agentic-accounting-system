@@ -137,13 +137,19 @@ func withWrite(ctx context.Context, s *Store, fn func(tx *writeTx) error) error 
 	if err != nil {
 		return err
 	}
+	// The transaction-control statements run under a cancellation-proof
+	// context: when fn fails BECAUSE ctx was canceled (the BL-28 timeout
+	// scenario), a ctx-bound ROLLBACK fails before reaching the driver and
+	// the pooled connection would return to the pool still holding the
+	// BEGIN IMMEDIATE write lock.
+	rbCtx := context.WithoutCancel(ctx)
 	if err := fn(tx); err != nil {
-		_, _ = tx.conn.ExecContext(ctx, "ROLLBACK")
+		_, _ = tx.conn.ExecContext(rbCtx, "ROLLBACK")
 		_ = tx.conn.Close()
 		return err
 	}
 	if _, err := tx.conn.ExecContext(ctx, "COMMIT"); err != nil {
-		_, _ = tx.conn.ExecContext(ctx, "ROLLBACK")
+		_, _ = tx.conn.ExecContext(rbCtx, "ROLLBACK")
 		_ = tx.conn.Close()
 		return fmt.Errorf("sqlite: COMMIT: %w", err)
 	}

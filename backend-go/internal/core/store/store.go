@@ -70,11 +70,11 @@
 // and returns the stored receipt either way, so a timed-out command resolves
 // by querying with the same key — never by posting twice (engineering
 // workflow §3). The frozen Python schema has NO receipts table: the
-// command_receipts table is NEW behaviour and its DDL belongs in a goose
-// migration (migrations/** is another work package). Both adapters implement
-// the methods against that table; until the migration lands, the methods
-// return ErrReceiptsTableMissing and the shared suite skips its receipts
-// tests with a pointer to the required DDL.
+// command_receipts table is NEW behaviour, carried by goose migration 0007
+// (migrations/**). Both adapters implement the methods against that table;
+// the ErrReceiptsTableMissing sentinel stays as the fail-closed answer of a
+// database that predates 0007 and was never migrated (the shared suite
+// exercises the real table).
 package store
 
 import (
@@ -152,8 +152,8 @@ type Store interface {
 var ErrBackupUnsupported = errors.New("store: backup not supported by this adapter")
 
 // ErrReceiptsTableMissing reports that the command_receipts table does not
-// exist yet — the BL-28 receipts table is new behaviour whose DDL must land
-// as a goose migration (see the package doc).
+// exist — a database predating migration 0007 that was never migrated to it
+// (the BL-28 receipts table is new behaviour; see the package doc).
 var ErrReceiptsTableMissing = errors.New("store: command_receipts table missing (needs a goose migration)")
 
 // Error is a classified store refusal. Kind mirrors the frozen reference's

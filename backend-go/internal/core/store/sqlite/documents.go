@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/CHEUKFUNGUWU/agentic-accounting-system/backend-go/internal/core/domain/ledger"
+	"github.com/CHEUKFUNGUWU/agentic-accounting-system/backend-go/internal/core/domain/localization"
 	"github.com/CHEUKFUNGUWU/agentic-accounting-system/backend-go/internal/core/domain/voucher"
 	"github.com/CHEUKFUNGUWU/agentic-accounting-system/backend-go/internal/core/money"
 	"github.com/CHEUKFUNGUWU/agentic-accounting-system/backend-go/internal/core/store"
@@ -542,8 +543,16 @@ func (s *Store) ClaimDocumentForVoucher(ctx context.Context, cmd store.ClaimDocu
 		if err != nil {
 			return fmt.Errorf("sqlite: document amount: %w", err)
 		}
+		// The reference's conversion order (api_documents.py:166-171): q4 —
+		// ROUND_HALF_UP to four places (localization.Q4) — runs FIRST, and
+		// the zero gate reads the ROUNDED value, so a 5th-decimal tie drafts
+		// 0.0001 and 0.00004 refuses.
+		amountQ4, err := localization.Q4(amount)
+		if err != nil {
+			return fmt.Errorf("sqlite: document amount: %w", err)
+		}
 		zero, _ := money.Parse("0")
-		if amount.Cmp(zero) <= 0 {
+		if amountQ4.Cmp(zero) <= 0 {
 			return &store.Error{Kind: store.KindAmountRequired,
 				Message: "單據金額為零，無法產生分錄。請先補上金額。"}
 		}
@@ -566,10 +575,8 @@ func (s *Store) ClaimDocumentForVoucher(ctx context.Context, cmd store.ClaimDocu
 		if err != nil {
 			return fmt.Errorf("sqlite: draft id: %w", err)
 		}
-		amountQ4, err := amount.Round(4, money.RoundHalfEven)
-		if err != nil {
-			return err
-		}
+		// amountQ4 was rounded (localization.Q4, ROUND_HALF_UP) at the gate
+		// above, matching the reference's conversion order.
 		amountStr := amountQ4.String()
 		label := doc.CounterpartyName
 		if label == "" {

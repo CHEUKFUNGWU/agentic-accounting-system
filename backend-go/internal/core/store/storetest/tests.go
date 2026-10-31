@@ -185,7 +185,7 @@ func testPostVoucherHappyPath(t *testing.T, newStore func(t *testing.T) store.St
 	if res.BlockIndex != 1 || res.LinesWritten != 2 || res.Columns != "period_op" {
 		t.Fatalf("post result = %+v", res)
 	}
-	if len(res.EntryHash) != 64 || res.PrevEntryHash[:13] != "GENESIS_BLOCK" {
+	if len(res.EntryHash) != 64 || res.PrevEntryHash != "GENESIS_BLOCK_0000000000000000000000000000000000000000000000000000000000" {
 		t.Fatalf("seal fields: hash=%q prev=%q", res.EntryHash, res.PrevEntryHash)
 	}
 	// The committed wire form carries the seal: revision incremented,
@@ -198,6 +198,11 @@ func testPostVoucherHappyPath(t *testing.T, newStore func(t *testing.T) store.St
 	}
 	if strOf(t, res.Voucher["approved_by_principal_id"]) != "human-cpa" {
 		t.Fatalf("approved_by_principal_id = %q", strOf(t, res.Voucher["approved_by_principal_id"]))
+	}
+	// BL-36: the number is allocated at posting, first of the period, and
+	// the pre-posting draft carried none (drafts keep only their draft ID).
+	if got := strOf(t, res.Voucher["voucher_no"]); got != "JV-2026-0001" {
+		t.Fatalf("committed voucher_no = %q, want %q (neutral format, allocated at posting)", got, "JV-2026-0001")
 	}
 
 	// The ledger lines carry the snapshot's money strings byte-identical —
@@ -388,6 +393,12 @@ func testChainProgression(t *testing.T, newStore func(t *testing.T) store.Store)
 	if second.BlockIndex != 2 || second.PrevEntryHash != first.EntryHash {
 		t.Fatalf("block 2 = %d prev %s, want 2 prev %s", second.BlockIndex, second.PrevEntryHash, first.EntryHash)
 	}
+	// BL-36 continuity: posted vouchers of one entity and period are numbered
+	// continuously (both drafts are 2026-10; a draft refusal would never
+	// have consumed a number to skip).
+	if no1, no2 := strOf(t, first.Voucher["voucher_no"]), strOf(t, second.Voucher["voucher_no"]); no1 != "JV-2026-0001" || no2 != "JV-2026-0002" {
+		t.Fatalf("voucher numbers = (%q, %q), want (JV-2026-0001, JV-2026-0002)", no1, no2)
+	}
 	rep, err := st.VerifyChain(ctx, "E1")
 	if err != nil {
 		t.Fatalf("verify: %v", err)
@@ -475,6 +486,15 @@ func testConcurrentPosting(t *testing.T, newStore func(t *testing.T) store.Store
 	}
 	if len(blocks) != 2 || blocks[1] == "" || blocks[2] == "" {
 		t.Fatalf("block indexes = %v, want {1, 2}", blocks)
+	}
+	// BL-36 under the same race: the entity lock serializes the allocation
+	// too — two distinct numbers, 0001 and 0002, never one number twice.
+	numbers := map[string]bool{}
+	for _, r := range results {
+		numbers[strOf(t, r.Voucher["voucher_no"])] = true
+	}
+	if !numbers["JV-2026-0001"] || !numbers["JV-2026-0002"] || len(numbers) != 2 {
+		t.Fatalf("concurrent voucher numbers = %v, want {JV-2026-0001, JV-2026-0002}", numbers)
 	}
 	for _, id := range []string{"JV-P1", "JV-P2"} {
 		snap := mustReload(t, st, id)
@@ -747,7 +767,7 @@ func testReceipts(t *testing.T, newStore func(t *testing.T) store.Store) {
 		Key: key, CommandID: "CMD-1", Outcome: `{"status":"ok"}`, At: SuiteAt})
 	if err != nil {
 		if errors.Is(err, store.ErrReceiptsTableMissing) {
-			t.Skipf("command_receipts table missing; add the goose migration with the DDL in the store package doc (%v)", err)
+			t.Skipf("command_receipts table missing: a database predating migration 0007 that was never migrated (%v)", err)
 		}
 		t.Fatalf("put: %v", err)
 	}
@@ -923,6 +943,70 @@ func testBackupRestore(t *testing.T, newStore func(t *testing.T) store.Store) {
 	}
 	if _, err := st.Restore(ctx, store.BackupRef{DBFile: report.DBFile, EvidenceDir: t.TempDir()}, brokenTarget); err == nil {
 		t.Fatal("restore accepted a backup whose evidence set is empty")
+	}
+}
+
+// testConvertRoundingParity pins the reference's conversion rounding: q4
+// (ROUND_HALF_UP to four places) runs BEFORE the zero gate
+// (api_documents.py:166-171), so a 5th-decimal tie drafts the rounded-UP
+// value and an amount that rounds to zero refuses. A wrong mode (the decimal
+// context's default HALF_EVEN) or a gate on the unrounded parse would write
+// different money on exactly these ties — store territory the golden
+// fixtures cannot reach (no pure rule to fixture).
+func testConvertRoundingParity(t *testing.T, newStore func(t *testing.T) store.Store) {
+	ctx := context.Background()
+	st, hooks := open(t, newStore)
+	mustSeed(t, hooks, "E1")
+
+	convert := func(docID, amount string) (string, error) {
+		t.Helper()
+		content := []byte("rounding bytes " + docID)
+		digest := sha256Hex(content)
+		stored := digest[:16] + "-slip.pdf"
+		evidenceFor(t, st, "E1", stored, content)
+		rec := store.Document{
+			DocumentID: docID, EntityCode: "E1", DocType: "BANK_SLIP",
+			DocDate: "2026-10-15", CounterpartyName: "Acme Corp",
+			Amount: amount, Currency: "AUD", Status: "NEW",
+			Filename: "slip.pdf", StoredName: stored, Mime: "application/pdf",
+			Size: int64(len(content)), SHA256: digest, UploadedBy: "human-boss",
+		}
+		if _, err := st.ClaimDocument(ctx, store.ClaimDocumentCommand{Record: rec, Content: content, At: SuiteAt}); err != nil {
+			t.Fatalf("claim %s: %v", docID, err)
+		}
+		res, err := st.ClaimDocumentForVoucher(ctx, store.ClaimDocumentForVoucherCommand{
+			DocumentID: docID, DebitAccountCode: "1110", CreditAccountCode: "4100",
+			MakerPrincipalKey: "human-boss", MakerPrincipalID: "human-boss", At: SuiteAt,
+		})
+		if err != nil {
+			return "", err
+		}
+		snap, err := st.Journal(ctx, res.JournalID)
+		if err != nil {
+			t.Fatalf("reload %s: %v", docID, err)
+		}
+		return strOf(t, snap["total_debit"]), nil
+	}
+
+	// HALF_UP ties round UP where HALF_EVEN would round to even (down):
+	// the distinguishing cases against the wrong mode.
+	for _, tc := range []struct{ amount, want string }{
+		{"1.00005", "1.0001"}, // tie; HALF_EVEN would draft 1.0000
+		{"1.00025", "1.0003"}, // tie over an even digit; HALF_EVEN would draft 1.0002
+		{"0.00005", "0.0001"}, // tiny tie; HALF_EVEN would draft 0.0000
+	} {
+		got, err := convert("DOC-ROUND-"+tc.want, tc.amount)
+		if err != nil {
+			t.Fatalf("convert %s: %v", tc.amount, err)
+		}
+		if got != tc.want {
+			t.Fatalf("convert %s total_debit = %q, want %q (reference q4 ROUND_HALF_UP)", tc.amount, got, tc.want)
+		}
+	}
+	// The gate reads the ROUNDED value: 0.00004 rounds to 0.0000 and refuses,
+	// though the unrounded amount is positive.
+	if _, err := convert("DOC-ROUND-ZERO", "0.00004"); store.KindOf(err) != store.KindAmountRequired {
+		t.Fatalf("convert 0.00004 kind = %q (%v), want %q (gate after q4)", store.KindOf(err), err, store.KindAmountRequired)
 	}
 }
 

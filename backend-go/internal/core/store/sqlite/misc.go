@@ -92,9 +92,10 @@ func (s *Store) AuditLogs(ctx context.Context, q store.AuditQuery) ([]store.Audi
 }
 
 // ---------------------------------------------------------------------------
-// Receipts (BL-28) — the command_receipts table is NEW behaviour whose DDL
-// belongs in a goose migration (see the store package doc). Until that
-// migration lands, every receipts call reports ErrReceiptsTableMissing.
+// Receipts (BL-28) — the command_receipts table is NEW behaviour, carried by
+// goose migration 0007. On a database that predates it and was never
+// migrated, the table is absent and every receipts call reports
+// ErrReceiptsTableMissing (fail closed, never silently un-idempotent).
 // ---------------------------------------------------------------------------
 
 // receiptsMissing reports the "table absent" error of the current schema.
