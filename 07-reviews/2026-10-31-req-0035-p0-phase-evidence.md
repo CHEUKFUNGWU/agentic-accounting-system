@@ -1,6 +1,6 @@
 # REQ-0035 P0 phase evidence: toolchain and skeleton
 
-Date: 2026-10-31. Phase evidence for [ADR-0002 §3 P0](../03-planning/adr-0002-backend-golang-migration.md), produced during the session that executed the [work order](../05-requirements/req-0035-backend-go-migration/work-order.md). Branch `req-0035/p0-scaffold` in worktree `../aas-req-0035`; commits c071737 (skeleton), 0edb4d2 (three-axis review fixes), and the P0 completion commit carrying this record. Not a release approval; formal status stays in the [requirement pool](../04-requirement-pool/requirement-pool.md).
+Date: 2026-10-31. Phase evidence for [ADR-0002 §3 P0](../03-planning/adr-0002-backend-golang-migration.md), produced during the session that executed the [work order](../05-requirements/req-0035-backend-go-migration/work-order.md). Executed on local branch `req-0035/p0-scaffold` in worktree `../aas-req-0035`; pushed as PR #1, branch `req-0035/p0`; commits c071737 (skeleton), 0edb4d2 (three-axis review fixes), and the P0 completion commit carrying this record. Not a release approval; formal status stays in the [requirement pool](../04-requirement-pool/requirement-pool.md).
 
 ## Gate (ADR-0002 §3 P0)
 
