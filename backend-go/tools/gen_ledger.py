@@ -58,7 +58,6 @@ from app.core.db import (
 )
 from app.core.repository import repo
 
-
 # ---------------------------------------------------------------------------
 # Fake session: serves the seeded rows for exactly the queries ledger.py
 # issues. The WHERE clauses are read back out of each statement and applied to
@@ -196,12 +195,12 @@ class _FakeDBManager:
 
 
 def account_seed(**kw):
-    d = dict(
-        entity_code="DEMO", parent_account_id=None, account_code="", account_name="",
-        account_type="", normal_balance="", fs_category="", statement_ref="TB",
-        cash_flow_activity="OPERATING_WC", is_control_account=False,
-        allow_manual_je=True, tax_code_default=None, is_active=True,
-    )
+    d = {
+        "entity_code": "DEMO", "parent_account_id": None, "account_code": "", "account_name": "",
+        "account_type": "", "normal_balance": "", "fs_category": "", "statement_ref": "TB",
+        "cash_flow_activity": "OPERATING_WC", "is_control_account": False,
+        "allow_manual_je": True, "tax_code_default": None, "is_active": True,
+    }
     d.update(kw)
     d.setdefault("account_id", f"{d['entity_code']}:{d['account_code']}")
     return d
@@ -216,11 +215,11 @@ def account_model(seed):
 
 
 def period_seed(**kw):
-    d = dict(
-        entity_code="DEMO", period_code="", fiscal_year=0, period_number=0,
-        start_date="", end_date="", status="OPEN",
-        closed_by_principal_key=None, closed_at=None,
-    )
+    d = {
+        "entity_code": "DEMO", "period_code": "", "fiscal_year": 0, "period_number": 0,
+        "start_date": "", "end_date": "", "status": "OPEN",
+        "closed_by_principal_key": None, "closed_at": None,
+    }
     d.update(kw)
     d.setdefault("period_id", f"{d['entity_code']}:{d['period_code']}")
     return d
@@ -234,15 +233,15 @@ def period_model(seed):
 
 
 def line_seed(**kw):
-    d = dict(
-        journal_id="", entity_code="DEMO", line_number=1, account_code="",
-        account_name="", period_code="", entry_layer="OPERATIONAL",
-        accounting_date="", tx_currency="", exchange_rate="1.00000000",
-        tx_debit="0.0000", tx_credit="0.0000", func_debit="0.0000",
-        func_credit="0.0000", counterparty_id=None, counterparty_name="",
-        tax_code_id=None, func_tax_amount="0.0000", business_use_pct="1.0000",
-        statement_ref="", memo="",
-    )
+    d = {
+        "journal_id": "", "entity_code": "DEMO", "line_number": 1, "account_code": "",
+        "account_name": "", "period_code": "", "entry_layer": "OPERATIONAL",
+        "accounting_date": "", "tx_currency": "", "exchange_rate": "1.00000000",
+        "tx_debit": "0.0000", "tx_credit": "0.0000", "func_debit": "0.0000",
+        "func_credit": "0.0000", "counterparty_id": None, "counterparty_name": "",
+        "tax_code_id": None, "func_tax_amount": "0.0000", "business_use_pct": "1.0000",
+        "statement_ref": "", "memo": "",
+    }
     d.update(kw)
     return d
 
@@ -252,11 +251,11 @@ def line_model(seed):
 
 
 def counterparty_seed(**kw):
-    d = dict(
-        entity_code="DEMO", counterparty_type="VENDOR", legal_name="",
-        country_code="", tax_id_number="", withholding_rule="NONE",
-        is_active=True,
-    )
+    d = {
+        "entity_code": "DEMO", "counterparty_type": "VENDOR", "legal_name": "",
+        "country_code": "", "tax_id_number": "", "withholding_rule": "NONE",
+        "is_active": True,
+    }
     d.update(kw)
     d.setdefault("counterparty_id", f"{d['entity_code']}:{d['legal_name']}")
     return d
@@ -267,8 +266,8 @@ def counterparty_model(seed):
 
 
 def journal_seed(**kw):
-    d = dict(journal_id="", voucher_no="", status="POSTED",
-             accounting_date="", period=None)
+    d = {"journal_id": "", "voucher_no": "", "status": "POSTED",
+             "accounting_date": "", "period": None}
     d.update(kw)
     return d
 
@@ -1016,7 +1015,7 @@ async def run_case(name, op, case_input):
     try:
         out = await OPS[op](case_input)
         write("ledger", name, case_input, output=out, op=op)
-    except Exception as exc:  # noqa: BLE001 - classified below, else re-raised
+    except Exception as exc:
         kind = error_kind(exc)
         if kind is None:
             raise

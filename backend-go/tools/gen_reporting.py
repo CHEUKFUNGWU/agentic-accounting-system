@@ -59,7 +59,6 @@ from app.core.reporting import (
     TrialBalanceAccountRow,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fake session: serves the seeded rows for exactly the queries ledger.py
 # issues (mirrors tools/gen_ledger.py; see that file for the reasoning).
@@ -185,12 +184,12 @@ class _FakeDBManager:
 
 
 def account_seed(**kw):
-    d = dict(
-        entity_code="DEMO", parent_account_id=None, account_code="", account_name="",
-        account_type="", normal_balance="", fs_category="", statement_ref="TB",
-        cash_flow_activity="OPERATING_WC", is_control_account=False,
-        allow_manual_je=True, tax_code_default=None, is_active=True,
-    )
+    d = {
+        "entity_code": "DEMO", "parent_account_id": None, "account_code": "", "account_name": "",
+        "account_type": "", "normal_balance": "", "fs_category": "", "statement_ref": "TB",
+        "cash_flow_activity": "OPERATING_WC", "is_control_account": False,
+        "allow_manual_je": True, "tax_code_default": None, "is_active": True,
+    }
     d.update(kw)
     d.setdefault("account_id", f"{d['entity_code']}:{d['account_code']}")
     return d
@@ -205,15 +204,15 @@ def account_model(seed):
 
 
 def line_seed(**kw):
-    d = dict(
-        line_id="", journal_id="", entity_code="DEMO", line_number=1,
-        account_id=None, account_code="", account_name="", period_code="",
-        entry_layer="OPERATIONAL", accounting_date="", tx_currency="",
-        exchange_rate="1.00000000", tx_debit="0.0000", tx_credit="0.0000",
-        func_debit="0.0000", func_credit="0.0000", counterparty_id=None,
-        counterparty_name="", tax_code_id=None, func_tax_amount="0.0000",
-        business_use_pct="1.0000", statement_ref="", memo="",
-    )
+    d = {
+        "line_id": "", "journal_id": "", "entity_code": "DEMO", "line_number": 1,
+        "account_id": None, "account_code": "", "account_name": "", "period_code": "",
+        "entry_layer": "OPERATIONAL", "accounting_date": "", "tx_currency": "",
+        "exchange_rate": "1.00000000", "tx_debit": "0.0000", "tx_credit": "0.0000",
+        "func_debit": "0.0000", "func_credit": "0.0000", "counterparty_id": None,
+        "counterparty_name": "", "tax_code_id": None, "func_tax_amount": "0.0000",
+        "business_use_pct": "1.0000", "statement_ref": "", "memo": "",
+    }
     d.update(kw)
     d.setdefault("account_id", f"{d['entity_code']}:{d['account_code']}")
     return d

@@ -52,18 +52,17 @@ from __future__ import annotations
 import json
 import sys
 import uuid
+from datetime import UTC
 from datetime import date as _py_date
 from datetime import datetime as _py_datetime
-from datetime import timezone
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 OUT = REPO / "backend-go" / "fixtures" / "workflow"
 sys.path.insert(0, str(REPO / "backend"))
 
-from app.core import monolith as M  # noqa: E402
-from app.core.monolith import WorkspaceError  # noqa: E402
-
+from app.core import monolith as M
+from app.core.monolith import WorkspaceError
 
 # ---------------------------------------------------------------------------
 # Determinism patches: the frozen reference reads the clock and uuid4 inside
@@ -80,7 +79,7 @@ class _FakeDate(_py_date):
 class _FakeDatetime(_py_datetime):
     @classmethod
     def now(cls, tz=None):
-        return cls(2026, 10, 15, 12, 0, 0, tzinfo=timezone.utc)
+        return cls(2026, 10, 15, 12, 0, 0, tzinfo=UTC)
 
 
 class _FakeUUID:

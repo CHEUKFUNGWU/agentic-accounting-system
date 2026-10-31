@@ -67,7 +67,7 @@ Every row is an Observed defect unless its qualification says otherwise. An unch
 
 - [x] **BL-20, high: unsupported filing calculations.** `backend/app/core/reporting.py:368–430`. A 1,000 prepayment with no GST yielded Australian GST credit 600; other regional input credits use similar fixed percentages. Unknown jurisdictions fall back to AU. Required: transaction-derived tax, effective-dated eligibility, and fail-closed unsupported regimes. Existing output is not filing-ready.
 - [x] **BL-21, medium: provision inputs remain editable.** `backend/app/core/monolith.py:235–253`. After provision 210, editing inputs calculated 420 while the journal remained 210 and reposting was blocked. Required: freeze inputs or linked adjustment workflow.
-- [ ] **BL-22, medium, exposure unconfirmed: document length masquerades as tax verification.** `backend/app/core/localization.py:127–128`. Twenty arbitrary characters granted recoverable VAT 130 on a 1,000 purchase. No active evaluator caller was found. Required: verified eligibility, not string-length checks.
+- [x] **BL-22, medium, exposure unconfirmed: document length masquerades as tax verification.** `backend/app/core/localization.py:127–128`. Twenty arbitrary characters granted recoverable VAT 130 on a 1,000 purchase. No active evaluator caller was found. Required: verified eligibility, not string-length checks.
 
 ### Recovery and technical accounting controls
 
@@ -172,11 +172,12 @@ Per [ADR-0002 §3.1](../03-planning/adr-0002-backend-golang-migration.md) and th
 | BL-11 | depreciation requires a POSTED capitalization entry reconciling to cost (workflow) | `TestBL11_depreciation_requires_capitalization` | 778e226 |
 | BL-12 | cash flows classify only actual cash legs (reporting) | `TestBL12_noncash_acquisition_creates_no_cash_flow` | 778e226 |
 | BL-13 | versioned FS-category mapping; unmapped categories block every statement (reporting) | `TestBL13_unmapped_categories_block_reporting` | 778e226 |
-| BL-14 | owner-decided period semantics: financial reports anchored to fiscal_periods (monthly/quarterly/semi-annual/annual, annually = entity fiscal year), management custom periods read-only (ledger, reporting) | `TestBL14_*` (10 tests across ledger + reporting) | 3b6dac1, 778e226 |
+| BL-14 | owner-decided period semantics: financial reports anchored to fiscal_periods (monthly/quarterly/semi-annual/annual, annually = entity fiscal year), management custom periods read-only (ledger, reporting) | `TestBL14_*` (9 tests: 6 ledger + 3 reporting) | 3b6dac1, 778e226 |
 | BL-17 | account-ledger projection preserves original and reversing amounts in their periods (reporting) | `TestBL17_reversal_preserves_both_amounts` | 778e226 |
 | BL-18 | compound entries allocate only actual cash legs (reporting) | `TestBL18_compound_entry_allocates_actual_cash_legs` | 778e226 |
 | BL-20 | fail-closed jurisdictions: no AU fallback, no fabricated credits, output boxes carry the not-filing-ready disclosure (reporting) | `TestBL20_unsupported_jurisdictions_rejected`, `TestBL20_no_fabricated_input_credits` | 778e226, 6aedec8 |
 | BL-21 | provision inputs freeze after posting (workflow) | `TestBL21_provision_inputs_freeze_after_posting` | 778e226 |
+| BL-22 | tax identifiers validated by shape/checksum offline, fail-closed; string-length checks gone; live-registry verification deferred (P1 evidence note 3) | `TestBL22_tax_identifier_fail_closed` | c2b0538 |
 | BL-27 | exact decimal end to end; no float conversion exists (workflow, money) | `TestBL27_exact_decimal_round_trip` | 778e226 |
 
 Scope notes: BL-14 implemented per SRC-0027 (owner, confirmed 2026-10-30); BL-20 is the interim fail-closed rule until REQ-0014. Historical observations above are unchanged.

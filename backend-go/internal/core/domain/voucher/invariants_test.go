@@ -278,8 +278,8 @@ func snap(t *testing.T, s string) Snapshot {
 	return m
 }
 
-// TestBL36_DraftIDVoucherNumberSeparation pins the SRC-0017 owner decision
-// (2026-10-21): drafts use a separate draft ID; the voucher number is
+// TestBL36_DraftIDVoucherNumberSeparation pins the SRC-0027 owner decision
+// (2026-10-24): drafts use a separate draft ID; the voucher number is
 // allocated only at posting under a unique constraint per entity and
 // period, so rejected or voided drafts cannot leave gaps in the posted
 // sequence.
